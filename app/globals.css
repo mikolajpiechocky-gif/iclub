@@ -1,0 +1,83 @@
+/* =====================================================================
+   iClub Management — globalne style i tokeny designu
+   Tailwind CSS v4 (Next.js 16 / React 19).
+   INTEGRACJA: zastąp treść istniejącego app/globals.css tym plikiem
+   LUB wklej blok @theme oraz reguły :root/body do swojego globals.css.
+   ===================================================================== */
+
+/* Fonty wczytywane przez next/font w app/layout.tsx (self-hosted, offline-friendly).
+   Zmienne --font-manrope / --font-space-grotesk są mapowane w bloku @theme niżej. */
+@import "tailwindcss";
+
+@theme {
+  /* --- Powierzchnie / tła (dark mode „Night Event”) --- */
+  --color-app: #08090d;          /* najciemniejsze tło aplikacji */
+  --color-workspace: #0f1016;    /* przestrzeń robocza */
+  --color-panel: #0a0b10;        /* sidebar, paski, dolna nawigacja */
+  --color-surface: #171922;      /* karty */
+  --color-surface-2: #1f212c;    /* karty podniesione / hover / inset */
+  --color-border: #262935;       /* obramowania kart */
+  --color-border-soft: #23252f;  /* delikatne linie / separatory */
+
+  /* --- Tekst --- */
+  --color-ink: #ecedf2;          /* podstawowy */
+  --color-ink-2: #9096a8;        /* drugorzędny */
+  --color-muted: #6b7180;        /* wyciszony */
+
+  /* --- Akcenty marki --- */
+  --color-accent: #e11d74;       /* magenta (główny) */
+  --color-accent-2: #b5179e;     /* fiolet (koniec gradientu) */
+  --color-accent-soft: #f26fa6;  /* link / akcent na ciemnym tle */
+  --color-teal: #14b8c4;         /* drugi akcent (wypożyczalnia) */
+
+  /* --- Kolory statusów (tekst) --- */
+  --color-ok: #5fd68b;
+  --color-warn: #ebb05a;
+  --color-bad: #f58585;
+  --color-info: #7fa8f5;
+  --color-violet: #b98cf5;
+  --color-neutral: #9aa0b2;
+
+  /* --- Promienie --- */
+  --radius-field: 0.75rem;   /* 12px pola/przyciski */
+  --radius-card: 1rem;       /* 16px karty */
+  --radius-card-lg: 1.125rem;/* 18px duże karty */
+
+  /* --- Typografia (zmienne z next/font, patrz app/layout.tsx) --- */
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Gradient marki — używaj klasy .bg-brand lub var(--grad-brand) */
+:root {
+  --grad-brand: linear-gradient(135deg, #e11d74, #b5179e);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 20px 50px -24px rgba(0, 0, 0, 0.85);
+  /* minimalny obszar dotykowy */
+  --tap: 44px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--color-app);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body { margin: 0; }
+
+a { color: var(--color-accent-soft); text-decoration: none; }
+a:hover { color: var(--color-accent); }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: #2a2d3a; border-radius: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Klasa pomocnicza dla przycisków/pasków marki */
+.bg-brand { background: var(--grad-brand); }
+.font-display { font-family: var(--font-display); }
+
+@keyframes ic-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.animate-ic-pulse { animation: ic-pulse 1.6s infinite; }

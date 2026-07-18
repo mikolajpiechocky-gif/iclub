@@ -1,0 +1,7 @@
+// app/(app)/layout.tsx — wspólny shell (sidebar + dolna nawigacja) dla całej aplikacji.
+import type { ReactNode } from "react";
+import { AppShell } from "@/components/layout";
+
+export default function AppGroupLayout({ children }: { children: ReactNode }) {
+  return <AppShell>{children}</AppShell>;
+}
