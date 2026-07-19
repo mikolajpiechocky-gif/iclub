@@ -31,7 +31,6 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
   { group: "Zasoby", tint: "#3b82f6", items: [
     { href: "/customers", label: "Klienci", icon: "users" },
     { href: "/inventory", label: "Magazyn", icon: "box" },
-    { href: "/inventory#gear", label: "Sprzęt", icon: "cube" },
     { href: "/employees", label: "Pracownicy", icon: "users" },
     { href: "/availability", label: "Dostępność", icon: "calendar" },
     { href: "/vehicles", label: "Flota", icon: "truck" },
@@ -44,8 +43,6 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
   { group: "System", tint: "#64748b", items: [
     { href: "/media", label: "Zgłoszenia i szkody", icon: "camera" },
     { href: "/service", label: "Serwis", icon: "refresh" },
-    { href: "/dashboard#dokumenty", label: "Dokumenty", icon: "doc" },
-    { href: "/dashboard#ustawienia", label: "Ustawienia", icon: "gear" },
   ]},
 ];
 

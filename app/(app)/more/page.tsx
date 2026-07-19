@@ -7,16 +7,16 @@ const LINKS: { href: string; label: string; icon: IconName }[] = [
   { href: "/notifications", label: "Powiadomienia", icon: "inbox" },
   { href: "/customers", label: "Klienci", icon: "users" },
   { href: "/inquiries", label: "Zapytania", icon: "inbox" },
-  { href: "/availability", label: "Dostępność", icon: "calendar" },
   { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },
   { href: "/jobs", label: "Zlecenia", icon: "clipboard" },
-  { href: "/costs/new", label: "Dodaj koszt", icon: "coins" },
+  { href: "/availability", label: "Dostępność", icon: "calendar" },
+  { href: "/employees", label: "Pracownicy", icon: "users" },
+  { href: "/vehicles", label: "Flota", icon: "truck" },
+  { href: "/costs", label: "Koszty", icon: "coins" },
   { href: "/payments", label: "Płatności", icon: "card" },
+  { href: "/reports", label: "Raporty", icon: "chart" },
   { href: "/media", label: "Zgłoszenia i szkody", icon: "camera" },
   { href: "/service", label: "Serwis", icon: "refresh" },
-  { href: "/signature", label: "Podpis klienta", icon: "signature" },
-  { href: "/conflicts", label: "Konflikty", icon: "warning" },
-  { href: "/sync", label: "Stany synchronizacji", icon: "refresh" },
 ];
 
 export default function MorePage() {
