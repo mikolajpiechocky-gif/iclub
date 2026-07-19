@@ -1,8 +1,9 @@
 -- =============================================================
--- iClub Management — KOMPLETNY SETUP BAZY (wklej całość i uruchom)
--- Zawiera migracje 0001 + 0002 + 0003 w poprawnej kolejności.
+-- iClub Management — KOMPLETNY SETUP BAZY (migracje 0001–0010)
+-- Wklej calosc i uruchom. Idempotentne (mozna puscic ponownie).
 -- =============================================================
 
+-- ---- migracja 0001_init_profiles_customers_inquiries ----
 -- =====================================================================
 -- iClub Management — migracja MVP 1
 -- Zakres: profiles, customers, inquiries (+ enumy, RLS, triggery).
@@ -206,6 +207,7 @@ create policy inquiries_delete on public.inquiries
   for delete to authenticated using (true);
 
 
+-- ---- migracja 0002_resources ----
 -- =====================================================================
 -- iClub Management — migracja 0002: zasoby konfigurowalne
 -- Namioty, pakiety i dodatki. Ceny i skład są w BAZIE (nie w kodzie) —
@@ -319,6 +321,7 @@ insert into public.addons (code, name, price, sort) values
 on conflict (code) do nothing;
 
 
+-- ---- migracja 0003_reservations_jobs ----
 -- =====================================================================
 -- iClub Management — migracja 0003: rezerwacje, zlecenia, etapy
 -- Rezerwacja iClub → automatyczne zlecenie (job) i podstawowe etapy.
@@ -423,3 +426,336 @@ create policy jobs_all on public.jobs for all to authenticated using (true) with
 
 drop policy if exists job_stages_all on public.job_stages;
 create policy job_stages_all on public.job_stages for all to authenticated using (true) with check (true);
+
+
+-- ---- migracja 0004_equipment ----
+-- =====================================================================
+-- iClub Management — migracja 0004: sprzęt (magazyn, część 1)
+-- Sprzęt liczony ilościowo. Pełny model (numery seryjne, serwis, rentowność,
+-- ruchy magazynowe) dojdzie w kolejnych częściach Fazy 4.
+-- =====================================================================
+
+do $$ begin
+  create type public.equipment_status as enum ('AVAILABLE', 'SERVICE', 'DAMAGED');
+exception when duplicate_object then null; end $$;
+
+create table if not exists public.equipment (
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique,
+  name text not null,
+  category text,
+  quantity integer not null default 0,     -- ilość na stanie
+  tracking text not null default 'QUANTITY', -- QUANTITY | INDIVIDUAL (na razie QUANTITY)
+  unit_cost numeric(10,2),                  -- koszt zakupu (do rentowności)
+  status public.equipment_status not null default 'AVAILABLE',
+  notes text,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_equipment_category on public.equipment (category);
+
+drop trigger if exists trg_equipment_updated_at on public.equipment;
+create trigger trg_equipment_updated_at before update on public.equipment
+  for each row execute function public.set_updated_at();
+
+alter table public.equipment enable row level security;
+
+drop policy if exists equipment_select on public.equipment;
+create policy equipment_select on public.equipment for select to authenticated using (true);
+drop policy if exists equipment_write on public.equipment;
+create policy equipment_write on public.equipment for all to authenticated
+  using (public.is_owner()) with check (public.is_owner());
+
+-- SEED
+insert into public.equipment (code, name, category, quantity, unit_cost) values
+  ('EQ-01', 'Kolumny aktywne',   'Nagłośnienie', 8,   1200),
+  ('EQ-02', 'Głowice LED',       'Oświetlenie',  12,  450),
+  ('EQ-03', 'Wytwornice dymu',   'Efekty',       4,   600),
+  ('EQ-04', 'Stoły koktajlowe',  'Meble',        20,  120),
+  ('EQ-05', 'Krzesła',           'Meble',        120, 35),
+  ('EQ-06', 'Parasole grzewcze', 'Ogrzewanie',   6,   500)
+on conflict (code) do nothing;
+
+
+-- ---- migracja 0005_employee_rates ----
+-- =====================================================================
+-- iClub Management — migracja 0005: stawki i premie pracowników (§10)
+-- Dane poufne — dostęp tylko dla OWNER (RLS). Pracownik nie widzi stawek innych.
+-- Pracownik = profil (profiles). Tu przechowujemy jego model rozliczenia.
+-- =====================================================================
+
+do $$ begin
+  create type public.rate_model as enum ('FLAT', 'HOURLY', 'FLAT_PLUS_BONUS', 'HOURLY_PLUS_BONUS', 'MIXED');
+exception when duplicate_object then null; end $$;
+
+create table if not exists public.employee_rates (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  rate_model public.rate_model not null default 'FLAT',
+  hourly_rate numeric(10,2),          -- stawka godzinowa
+  iclub_flat numeric(10,2),           -- ryczałt za realizację iClub
+  far_bonus numeric(10,2),            -- premia za daleki wyjazd
+  gastro_bonus numeric(10,2),         -- premia za namiot gastronomiczny
+  review_bonus numeric(10,2),         -- premia za opinię
+  reel_bonus numeric(10,2),           -- premia za rolkę
+  upsell_percent numeric(5,2) default 15, -- % premii za dosprzedaż (§18)
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_employee_rates_updated_at on public.employee_rates;
+create trigger trg_employee_rates_updated_at before update on public.employee_rates
+  for each row execute function public.set_updated_at();
+
+alter table public.employee_rates enable row level security;
+
+-- Tylko właściciel widzi i edytuje stawki.
+drop policy if exists employee_rates_owner on public.employee_rates;
+create policy employee_rates_owner on public.employee_rates for all to authenticated
+  using (public.is_owner()) with check (public.is_owner());
+
+
+-- ---- migracja 0006_job_assignments ----
+-- =====================================================================
+-- iClub Management — migracja 0006: przypisania pracowników do zleceń (§9)
+-- + ręczny bonus właściciela do zlecenia (§10).
+-- =====================================================================
+
+alter table public.jobs add column if not exists owner_bonus numeric(10,2) not null default 0;
+
+-- Pracownik może zobaczyć WŁASNE stawki (do wyliczenia własnego zarobku, §6).
+drop policy if exists employee_rates_self_select on public.employee_rates;
+create policy employee_rates_self_select on public.employee_rates for select to authenticated
+  using (profile_id = auth.uid());
+
+create table if not exists public.job_assignments (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  is_lead boolean not null default false,
+  note text,
+  assigned_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (job_id, profile_id)
+);
+
+create index if not exists idx_job_assignments_job on public.job_assignments (job_id);
+create index if not exists idx_job_assignments_profile on public.job_assignments (profile_id);
+
+drop trigger if exists trg_job_assignments_updated_at on public.job_assignments;
+create trigger trg_job_assignments_updated_at before update on public.job_assignments
+  for each row execute function public.set_updated_at();
+
+alter table public.job_assignments enable row level security;
+
+-- Wszyscy zalogowani widzą przypisania (koordynacja, wspólny kalendarz).
+drop policy if exists job_assignments_select on public.job_assignments;
+create policy job_assignments_select on public.job_assignments for select to authenticated using (true);
+
+-- Dodać przypisanie może właściciel (dowolne) lub pracownik samego siebie (§9).
+drop policy if exists job_assignments_insert on public.job_assignments;
+create policy job_assignments_insert on public.job_assignments for insert to authenticated
+  with check (public.is_owner() or profile_id = auth.uid());
+
+-- Zmieniać / usuwać przypisania może tylko właściciel (pracownik nie może się odpiąć).
+drop policy if exists job_assignments_update on public.job_assignments;
+create policy job_assignments_update on public.job_assignments for update to authenticated
+  using (public.is_owner()) with check (public.is_owner());
+
+drop policy if exists job_assignments_delete on public.job_assignments;
+create policy job_assignments_delete on public.job_assignments for delete to authenticated
+  using (public.is_owner());
+
+
+-- ---- migracja 0007_payments_costs ----
+-- =====================================================================
+-- iClub Management — migracja 0007: płatności i koszty (§21, §45)
+-- Płatność: metoda, status (zgłoszenie gotówki → weryfikacja właściciela).
+-- Koszt: kategoria, kwota, przypisany do zlecenia; status weryfikacji.
+-- =====================================================================
+
+do $$ begin
+  create type public.payment_method as enum ('CASH', 'TRANSFER', 'BLIK', 'CARD');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type public.payment_status as enum ('PLANNED', 'REPORTED', 'PAID', 'OVERDUE', 'REFUNDED');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type public.cost_status as enum ('PENDING', 'VERIFIED');
+exception when duplicate_object then null; end $$;
+
+-- --- Płatności ---
+create table if not exists public.payments (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid references public.jobs(id) on delete cascade,
+  title text,
+  method public.payment_method not null default 'TRANSFER',
+  amount numeric(10,2) not null default 0,
+  status public.payment_status not null default 'PLANNED',
+  note text,
+  reported_by uuid references public.profiles(id) on delete set null,
+  verified_by uuid references public.profiles(id) on delete set null,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_payments_job on public.payments (job_id);
+create index if not exists idx_payments_status on public.payments (status);
+
+drop trigger if exists trg_payments_updated_at on public.payments;
+create trigger trg_payments_updated_at before update on public.payments
+  for each row execute function public.set_updated_at();
+
+-- --- Koszty ---
+create table if not exists public.costs (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid references public.jobs(id) on delete set null,
+  category text not null default 'Inne',
+  amount numeric(10,2) not null default 0,
+  spent_on date,
+  note text,
+  status public.cost_status not null default 'PENDING',
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_costs_job on public.costs (job_id);
+create index if not exists idx_costs_status on public.costs (status);
+
+drop trigger if exists trg_costs_updated_at on public.costs;
+create trigger trg_costs_updated_at before update on public.costs
+  for each row execute function public.set_updated_at();
+
+-- --- RLS: CRUD dla zalogowanych (pracownik dodaje koszty i zgłasza gotówkę;
+--     weryfikację wymusza aplikacja po stronie właściciela) ---
+alter table public.payments enable row level security;
+alter table public.costs    enable row level security;
+
+drop policy if exists payments_all on public.payments;
+create policy payments_all on public.payments for all to authenticated using (true) with check (true);
+
+drop policy if exists costs_all on public.costs;
+create policy costs_all on public.costs for all to authenticated using (true) with check (true);
+
+
+-- ---- migracja 0008_checklist_items ----
+-- =====================================================================
+-- iClub Management — migracja 0008: checklisty pakowania (§17)
+-- Pozycje checklisty przypisane do zlecenia; generowane z konfiguracji.
+-- =====================================================================
+
+create table if not exists public.checklist_items (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  category text not null default 'Magazyn',
+  label text not null,
+  qty text,
+  required boolean not null default false,
+  done boolean not null default false,
+  problem boolean not null default false,
+  sort integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_checklist_items_job on public.checklist_items (job_id);
+
+drop trigger if exists trg_checklist_items_updated_at on public.checklist_items;
+create trigger trg_checklist_items_updated_at before update on public.checklist_items
+  for each row execute function public.set_updated_at();
+
+alter table public.checklist_items enable row level security;
+
+drop policy if exists checklist_items_all on public.checklist_items;
+create policy checklist_items_all on public.checklist_items for all to authenticated using (true) with check (true);
+
+
+-- ---- migracja 0009_incidents ----
+-- =====================================================================
+-- iClub Management — migracja 0009: zgłoszenia i szkody / incydenty (§22, §30)
+-- Jeden rejestr zgłoszeń: szkody, awarie, braki, zgłoszenia pracownika.
+-- =====================================================================
+
+do $$ begin
+  create type public.incident_priority as enum ('LOW', 'MEDIUM', 'HIGH');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type public.incident_status as enum ('OPEN', 'IN_PROGRESS', 'RESOLVED');
+exception when duplicate_object then null; end $$;
+
+create table if not exists public.incidents (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid references public.jobs(id) on delete set null,
+  category text not null default 'Inne',
+  description text,
+  equipment text,                       -- czego dotyczy (opis)
+  priority public.incident_priority not null default 'MEDIUM',
+  status public.incident_status not null default 'OPEN',
+  resolution text,
+  reported_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_incidents_job on public.incidents (job_id);
+create index if not exists idx_incidents_status on public.incidents (status);
+create index if not exists idx_incidents_created_at on public.incidents (created_at desc);
+
+drop trigger if exists trg_incidents_updated_at on public.incidents;
+create trigger trg_incidents_updated_at before update on public.incidents
+  for each row execute function public.set_updated_at();
+
+alter table public.incidents enable row level security;
+
+drop policy if exists incidents_all on public.incidents;
+create policy incidents_all on public.incidents for all to authenticated using (true) with check (true);
+
+
+-- ---- migracja 0010_employee_availability ----
+-- =====================================================================
+-- iClub Management — migracja 0010: dostępność pracowników (§11)
+-- Pracownik oznacza niedostępność (zakres dni + opis). Blokuje sugestie
+-- przypisania i generuje ostrzeżenie; właściciel może nadpisać.
+-- =====================================================================
+
+create table if not exists public.employee_availability (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  start_date date not null,
+  end_date date not null,
+  note text,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_emp_avail_profile on public.employee_availability (profile_id);
+create index if not exists idx_emp_avail_dates on public.employee_availability (start_date, end_date);
+
+alter table public.employee_availability enable row level security;
+
+-- Wszyscy zalogowani widzą niedostępności (koordynacja przypisań).
+drop policy if exists emp_avail_select on public.employee_availability;
+create policy emp_avail_select on public.employee_availability for select to authenticated using (true);
+
+-- Dodać/edytować/usunąć może właściciel (dowolne) lub pracownik swoje.
+drop policy if exists emp_avail_insert on public.employee_availability;
+create policy emp_avail_insert on public.employee_availability for insert to authenticated
+  with check (public.is_owner() or profile_id = auth.uid());
+
+drop policy if exists emp_avail_update on public.employee_availability;
+create policy emp_avail_update on public.employee_availability for update to authenticated
+  using (public.is_owner() or profile_id = auth.uid()) with check (public.is_owner() or profile_id = auth.uid());
+
+drop policy if exists emp_avail_delete on public.employee_availability;
+create policy emp_avail_delete on public.employee_availability for delete to authenticated
+  using (public.is_owner() or profile_id = auth.uid());
+
+
