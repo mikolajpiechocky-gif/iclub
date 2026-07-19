@@ -40,7 +40,8 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
     { href: "/reports", label: "Raporty", icon: "chart" },
   ]},
   { group: "System", tint: "#64748b", items: [
-    { href: "/media", label: "Zdjęcia i szkody", icon: "camera" },
+    { href: "/media", label: "Zgłoszenia i szkody", icon: "camera" },
+    { href: "/service", label: "Serwis", icon: "refresh" },
     { href: "/dashboard#dokumenty", label: "Dokumenty", icon: "doc" },
     { href: "/dashboard#ustawienia", label: "Ustawienia", icon: "gear" },
   ]},

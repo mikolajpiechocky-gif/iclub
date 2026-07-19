@@ -249,6 +249,24 @@ export interface EmployeeWithRate extends ProfileRecord {
   rate: EmployeeRate | null;
 }
 
+export type ServiceStatus = "OPEN" | "IN_PROGRESS" | "DONE";
+export const SERVICE_KINDS = ["Sprawdzenie", "Czyszczenie", "Naprawa", "Inne"];
+export const SERVICE_STATUS_META: Record<ServiceStatus, { label: string; fg: string; bg: string }> = {
+  OPEN: { label: "Otwarte", fg: "#f58585", bg: "#341a1d" },
+  IN_PROGRESS: { label: "W toku", fg: "#ebb05a", bg: "#332814" },
+  DONE: { label: "Zrobione", fg: "#5fd68b", bg: "#16301f" },
+};
+
+export interface ServiceTaskRecord {
+  id: string;
+  equipment: string | null;
+  kind: string;
+  description: string | null;
+  status: ServiceStatus;
+  due_date: string | null;
+  created_at: string;
+}
+
 export interface AvailabilityRecord {
   id: string;
   profile_id: string;
