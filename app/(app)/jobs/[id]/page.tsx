@@ -4,7 +4,12 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout";
 import { SectionCard, Pill } from "@/components/ui";
 import { getJob, getJobStages } from "@/lib/data/jobs";
+import { listJobAssignments } from "@/lib/data/assignments";
+import { listEmployees } from "@/lib/data/employees";
+import { getCurrentProfile } from "@/lib/data/profiles";
+import { predictedEarnings } from "@/lib/domain/earnings";
 import { JOB_STATUS_META, STAGE_STATUS_META } from "@/lib/data/types";
+import { JobTeam, type AssignmentView } from "../job-team";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +20,35 @@ const fmtPLN = (v: number | null) =>
 
 export default async function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [job, stages] = await Promise.all([getJob(id), getJobStages(id)]);
+  const [job, stages, assignments, employees, profile] = await Promise.all([
+    getJob(id),
+    getJobStages(id),
+    listJobAssignments(id),
+    listEmployees(),
+    getCurrentProfile(),
+  ]);
   if (!job) notFound();
 
   const r = job.reservation;
   const m = JOB_STATUS_META[job.status];
   const done = stages.filter((s) => s.status === "DONE").length;
+
+  const isOwner = profile?.role === "OWNER";
+  const ownerBonus = job.owner_bonus ?? 0;
+  const assignmentViews: AssignmentView[] = assignments.map((a) => ({
+    id: a.id,
+    profile_id: a.profile_id,
+    full_name: a.employee?.full_name ?? "—",
+    is_lead: a.is_lead,
+    earnings: a.rate ? predictedEarnings(a.rate, job.business_line, ownerBonus) : null,
+  }));
+  const assignedIds = new Set(assignments.map((a) => a.profile_id));
+  const availableEmployees = employees
+    .filter((e) => !assignedIds.has(e.id))
+    .map((e) => ({ id: e.id, full_name: e.full_name || "—" }));
+  const myRate = employees.find((e) => e.id === profile?.id)?.rate ?? null;
+  const myEarnings = myRate ? predictedEarnings(myRate, job.business_line, ownerBonus) : null;
+  const amIAssigned = profile ? assignedIds.has(profile.id) : false;
 
   const cards: { h: string; rows: [string, string][] }[] = [
     { h: "Klient", rows: [["Klient", r?.customer?.name ?? "—"], ["Źródło", r?.source ?? "—"]] },
@@ -73,6 +101,17 @@ export default async function JobDetailsPage({ params }: { params: Promise<{ id:
           )}
         </div>
       </SectionCard>
+
+      <JobTeam
+        jobId={job.id}
+        isOwner={isOwner}
+        currentProfileId={profile?.id ?? null}
+        ownerBonus={ownerBonus}
+        assignments={assignmentViews}
+        availableEmployees={availableEmployees}
+        myEarnings={myEarnings}
+        amIAssigned={amIAssigned}
+      />
     </div>
   );
 }

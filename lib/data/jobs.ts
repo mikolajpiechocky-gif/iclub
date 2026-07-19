@@ -18,6 +18,7 @@ const DEMO_JOBS: JobWithReservation[] = DEMO_RESERVATIONS.map((r, i) => ({
   title: r.event_type ?? "Zlecenie",
   event_date: r.event_date,
   status: (i === 0 ? "IN_PROGRESS" : "PLANNED") as JobStatus,
+  owner_bonus: 0,
   created_at: now,
   updated_at: now,
   reservation: r,

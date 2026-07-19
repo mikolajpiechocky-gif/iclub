@@ -10,7 +10,7 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 | 2 | Klienci i zapytania | ✅ |
 | 3 | Rezerwacja iClub (część 1: zasoby, rezerwacja → auto zlecenie + etapy) | 🟡 |
 | 4 | Magazyn i dostępność (część 1: sprzęt w bazie, magazyn na danych, kontrola konfliktu namiotu) | 🟡 |
-| 5 | Pracownicy, stawki, premie, dostępność, przypisania, przewidywany zarobek (część 1: pracownicy + stawki/premie, tylko OWNER) | 🟡 |
+| 5 | Pracownicy, stawki, premie, dostępność, przypisania, przewidywany zarobek (część 1: stawki/premie; część 2: przypisania do zleceń, samodzielne podjęcie, lider, bonus, przewidywany zarobek) | 🟡 |
 | 6 | Kalendarz wspólny i osobisty, automatyczne zadania, powiadomienia (część 1: kalendarz na prawdziwych rezerwacjach + nawigacja miesięcy) | 🟡 |
 | 7 | Flota, Google Maps, paliwo, plany transportowe, optymalizacja tras | ⬜ |
 | 8 | Pakowanie | ⬜ |

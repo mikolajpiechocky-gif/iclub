@@ -185,6 +185,7 @@ export interface JobRecord {
   title: string | null;
   event_date: string | null;
   status: JobStatus;
+  owner_bonus: number;
   created_at: string;
   updated_at: string;
 }
