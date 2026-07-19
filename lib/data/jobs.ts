@@ -47,6 +47,18 @@ export async function listJobs(): Promise<JobWithReservation[]> {
   return (data ?? []) as unknown as JobWithReservation[];
 }
 
+export async function listAssignedJobs(profileId: string): Promise<JobWithReservation[]> {
+  if (!isSupabaseConfigured()) return DEMO_JOBS;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("job_assignments")
+    .select(`job:jobs(${RESV_SELECT})`)
+    .eq("profile_id", profileId);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as unknown as { job: JobWithReservation | null }[];
+  return rows.map((r) => r.job).filter((j): j is JobWithReservation => Boolean(j));
+}
+
 export async function getJob(id: string): Promise<JobWithReservation | null> {
   if (!isSupabaseConfigured()) return DEMO_JOBS.find((j) => j.id === id) ?? null;
   const supabase = await createClient();
