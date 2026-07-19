@@ -11,31 +11,34 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
 import { StatusBadge } from "./ui";
+import { UserMenu } from "./auth/user-menu";
 import type { StatusKey } from "@/lib/types";
+import type { ProfileRecord } from "@/lib/data/types";
 
 /* Konfiguracja nawigacji — pełna dla sidebar desktop, pogrupowana. */
-const NAV_GROUPS: { group: string; items: { href: string; label: string; icon: IconName; badge?: string }[] }[] = [
-  { group: "Główne", items: [
+const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { href: string; label: string; icon: IconName; badge?: string }[] }[] = [
+  { group: "Główne", tint: "#14b8c4", items: [
     { href: "/dashboard", label: "Pulpit", icon: "home" },
     { href: "/calendar", label: "Kalendarz", icon: "calendar" },
   ]},
-  { group: "Sprzedaż", items: [
-    { href: "/inquiries", label: "Zapytania", icon: "inbox", badge: "5" },
-    { href: "/reservations/new", label: "Rezerwacje", icon: "bookmark" },
+  { group: "Sprzedaż", tint: "#7c3aed", items: [
+    { href: "/inquiries", label: "Zapytania", icon: "inbox" },
+    { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },
     { href: "/jobs/1042", label: "Zlecenia", icon: "clipboard" },
     { href: "/field/1042", label: "Realizacje", icon: "truck" },
   ]},
-  { group: "Zasoby", items: [
+  { group: "Zasoby", tint: "#3b82f6", items: [
+    { href: "/customers", label: "Klienci", icon: "users" },
     { href: "/inventory", label: "Magazyn", icon: "box" },
-    { href: "/conflicts", label: "Konflikty", icon: "warning" },
     { href: "/inventory#gear", label: "Sprzęt", icon: "cube" },
+    { href: "#", label: "Pracownicy", icon: "users" },
   ]},
-  { group: "Finanse", items: [
-    { href: "/costs/new", label: "Koszty", icon: "coins", badge: "3" },
+  { group: "Finanse", tint: "#22c55e", ownerOnly: true, items: [
+    { href: "/costs/new", label: "Koszty", icon: "coins" },
     { href: "/payments", label: "Płatności", icon: "card" },
     { href: "/dashboard#raporty", label: "Raporty", icon: "chart" },
   ]},
-  { group: "System", items: [
+  { group: "System", tint: "#64748b", items: [
     { href: "/media", label: "Zdjęcia i szkody", icon: "camera" },
     { href: "/dashboard#dokumenty", label: "Dokumenty", icon: "doc" },
     { href: "/dashboard#ustawienia", label: "Ustawienia", icon: "gear" },
@@ -52,21 +55,23 @@ const BOTTOM_NAV: { href: string; label: string; icon: IconName }[] = [
 ];
 
 function isActive(pathname: string, href: string) {
-  const base = href.split("#")[0];
-  if (base === "/dashboard") return pathname === "/dashboard" || pathname === "/";
-  return pathname === base || pathname.startsWith(base + "/");
+  if (href.includes("#")) return false; // kotwice (#) nie oznaczają aktywnej strony
+  if (href === "/dashboard") return pathname === "/dashboard" || pathname === "/";
+  return pathname === href || pathname.startsWith(href + "/");
 }
 
 /* ---------------------- AppSidebar (desktop) -------------------------- */
-export function AppSidebar() {
+export function AppSidebar({ profile }: { profile: ProfileRecord | null }) {
   const pathname = usePathname();
+  const isOwner = profile?.role === "OWNER";
+  const groups = NAV_GROUPS.filter((g) => !g.ownerOnly || isOwner);
   return (
     <aside className="hidden w-[230px] flex-none flex-col overflow-y-auto border-r border-[#1b1d27] bg-panel px-3 pb-6 md:flex">
-      <Link href="/dashboard" className="mt-4 mb-2 flex items-center gap-2.5 px-2">
-        <span className="bg-brand flex h-9 w-9 items-center justify-center rounded-[11px] font-display text-lg font-bold text-white shadow-[0_6px_20px_rgba(225,29,116,0.45)]">i</span>
-        <span className="font-display text-[17px] font-bold text-white">iClub</span>
+      <Link href="/dashboard" className="mt-5 mb-3 flex items-center px-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-iclub.png" alt="iClub" className="h-10 w-auto" />
       </Link>
-      {NAV_GROUPS.map((g) => (
+      {groups.map((g) => (
         <div key={g.group}>
           <div className="mt-4 mb-2 px-2.5 text-[10px] font-bold uppercase tracking-[1.2px] text-[#4a4f60]">{g.group}</div>
           {g.items.map((it) => {
@@ -75,9 +80,14 @@ export function AppSidebar() {
               <Link
                 key={it.href}
                 href={it.href}
-                className={`mb-0.5 flex items-center gap-3 rounded-[10px] px-2.5 py-2.5 text-[13.5px] font-semibold transition ${active ? "bg-brand text-white" : "text-ink-2 hover:bg-surface"}`}
+                className={`mb-0.5 flex items-center gap-2.5 rounded-[10px] px-2 py-1.5 text-[13.5px] font-semibold transition ${active ? "bg-brand text-white" : "text-[#d3d7e1] hover:bg-surface"}`}
               >
-                <Icon name={it.icon} className="h-[18px] w-[18px] flex-none" />
+                <span
+                  className="flex h-7 w-7 flex-none items-center justify-center rounded-[9px] text-white"
+                  style={{ background: active ? "rgba(255,255,255,0.22)" : g.tint }}
+                >
+                  <Icon name={it.icon} className="h-[15px] w-[15px]" />
+                </span>
                 <span className="flex-1">{it.label}</span>
                 {it.badge && <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1.5 text-[10.5px] font-bold text-white">{it.badge}</span>}
               </Link>
@@ -85,6 +95,7 @@ export function AppSidebar() {
           })}
         </div>
       ))}
+      <UserMenu profile={profile} />
     </aside>
   );
 }
@@ -110,10 +121,10 @@ export function MobileBottomNavigation() {
 }
 
 /* ---------------------- AppShell -------------------------------------- */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, profile }: { children: ReactNode; profile: ProfileRecord | null }) {
   return (
     <div className="flex min-h-screen bg-workspace">
-      <AppSidebar />
+      <AppSidebar profile={profile} />
       <main className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
       <MobileBottomNavigation />
     </div>

@@ -90,6 +90,78 @@ Powód: Pliki i zaawansowana synchronizacja znacząco zwiększają ryzyko techni
 Konsekwencje: Offline nie blokuje walidacji procesu online w MVP 1.  
 Status: zatwierdzona kierunkowo
 
+### 11. Fonty self-hostowane
+
+Data: 2026-07-18  
+Decyzja: Manrope i Space Grotesk trzymamy jako lokalne pliki `.woff2` w `public/fonts/` (nie przez `next/font`).  
+Powód: `next/font` pobiera fonty w trakcie kompilacji, co blokuje build w środowisku offline; lokalne pliki działają zawsze.  
+Konsekwencje: Font ładuje się także offline; aktualizacja fontu = ponowne pobranie plików.  
+Status: zatwierdzona
+
+### 12. Supabase jako backend MVP 1 i logowanie e-mail/hasło
+
+Data: 2026-07-19  
+Decyzja: Backendem jest Supabase (Auth + Postgres). Logowanie e-mail/hasło; konta zakłada właściciel w panelu Supabase (brak otwartej rejestracji).  
+Powód: Narzędzie wewnętrzne — prostota i kontrola dostępu.  
+Konsekwencje: Nowych pracowników dodaje właściciel; ról nie zmienia się z poziomu aplikacji (na razie).  
+Status: zatwierdzona
+
+### 13. Tryb demo jako fallback
+
+Data: 2026-07-19  
+Decyzja: Przy braku konfiguracji Supabase aplikacja działa w TRYBIE DEMO — logowanie wyłączone, warstwa danych zwraca dane przykładowe.  
+Powód: Możliwość testowania interfejsu bez backendu i bez blokowania użytkownika.  
+Konsekwencje: Zapis danych w trybie demo jest zablokowany z czytelnym komunikatem.  
+Status: zatwierdzona
+
+### 14. Warstwa dostępu do danych
+
+Data: 2026-07-19  
+Decyzja: Dostęp do danych wyłącznie przez `lib/data/*` (profiles, customers, inquiries). Strony i komponenty nie odpytują Supabase bezpośrednio.  
+Powód: Jedno miejsce podmiany źródła danych i logiki fallbacku.  
+Konsekwencje: Każdy nowy moduł dostaje własny plik w `lib/data/`.  
+Status: zatwierdzona
+
+### 15. Minimalny model danych MVP 1
+
+Data: 2026-07-19  
+Decyzja: Fizycznie tworzymy tylko `profiles`, `customers`, `inquiries`. Pozostałe encje opisane jako plan (`docs/DATA_MODEL_MVP1.md`), bez tworzenia na zapas.  
+Powód: Zasada „nie budujemy na zapas”; model rozwijamy modułami.  
+Konsekwencje: Kolejne encje = osobne migracje przy budowie modułów.  
+Status: zatwierdzona
+
+### 16. Next.js 16 — konwencja `proxy.ts`
+
+Data: 2026-07-19  
+Decyzja: Ochrona tras i odświeżanie sesji w `proxy.ts` (nowa konwencja Next 16 zastępująca `middleware.ts`).  
+Powód: `middleware` jest wycofywane; unikamy ostrzeżeń i pracy na przestarzałym API.  
+Konsekwencje: Logika w `proxy.ts` + helper `lib/supabase/proxy.ts`.  
+Status: zatwierdzona
+
+### 17. Zasoby konfigurowalne w bazie
+
+Data: 2026-07-19  
+Decyzja: Namioty, pakiety i dodatki (wraz z cenami) trzymamy w tabelach `tents`/`packages`/`addons`, z seedem; nie zaszywamy ich w komponentach.  
+Powód: Oferta i ceny się zmieniają (§51 instrukcji master).  
+Konsekwencje: Edycja przez OWNER (RLS); docelowo ekran ustawień.  
+Status: zatwierdzona
+
+### 18. Rezerwacja automatycznie tworzy zlecenie i etapy
+
+Data: 2026-07-19  
+Decyzja: Zapis rezerwacji iClub tworzy zlecenie (`jobs`) i etapy (`job_stages`) z szablonu domenowego (`lib/domain/stages.ts`).  
+Powód: Automatyzacja procesu (§28/§50); mniej ręcznej pracy.  
+Konsekwencje: Zmiana szablonu etapów wpływa na nowe zlecenia; edycja rezerwacji nie regeneruje etapów.  
+Status: zatwierdzona
+
+### 19. Rezerwacja tymczasowa 48h
+
+Data: 2026-07-19  
+Decyzja: Nowa rezerwacja o statusie `TEMPORARY` domyślnie wygasa po 48 godzinach (`expires_at`), wartość konfigurowalna w kodzie akcji.  
+Powód: Zgodność z ustaloną regułą blokady zasobu (decyzja 7).  
+Konsekwencje: Automatyczne wygaszanie i przypomnienia — do wdrożenia w kolejnych fazach.  
+Status: zatwierdzona kierunkowo
+
 ## Propozycja wymagająca zatwierdzenia
 
 MVP 1 obejmuje podstawowy proces od klienta do płatności i kosztu. MVP 2 dodaje pierwszy etap offline, rozbudowę magazynu, checklist, czasu pracy, płatności i dokumentów. Szczegóły znajdują się w `CURRENT_SCOPE.md`.

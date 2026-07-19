@@ -22,6 +22,8 @@ export default function EmployeeDashboardPage() {
 
   return (
     <div className="mx-auto max-w-md px-4 py-4">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-iclub.png" alt="iClub" className="mb-4 h-7 w-auto" />
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-[13px] text-[17px] font-bold text-white" style={{ background: "linear-gradient(135deg,#7c3aed,#e11d74)" }}>{CURRENT_EMPLOYEE.initials}</span>

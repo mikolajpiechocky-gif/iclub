@@ -27,6 +27,20 @@ export function StatusBadge({ status, className = "" }: { status: StatusKey; cla
   );
 }
 
+/* ---------------------- Pill (uniwersalny status) ---------------------
+   Etykieta + kropka + tekst z dowolnymi kolorami (np. statusy zapytań). */
+export function Pill({ label, fg, bg, className = "" }: { label: string; fg: string; bg: string; className?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${className}`}
+      style={{ background: bg, color: fg }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: fg }} aria-hidden />
+      {label}
+    </span>
+  );
+}
+
 /* ---------------------- MetricCard ------------------------------------ */
 const TONE_FG: Record<string, string> = { neutral: "var(--color-ink)", warn: "var(--color-warn)", bad: "var(--color-bad)", ok: "var(--color-ok)" };
 export function MetricCard({ label, value, sub, tone = "neutral" }: { label: string; value: string; sub?: string; tone?: "neutral" | "warn" | "bad" | "ok" }) {

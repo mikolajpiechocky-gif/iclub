@@ -1,20 +1,10 @@
 import type { Metadata } from "next";
-import { Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-// Fonty designu „Night Event" — wczytywane przez next/font (self-hosted,
-// działa też offline w przyszłej PWA). Zmienne trafiają do @theme w globals.css.
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope",
-  display: "swap",
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-space-grotesk",
-  display: "swap",
-});
+// Fonty (Manrope + Space Grotesk) są self-hostowane lokalnie: pliki .woff2 w
+// public/fonts/, a @font-face w app/fonts.css (podpięte z globals.css).
+// Świadomie NIE używamy next/font — pobiera on fonty w trakcie kompilacji, co
+// blokuje build w środowisku offline. Lokalne pliki działają zawsze (też offline/PWA).
 
 export const metadata: Metadata = {
   title: "iClub Management",
@@ -30,7 +20,7 @@ export default function RootLayout({
   return (
     <html
       lang="pl"
-      className={`${manrope.variable} ${spaceGrotesk.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

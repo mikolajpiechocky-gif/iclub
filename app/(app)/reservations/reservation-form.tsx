@@ -1,0 +1,184 @@
+"use client";
+// Formularz rezerwacji iClub (dodawanie / edycja). Wybór pakietu, namiotu,
+// dodatków; walidacja; komunikaty. Zapis tworzy też zlecenie i etapy.
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { PageHeader } from "@/components/layout";
+import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
+import type { ReservationRecord, TentRecord, PackageRecord, AddonRecord, ReservationStatus } from "@/lib/data/types";
+import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
+import { createReservationAction, updateReservationAction, type ReservationFormValues } from "./actions";
+
+type CustomerOption = { id: string; name: string };
+
+const fmtPLN = (v: number) =>
+  new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
+
+export function ReservationForm({
+  initial,
+  customers,
+  tents,
+  packages,
+  addons,
+}: {
+  initial?: ReservationRecord;
+  customers: CustomerOption[];
+  tents: TentRecord[];
+  packages: PackageRecord[];
+  addons: AddonRecord[];
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const isEdit = Boolean(initial);
+
+  const [v, setV] = useState<ReservationFormValues>({
+    customer_id: initial?.customer_id ?? "",
+    event_type: initial?.event_type ?? "",
+    event_date: initial?.event_date ?? "",
+    setup_date: initial?.setup_date ?? "",
+    teardown_date: initial?.teardown_date ?? "",
+    location: initial?.location ?? "",
+    guests: initial?.guests != null ? String(initial.guests) : "",
+    tent_id: initial?.tent_id ?? "",
+    package_id: initial?.package_id ?? "",
+    addon_ids: initial?.addon_ids ?? [],
+    price: initial?.price != null ? String(initial.price) : "",
+    discount: initial?.discount != null ? String(initial.discount) : "",
+    deposit: initial?.deposit != null ? String(initial.deposit) : "",
+    is_invoice: initial?.is_invoice ?? false,
+    source: initial?.source ?? "",
+    status: initial?.status ?? "TEMPORARY",
+    notes: initial?.notes ?? "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const set = <K extends keyof ReservationFormValues>(k: K, val: ReservationFormValues[K]) =>
+    setV((s) => ({ ...s, [k]: val }));
+
+  const toggleAddon = (id: string) =>
+    setV((s) => ({
+      ...s,
+      addon_ids: s.addon_ids.includes(id) ? s.addon_ids.filter((a) => a !== id) : [...s.addon_ids, id],
+    }));
+
+  const addonsTotal = addons
+    .filter((a) => v.addon_ids.includes(a.id))
+    .reduce((sum, a) => sum + Number(a.price || 0), 0);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+    setFormError(null);
+    startTransition(async () => {
+      const res = isEdit
+        ? await updateReservationAction(initial!.id, v)
+        : await createReservationAction(v);
+      if (res.ok) {
+        router.push("/reservations");
+        router.refresh();
+        return;
+      }
+      if (res.fieldErrors) setErrors(res.fieldErrors);
+      if (res.error) setFormError(res.error);
+    });
+  };
+
+  return (
+    <div className="mx-auto max-w-[900px] px-5 py-6 md:px-8">
+      <PageHeader
+        title={isEdit ? "Edycja rezerwacji" : "Nowa rezerwacja iClub"}
+        subtitle={isEdit ? "Zaktualizuj dane rezerwacji" : "Zapisanie utworzy też zlecenie i etapy realizacji"}
+        back={{ href: "/reservations", label: "Rezerwacje" }}
+      />
+
+      {formError && (
+        <div className="mb-4"><Alert tone="bad" title="Nie udało się zapisać">{formError}</Alert></div>
+      )}
+
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <SectionCard title="Klient i wydarzenie" className="p-5">
+          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
+            <SelectField label="Klient" value={v.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
+              <option value="">— bez klienta —</option>
+              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </SelectField>
+            <SelectField label="Status" value={v.status} onChange={(e) => set("status", e.target.value as ReservationStatus)}>
+              {RESERVATION_STATUS_ORDER.map((s) => <option key={s} value={s}>{RESERVATION_STATUS_LABELS[s]}</option>)}
+            </SelectField>
+            <TextField label="Rodzaj imprezy" placeholder="Osiemnastka" value={v.event_type} onChange={(e) => set("event_type", e.target.value)} />
+            <TextField label="Liczba osób" inputMode="numeric" placeholder="45" value={v.guests} onChange={(e) => set("guests", e.target.value)} error={errors.guests} />
+            <TextField label="Data imprezy" type="date" value={v.event_date} onChange={(e) => set("event_date", e.target.value)} />
+            <TextField label="Lokalizacja" placeholder="Tarnowo Podgórne" value={v.location} onChange={(e) => set("location", e.target.value)} />
+            <TextField label="Data montażu" type="date" value={v.setup_date} onChange={(e) => set("setup_date", e.target.value)} />
+            <TextField label="Data demontażu" type="date" value={v.teardown_date} onChange={(e) => set("teardown_date", e.target.value)} />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Namiot i pakiet" className="p-5">
+          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
+            <SelectField label="Namiot" value={v.tent_id} onChange={(e) => set("tent_id", e.target.value)}>
+              <option value="">— wybierz namiot —</option>
+              {tents.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}{t.has_back_door ? " (drzwi z tyłu)" : ""}</option>
+              ))}
+            </SelectField>
+            <SelectField label="Pakiet" value={v.package_id} onChange={(e) => set("package_id", e.target.value)}>
+              <option value="">— wybierz pakiet —</option>
+              {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </SelectField>
+          </div>
+          <div className="px-5 pb-5">
+            <div className="mb-2 text-[12.5px] font-semibold text-ink-2">Dodatki {addonsTotal > 0 && <span className="text-ink">· {fmtPLN(addonsTotal)}</span>}</div>
+            <div className="flex flex-wrap gap-2">
+              {addons.map((a) => {
+                const on = v.addon_ids.includes(a.id);
+                return (
+                  <button
+                    type="button"
+                    key={a.id}
+                    onClick={() => toggleAddon(a.id)}
+                    className={`rounded-[10px] border px-3 py-2 text-[12.5px] font-semibold transition ${on ? "border-[#3a2a55] bg-[#271b3f] text-[#e0c8ff]" : "border-border bg-surface text-ink-2"}`}
+                  >
+                    {a.name}{a.price > 0 ? ` · ${fmtPLN(a.price)}` : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Rozliczenie" className="p-5">
+          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-3">
+            <TextField label="Wartość (zł)" inputMode="numeric" placeholder="6800" value={v.price} onChange={(e) => set("price", e.target.value)} error={errors.price} />
+            <TextField label="Rabat (zł)" inputMode="numeric" placeholder="0" value={v.discount} onChange={(e) => set("discount", e.target.value)} error={errors.discount} />
+            <TextField label="Zaliczka (zł)" inputMode="numeric" placeholder="2000" value={v.deposit} onChange={(e) => set("deposit", e.target.value)} error={errors.deposit} />
+            <SelectField label="Źródło" value={v.source} onChange={(e) => set("source", e.target.value)}>
+              <option value="">— nie podano —</option>
+              {(Object.keys(INQUIRY_SOURCE_LABELS) as (keyof typeof INQUIRY_SOURCE_LABELS)[]).map((s) => (
+                <option key={s} value={s}>{INQUIRY_SOURCE_LABELS[s]}</option>
+              ))}
+            </SelectField>
+            <SelectField label="Rozliczenie" value={v.is_invoice ? "FV" : "PRIV"} onChange={(e) => set("is_invoice", e.target.value === "FV")}>
+              <option value="PRIV">Prywatnie</option>
+              <option value="FV">Faktura VAT</option>
+            </SelectField>
+          </div>
+          <div className="px-5 pb-5">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="notes" className="text-[12.5px] font-semibold text-ink-2">Ustalenia / notatki</label>
+              <textarea id="notes" rows={3} value={v.notes} onChange={(e) => set("notes", e.target.value)} className="rounded-field border border-border bg-surface-2 px-3.5 py-3 text-[14px] text-ink outline-none focus:border-accent" placeholder="Np. wjazd od podwórza, prąd z garażu, brak zadatku…" />
+            </div>
+          </div>
+        </SectionCard>
+
+        <div className="flex justify-end gap-2.5">
+          <SecondaryButton type="button" onClick={() => router.push("/reservations")}>Anuluj</SecondaryButton>
+          <PrimaryButton type="submit" icon="check" disabled={pending}>
+            {pending ? "Zapisywanie…" : isEdit ? "Zapisz zmiany" : "Utwórz rezerwację"}
+          </PrimaryButton>
+        </div>
+      </form>
+    </div>
+  );
+}

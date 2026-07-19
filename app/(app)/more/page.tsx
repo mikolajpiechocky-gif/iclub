@@ -4,8 +4,9 @@ import Link from "next/link";
 import { Icon, type IconName } from "@/components/icons";
 
 const LINKS: { href: string; label: string; icon: IconName }[] = [
+  { href: "/customers", label: "Klienci", icon: "users" },
   { href: "/inquiries", label: "Zapytania", icon: "inbox" },
-  { href: "/reservations/new", label: "Nowa rezerwacja", icon: "bookmark" },
+  { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },
   { href: "/jobs/1042", label: "Zlecenia", icon: "clipboard" },
   { href: "/costs/new", label: "Dodaj koszt", icon: "coins" },
   { href: "/payments", label: "Płatności", icon: "card" },

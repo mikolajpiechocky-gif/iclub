@@ -5,8 +5,10 @@
    LUB wklej blok @theme oraz reguły :root/body do swojego globals.css.
    ===================================================================== */
 
-/* Fonty wczytywane przez next/font w app/layout.tsx (self-hosted, offline-friendly).
-   Zmienne --font-manrope / --font-space-grotesk są mapowane w bloku @theme niżej. */
+/* Fonty self-hostowane lokalnie (public/fonts/) — działają też offline.
+   Definicje @font-face: app/fonts.css (regeneracja: node scratchpad/fetch-fonts.js). */
+@import "./fonts.css";
+
 @import "tailwindcss";
 
 @theme {
@@ -43,9 +45,9 @@
   --radius-card: 1rem;       /* 16px karty */
   --radius-card-lg: 1.125rem;/* 18px duże karty */
 
-  /* --- Typografia (zmienne z next/font, patrz app/layout.tsx) --- */
-  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  /* --- Typografia --- */
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Gradient marki — używaj klasy .bg-brand lub var(--grad-brand) */
@@ -68,8 +70,12 @@ html, body {
 
 body { margin: 0; }
 
-a { color: var(--color-accent-soft); text-decoration: none; }
-a:hover { color: var(--color-accent); }
+/* W @layer base, aby klasy Tailwind (text-*) na linkach mogły to nadpisać.
+   Bez warstwy ta reguła przebijała kolory tekstu we wszystkich <Link> (np. menu). */
+@layer base {
+  a { color: var(--color-accent-soft); text-decoration: none; }
+  a:hover { color: var(--color-accent); }
+}
 
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { background: #2a2d3a; border-radius: 9px; }

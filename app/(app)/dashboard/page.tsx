@@ -16,7 +16,7 @@ export default function DashboardPage() {
         actions={
           <>
             <SecondaryButton>Eksport</SecondaryButton>
-            <PrimaryButton icon="plus">Nowe zapytanie</PrimaryButton>
+            <Link href="/inquiries/new"><PrimaryButton icon="plus">Nowe zapytanie</PrimaryButton></Link>
           </>
         }
       />

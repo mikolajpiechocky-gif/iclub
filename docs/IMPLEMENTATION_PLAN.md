@@ -6,7 +6,21 @@ Połączyć etapy produktu z powtarzalnym cyklem dostarczania małych, sprawdzal
 
 ## Stan obecny
 
-Zaproponowano MVP 1 i MVP 2. Przed kodowaniem trzeba zatwierdzić granice MVP 1 i rozstrzygnąć pytania blokujące model danych.
+Rozpoczęto budowę MVP 1. Zrealizowano fundament techniczny i pierwszy pionowy
+moduł.
+
+Zrobione:
+- Supabase, klienci serwer/przeglądarka, ochrona tras (`proxy.ts`), tryb demo jako fallback.
+- Model danych MVP 1: `profiles`, `customers`, `inquiries` (migracja `0001`).
+- Logowanie e-mail/hasło, role `OWNER`/`EMPLOYEE`, wylogowanie.
+- Warstwa danych `lib/data/*`.
+- Moduł **Klienci** (lista, dodawanie, edycja, walidacja).
+- Moduł **Zapytania** (lista, dodawanie, edycja, powiązanie z klientem, statusy).
+- Moduł **Rezerwacje iClub** (część 1): zasoby konfigurowalne, rezerwacja →
+  automatyczne zlecenie i etapy.
+
+Pełny status faz: `docs/IMPLEMENTATION_PHASES.md`. Następny krok to dokończenie
+Fazy 3 / Faza 4: automatyczna lista sprzętu, dostępność, blokady i konflikty.
 
 ## Proponowana kolejność MVP 1
 

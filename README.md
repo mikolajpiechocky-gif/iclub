@@ -6,13 +6,29 @@ Docelowo będzie to responsywna PWA dostępna przez przeglądarkę na komputerac
 
 ## Aktualny status
 
-Fundament projektu jest gotowy. Opisano wizję produktu, proces główny oraz propozycję MVP 1 i MVP 2. Moduły biznesowe, PWA, tryb offline i backend nie zostały jeszcze wdrożone. Supabase zostanie dodany na późniejszym etapie.
+Trwa budowa właściwej aplikacji, moduł po module.
+
+Gotowe:
+- warstwa demonstracyjna UX/UI (design z Claude Design),
+- fundament techniczny Supabase (klienci, ochrona tras, model danych MVP 1),
+- logowanie i role `OWNER` / `EMPLOYEE`,
+- warstwa dostępu do danych (`lib/data/*`),
+- moduł **Klienci i Zapytania** (zapis/odczyt w Supabase),
+- moduł **Rezerwacje iClub** (część 1): konfigurowalne namioty/pakiety/dodatki,
+  rezerwacja → automatyczne zlecenie i etapy.
+
+Aplikacja działa w **TRYBIE DEMO**, dopóki nie skonfigurujesz Supabase
+(logowanie wyłączone, dane przykładowe). Instrukcja: [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md).
+
+Nie wdrożono jeszcze: rezerwacji, zleceń, kalendarza, checklist, płatności,
+kosztów, magazynu, zdjęć, umów, PWA i trybu offline.
 
 ## Stos technologiczny
 
-- Next.js i React
+- Next.js 16 (App Router) i React 19
 - TypeScript
-- Tailwind CSS
+- Tailwind CSS v4
+- Supabase (Auth + Postgres) przez `@supabase/ssr`
 - ESLint
 - npm
 
@@ -45,3 +61,10 @@ npm.cmd run build
 - [Otwarte pytania](docs/OPEN_QUESTIONS.md)
 - [Strategia offline](docs/OFFLINE_STRATEGY.md)
 - [Plan implementacji](docs/IMPLEMENTATION_PLAN.md)
+- [Konfiguracja Supabase](docs/SUPABASE_SETUP.md)
+- [Wdrożenie (Vercel + domena)](docs/DEPLOYMENT.md)
+- [Model danych MVP 1](docs/DATA_MODEL_MVP1.md)
+- [Model danych (stan bieżący)](docs/DATA_MODEL.md)
+- [Pełny zakres produktu](docs/FULL_PRODUCT_SCOPE.md)
+- [Fazy wdrożenia](docs/IMPLEMENTATION_PHASES.md)
+- [Proces iClub](docs/WORKFLOW_ICLUB.md)

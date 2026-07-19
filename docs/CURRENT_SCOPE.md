@@ -6,7 +6,15 @@ Oddzielić wymagania zatwierdzone, propozycję etapów i funkcje świadomie odł
 
 ## Stan obecny
 
-Gotowe są fundament Next.js i dokumentacja. Nie ma jeszcze backendu, logowania ani modułów biznesowych.
+Gotowe: fundament Next.js + dokumentacja, integracja Supabase (klienci, ochrona
+tras `proxy.ts`, model danych MVP 1: `profiles`, `customers`, `inquiries`),
+logowanie e-mail/hasło, role `OWNER`/`EMPLOYEE`, warstwa danych `lib/data/*` oraz
+moduły **Klienci i Zapytania** oraz **Rezerwacje iClub** (część 1: konfigurowalne
+namioty/pakiety/dodatki, rezerwacja → automatyczne zlecenie i etapy).
+
+Do konfiguracji Supabase (patrz `docs/SUPABASE_SETUP.md`) aplikacja pracuje w
+TRYBIE DEMO: logowanie wyłączone, dane przykładowe. Pozostałe ekrany nadal
+korzystają z danych demonstracyjnych i są oznaczone jako niepodłączone.
 
 ## Zatwierdzone wymagania
 

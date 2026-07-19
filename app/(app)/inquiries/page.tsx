@@ -1,24 +1,48 @@
-// app/(app)/inquiries/page.tsx — Lista zapytań (RSC).
-// Desktop: tabela. Mobile: karty (tabela zamieniona na listę kart).
+// app/(app)/inquiries/page.tsx — Lista zapytań (RSC, dane z Supabase lub demo).
 import Link from "next/link";
 import { PageHeader } from "@/components/layout";
-import { StatusBadge, PrimaryButton, EmptyState } from "@/components/ui";
-import { DEMO_INQUIRIES } from "@/lib/demo-data";
+import { PrimaryButton, EmptyState, Pill } from "@/components/ui";
+import { listInquiries } from "@/lib/data/inquiries";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { INQUIRY_STATUS_META, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
 
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" });
+export const dynamic = "force-dynamic";
 
-export default function InquiriesPage() {
-  const rows = DEMO_INQUIRIES;
+const fmtDate = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : "—";
+
+export default async function InquiriesPage() {
+  const inquiries = await listInquiries();
+  const demo = !isSupabaseConfigured();
+
   return (
     <div className="mx-auto max-w-[1280px] px-5 py-6 md:px-8">
       <PageHeader
         title="Zapytania"
-        subtitle={`${rows.length} zapytań · źródła: OLX, telefon, formularz, polecenie, Facebook, Instagram`}
-        actions={<PrimaryButton icon="plus">Nowe zapytanie</PrimaryButton>}
+        subtitle={`${inquiries.length} ${inquiries.length === 1 ? "zapytanie" : "zapytań"}`}
+        actions={
+          <Link href="/inquiries/new">
+            <PrimaryButton icon="plus">Nowe zapytanie</PrimaryButton>
+          </Link>
+        }
       />
 
-      {rows.length === 0 ? (
-        <EmptyState title="Brak zapytań" desc="Nowe zapytania z OLX, Instagrama i formularza pojawią się tutaj." action={<PrimaryButton icon="plus">Dodaj ręcznie</PrimaryButton>} />
+      {demo && (
+        <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
+          Tryb demo — dane przykładowe. Po skonfigurowaniu Supabase lista pokaże prawdziwe zapytania.
+        </div>
+      )}
+
+      {inquiries.length === 0 ? (
+        <EmptyState
+          title="Brak zapytań"
+          desc="Dodaj pierwsze zapytanie, aby zacząć prowadzić sprzedaż."
+          action={
+            <Link href="/inquiries/new">
+              <PrimaryButton icon="plus">Nowe zapytanie</PrimaryButton>
+            </Link>
+          }
+        />
       ) : (
         <>
           {/* DESKTOP: tabela */}
@@ -26,46 +50,51 @@ export default function InquiriesPage() {
             <table className="w-full text-left">
               <thead className="border-b border-border bg-[#12131a] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">
                 <tr>
-                  {["Klient", "Źródło", "Data imprezy", "Miejscowość", "Osoby", "Zainteresowanie", "Status", "Prowadzi", "Ostatni kontakt"].map((h) => (
-                    <th key={h} className="px-4 py-3 font-bold">{h}</th>
+                  {["Klient", "Rodzaj", "Data", "Lokalizacja", "Osoby", "Źródło", "Status", ""].map((h, i) => (
+                    <th key={i} className="px-4 py-3 font-bold">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-border-soft last:border-0 hover:bg-surface-2">
-                    <td className="px-4 py-3"><Link href="/reservations/new" className="text-[13.5px] font-bold text-ink">{r.customer}</Link></td>
-                    <td className="px-4 py-3 text-[13px] text-ink-2">{r.source}</td>
-                    <td className="px-4 py-3 text-[13px] text-ink">{fmtDate(r.eventDate)}</td>
-                    <td className="px-4 py-3 text-[13px] text-ink-2">{r.city}</td>
-                    <td className="px-4 py-3 text-[13px] text-ink">{r.guests}</td>
-                    <td className="px-4 py-3 text-[13px] text-ink-2">{r.interest}</td>
-                    <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
-                    <td className="px-4 py-3 text-[13px] text-ink-2">{r.owner}</td>
-                    <td className="px-4 py-3 text-[13px] text-ink-2">{fmtDate(r.lastContact)}</td>
-                  </tr>
-                ))}
+                {inquiries.map((q) => {
+                  const m = INQUIRY_STATUS_META[q.status];
+                  return (
+                    <tr key={q.id} className="border-b border-border-soft last:border-0 hover:bg-surface-2">
+                      <td className="px-4 py-3"><Link href={`/inquiries/${q.id}/edit`} className="text-[13.5px] font-bold text-ink">{q.customer?.name ?? "— bez klienta —"}</Link></td>
+                      <td className="px-4 py-3 text-[13px] text-ink-2">{q.event_type || "—"}</td>
+                      <td className="px-4 py-3 text-[13px] text-ink">{fmtDate(q.event_date)}</td>
+                      <td className="px-4 py-3 text-[13px] text-ink-2">{q.location || "—"}</td>
+                      <td className="px-4 py-3 text-[13px] text-ink">{q.guests ?? "—"}</td>
+                      <td className="px-4 py-3 text-[13px] text-ink-2">{q.source ? INQUIRY_SOURCE_LABELS[q.source] : "—"}</td>
+                      <td className="px-4 py-3"><Pill label={m.label} fg={m.fg} bg={m.bg} /></td>
+                      <td className="px-4 py-3 text-right"><Link href={`/inquiries/${q.id}/edit`} className="text-[12.5px] font-semibold">Edytuj →</Link></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* MOBILE: karty */}
           <div className="flex flex-col gap-3 md:hidden">
-            {rows.map((r) => (
-              <Link key={r.id} href="/reservations/new" className="rounded-card border border-border bg-surface p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="text-[14.5px] font-bold text-ink">{r.customer}</div>
-                  <StatusBadge status={r.status} />
-                </div>
-                <div className="mt-1 text-[12.5px] font-medium text-ink-2">{r.interest}</div>
-                <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ink-2">
-                  <span>📅 {fmtDate(r.eventDate)}</span>
-                  <span>📍 {r.city}</span>
-                  <span>👥 {r.guests} os.</span>
-                  <span>🔗 {r.source}</span>
-                </div>
-              </Link>
-            ))}
+            {inquiries.map((q) => {
+              const m = INQUIRY_STATUS_META[q.status];
+              return (
+                <Link key={q.id} href={`/inquiries/${q.id}/edit`} className="rounded-card border border-border bg-surface p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-[14.5px] font-bold text-ink">{q.customer?.name ?? "— bez klienta —"}</div>
+                    <Pill label={m.label} fg={m.fg} bg={m.bg} />
+                  </div>
+                  <div className="mt-1 text-[12.5px] font-medium text-ink-2">{[q.event_type, q.tent_interest, q.package_interest].filter(Boolean).join(" · ") || "—"}</div>
+                  <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ink-2">
+                    <span>📅 {fmtDate(q.event_date)}</span>
+                    {q.location && <span>📍 {q.location}</span>}
+                    {q.guests != null && <span>👥 {q.guests} os.</span>}
+                    {q.source && <span>🔗 {INQUIRY_SOURCE_LABELS[q.source]}</span>}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </>
       )}
