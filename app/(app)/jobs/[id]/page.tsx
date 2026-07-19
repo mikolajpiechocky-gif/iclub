@@ -9,8 +9,10 @@ import { listEmployees } from "@/lib/data/employees";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { predictedEarnings } from "@/lib/domain/earnings";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
+import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
 import { JOB_STATUS_META, STAGE_STATUS_META } from "@/lib/data/types";
 import { JobTeam, type AssignmentView } from "../job-team";
+import { JobVehicles, type JobVehicleView } from "../job-vehicles";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +53,13 @@ export default async function JobDetailsPage({ params }: { params: Promise<{ id:
   const myEarnings = myRate ? predictedEarnings(myRate, job.business_line, ownerBonus) : null;
   const amIAssigned = profile ? assignedIds.has(profile.id) : false;
   const unavailableIds = await getUnavailableProfileIds(job.event_date);
+
+  const [vehicles, jobVehicles] = await Promise.all([listVehicles(), listJobVehicles(id)]);
+  const assignedVehicles: JobVehicleView[] = jobVehicles.map((jv) => ({ id: jv.id, vehicle_id: jv.vehicle_id, name: jv.vehicle?.name ?? "—", registration: jv.vehicle?.registration ?? null }));
+  const assignedVehicleIds = new Set(jobVehicles.map((jv) => jv.vehicle_id));
+  const availableVehicles = vehicles.filter((v) => !assignedVehicleIds.has(v.id)).map((v) => ({ id: v.id, name: v.name }));
+  const conflictArrays = await Promise.all(jobVehicles.map((jv) => findVehicleConflicts(jv.vehicle_id, job.event_date, job.id)));
+  const vehicleConflicts = [...new Set(conflictArrays.flat())];
 
   const cards: { h: string; rows: [string, string][] }[] = [
     { h: "Klient", rows: [["Klient", r?.customer?.name ?? "—"], ["Źródło", r?.source ?? "—"]] },
@@ -119,6 +128,14 @@ export default async function JobDetailsPage({ params }: { params: Promise<{ id:
         unavailableIds={unavailableIds}
         myEarnings={myEarnings}
         amIAssigned={amIAssigned}
+      />
+
+      <JobVehicles
+        jobId={job.id}
+        isOwner={isOwner}
+        assigned={assignedVehicles}
+        available={availableVehicles}
+        conflicts={vehicleConflicts}
       />
     </div>
   );

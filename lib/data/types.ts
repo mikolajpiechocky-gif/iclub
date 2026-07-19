@@ -249,6 +249,21 @@ export interface EmployeeWithRate extends ProfileRecord {
   rate: EmployeeRate | null;
 }
 
+export interface VehicleRecord {
+  id: string;
+  name: string;
+  registration: string | null;
+  type: string | null;
+  fuel_type: string | null;
+  consumption: number | null;
+  capacity: string | null;
+  mileage: number | null;
+  insurance_date: string | null;
+  inspection_date: string | null;
+  notes: string | null;
+  active: boolean;
+}
+
 export type ContractStatus = "DRAFT" | "SENT" | "SIGNED";
 export const CONTRACT_STATUS_META: Record<ContractStatus, { label: string; fg: string; bg: string }> = {
   DRAFT: { label: "Szkic", fg: "#9aa0b2", bg: "#22242e" },
