@@ -8,6 +8,7 @@ import { listJobAssignments } from "@/lib/data/assignments";
 import { listEmployees } from "@/lib/data/employees";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { predictedEarnings } from "@/lib/domain/earnings";
+import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { JOB_STATUS_META, STAGE_STATUS_META } from "@/lib/data/types";
 import { JobTeam, type AssignmentView } from "../job-team";
 
@@ -49,6 +50,7 @@ export default async function JobDetailsPage({ params }: { params: Promise<{ id:
   const myRate = employees.find((e) => e.id === profile?.id)?.rate ?? null;
   const myEarnings = myRate ? predictedEarnings(myRate, job.business_line, ownerBonus) : null;
   const amIAssigned = profile ? assignedIds.has(profile.id) : false;
+  const unavailableIds = await getUnavailableProfileIds(job.event_date);
 
   const cards: { h: string; rows: [string, string][] }[] = [
     { h: "Klient", rows: [["Klient", r?.customer?.name ?? "—"], ["Źródło", r?.source ?? "—"]] },
@@ -109,6 +111,7 @@ export default async function JobDetailsPage({ params }: { params: Promise<{ id:
         ownerBonus={ownerBonus}
         assignments={assignmentViews}
         availableEmployees={availableEmployees}
+        unavailableIds={unavailableIds}
         myEarnings={myEarnings}
         amIAssigned={amIAssigned}
       />

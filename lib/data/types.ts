@@ -249,6 +249,19 @@ export interface EmployeeWithRate extends ProfileRecord {
   rate: EmployeeRate | null;
 }
 
+export interface AvailabilityRecord {
+  id: string;
+  profile_id: string;
+  start_date: string;
+  end_date: string;
+  note: string | null;
+  created_at: string;
+}
+
+export interface AvailabilityWithProfile extends AvailabilityRecord {
+  profile: { id: string; full_name: string } | null;
+}
+
 export type IncidentPriority = "LOW" | "MEDIUM" | "HIGH";
 export type IncidentStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED";
 

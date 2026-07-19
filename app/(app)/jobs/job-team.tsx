@@ -21,7 +21,7 @@ export interface AssignmentView {
 }
 
 export function JobTeam({
-  jobId, isOwner, currentProfileId, ownerBonus, assignments, availableEmployees, myEarnings, amIAssigned,
+  jobId, isOwner, currentProfileId, ownerBonus, assignments, availableEmployees, unavailableIds, myEarnings, amIAssigned,
 }: {
   jobId: string;
   isOwner: boolean;
@@ -29,9 +29,11 @@ export function JobTeam({
   ownerBonus: number;
   assignments: AssignmentView[];
   availableEmployees: { id: string; full_name: string }[];
+  unavailableIds: string[];
   myEarnings: EarningsBreakdown | null;
   amIAssigned: boolean;
 }) {
+  const unavailable = new Set(unavailableIds);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -89,10 +91,13 @@ export function JobTeam({
               <label htmlFor="assign" className="text-[12px] font-semibold text-ink-2">Przypisz pracownika</label>
               <select id="assign" value={pick} onChange={(e) => setPick(e.target.value)} className="min-h-[44px] rounded-field border border-border bg-surface-2 px-3 text-[14px] text-ink outline-none focus:border-accent">
                 <option value="">— wybierz —</option>
-                {availableEmployees.map((e) => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                {availableEmployees.map((e) => <option key={e.id} value={e.id}>{e.full_name}{unavailable.has(e.id) ? " (niedostępny w tym terminie)" : ""}</option>)}
               </select>
             </div>
             <PrimaryButton onClick={() => pick && run(() => assignEmployeeAction(jobId, pick))} disabled={pending || !pick}>Przypisz</PrimaryButton>
+            {pick && unavailable.has(pick) && (
+              <div className="w-full"><Alert tone="warn" title="Pracownik oznaczył niedostępność">Możesz przypisać mimo to (decyzja właściciela), ale sprawdź termin.</Alert></div>
+            )}
           </div>
         )}
 
