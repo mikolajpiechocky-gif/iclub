@@ -20,6 +20,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
   { group: "Główne", tint: "#14b8c4", items: [
     { href: "/dashboard", label: "Pulpit", icon: "home" },
     { href: "/calendar", label: "Kalendarz", icon: "calendar" },
+    { href: "/notifications", label: "Powiadomienia", icon: "inbox" },
   ]},
   { group: "Sprzedaż", tint: "#7c3aed", items: [
     { href: "/inquiries", label: "Zapytania", icon: "inbox" },
@@ -64,7 +65,7 @@ function isActive(pathname: string, href: string) {
 }
 
 /* ---------------------- AppSidebar (desktop) -------------------------- */
-export function AppSidebar({ profile }: { profile: ProfileRecord | null }) {
+export function AppSidebar({ profile, unread = 0 }: { profile: ProfileRecord | null; unread?: number }) {
   const pathname = usePathname();
   const isOwner = profile?.role === "OWNER";
   const groups = NAV_GROUPS.filter((g) => !g.ownerOnly || isOwner);
@@ -79,6 +80,7 @@ export function AppSidebar({ profile }: { profile: ProfileRecord | null }) {
           <div className="mt-4 mb-2 px-2.5 text-[10px] font-bold uppercase tracking-[1.2px] text-[#4a4f60]">{g.group}</div>
           {g.items.map((it) => {
             const active = isActive(pathname, it.href);
+            const badge = it.href === "/notifications" ? (unread > 0 ? String(unread) : undefined) : it.badge;
             return (
               <Link
                 key={it.href}
@@ -92,7 +94,7 @@ export function AppSidebar({ profile }: { profile: ProfileRecord | null }) {
                   <Icon name={it.icon} className="h-[15px] w-[15px]" />
                 </span>
                 <span className="flex-1">{it.label}</span>
-                {it.badge && <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1.5 text-[10.5px] font-bold text-white">{it.badge}</span>}
+                {badge && <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1.5 text-[10.5px] font-bold text-white">{badge}</span>}
               </Link>
             );
           })}
@@ -124,10 +126,10 @@ export function MobileBottomNavigation() {
 }
 
 /* ---------------------- AppShell -------------------------------------- */
-export function AppShell({ children, profile }: { children: ReactNode; profile: ProfileRecord | null }) {
+export function AppShell({ children, profile, unread = 0 }: { children: ReactNode; profile: ProfileRecord | null; unread?: number }) {
   return (
     <div className="flex min-h-screen bg-workspace">
-      <AppSidebar profile={profile} />
+      <AppSidebar profile={profile} unread={unread} />
       <main className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
       <MobileBottomNavigation />
     </div>

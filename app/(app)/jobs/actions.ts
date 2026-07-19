@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { assignEmployee, removeAssignment, setAssignmentLead, setJobOwnerBonus } from "@/lib/data/assignments";
+import { getJob } from "@/lib/data/jobs";
+import { createNotification } from "@/lib/data/notifications";
 
 export interface ActionResult {
   ok: boolean;
@@ -24,6 +26,9 @@ export async function assignEmployeeAction(jobId: string, profileId: string): Pr
   if (!profileId) return { ok: false, error: "Wybierz pracownika." };
   try {
     await assignEmployee(jobId, profileId);
+    const job = await getJob(jobId);
+    const label = job?.reservation?.customer?.name ?? job?.title ?? "zlecenie";
+    await createNotification(profileId, "Przypisano Cię do realizacji", `Zlecenie: ${label}${job?.event_date ? " · " + job.event_date : ""}`, "ASSIGNMENT", jobId);
     revalidatePath(`/jobs/${jobId}`);
     return { ok: true };
   } catch (e) {

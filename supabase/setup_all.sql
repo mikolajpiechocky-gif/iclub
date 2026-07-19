@@ -1,7 +1,6 @@
 -- =============================================================
--- iClub Management — KOMPLETNY SETUP BAZY (migracje 0001–0013)
--- Wklej calosc i uruchom. Idempotentne — mozna puscic ponownie,
--- niezaleznie od tego co juz uruchomiles.
+-- iClub Management — KOMPLETNY SETUP BAZY (migracje 0001–0016)
+-- Wklej calosc i uruchom. Idempotentne.
 -- =============================================================
 
 -- ---- 0001_init_profiles_customers_inquiries ----
@@ -207,7 +206,6 @@ drop policy if exists inquiries_delete on public.inquiries;
 create policy inquiries_delete on public.inquiries
   for delete to authenticated using (true);
 
-
 -- ---- 0002_resources ----
 -- =====================================================================
 -- iClub Management — migracja 0002: zasoby konfigurowalne
@@ -321,7 +319,6 @@ insert into public.addons (code, name, price, sort) values
   ('COCKTAIL',     'Stoliki koktajlowe', 0,  6)
 on conflict (code) do nothing;
 
-
 -- ---- 0003_reservations_jobs ----
 -- =====================================================================
 -- iClub Management — migracja 0003: rezerwacje, zlecenia, etapy
@@ -428,7 +425,6 @@ create policy jobs_all on public.jobs for all to authenticated using (true) with
 drop policy if exists job_stages_all on public.job_stages;
 create policy job_stages_all on public.job_stages for all to authenticated using (true) with check (true);
 
-
 -- ---- 0004_equipment ----
 -- =====================================================================
 -- iClub Management — migracja 0004: sprzęt (magazyn, część 1)
@@ -479,7 +475,6 @@ insert into public.equipment (code, name, category, quantity, unit_cost) values
   ('EQ-06', 'Parasole grzewcze', 'Ogrzewanie',   6,   500)
 on conflict (code) do nothing;
 
-
 -- ---- 0005_employee_rates ----
 -- =====================================================================
 -- iClub Management — migracja 0005: stawki i premie pracowników (§10)
@@ -516,7 +511,6 @@ alter table public.employee_rates enable row level security;
 drop policy if exists employee_rates_owner on public.employee_rates;
 create policy employee_rates_owner on public.employee_rates for all to authenticated
   using (public.is_owner()) with check (public.is_owner());
-
 
 -- ---- 0006_job_assignments ----
 -- =====================================================================
@@ -569,7 +563,6 @@ create policy job_assignments_update on public.job_assignments for update to aut
 drop policy if exists job_assignments_delete on public.job_assignments;
 create policy job_assignments_delete on public.job_assignments for delete to authenticated
   using (public.is_owner());
-
 
 -- ---- 0007_payments_costs ----
 -- =====================================================================
@@ -645,7 +638,6 @@ create policy payments_all on public.payments for all to authenticated using (tr
 drop policy if exists costs_all on public.costs;
 create policy costs_all on public.costs for all to authenticated using (true) with check (true);
 
-
 -- ---- 0008_checklist_items ----
 -- =====================================================================
 -- iClub Management — migracja 0008: checklisty pakowania (§17)
@@ -676,7 +668,6 @@ alter table public.checklist_items enable row level security;
 
 drop policy if exists checklist_items_all on public.checklist_items;
 create policy checklist_items_all on public.checklist_items for all to authenticated using (true) with check (true);
-
 
 -- ---- 0009_incidents ----
 -- =====================================================================
@@ -719,7 +710,6 @@ alter table public.incidents enable row level security;
 drop policy if exists incidents_all on public.incidents;
 create policy incidents_all on public.incidents for all to authenticated using (true) with check (true);
 
-
 -- ---- 0010_employee_availability ----
 -- =====================================================================
 -- iClub Management — migracja 0010: dostępność pracowników (§11)
@@ -759,7 +749,6 @@ drop policy if exists emp_avail_delete on public.employee_availability;
 create policy emp_avail_delete on public.employee_availability for delete to authenticated
   using (public.is_owner() or profile_id = auth.uid());
 
-
 -- ---- 0011_signatures ----
 -- =====================================================================
 -- iClub Management — migracja 0011: podpis klienta (§21)
@@ -781,7 +770,6 @@ alter table public.signatures enable row level security;
 
 drop policy if exists signatures_all on public.signatures;
 create policy signatures_all on public.signatures for all to authenticated using (true) with check (true);
-
 
 -- ---- 0012_service_tasks ----
 -- =====================================================================
@@ -819,7 +807,6 @@ alter table public.service_tasks enable row level security;
 drop policy if exists service_tasks_all on public.service_tasks;
 create policy service_tasks_all on public.service_tasks for all to authenticated using (true) with check (true);
 
-
 -- ---- 0013_contracts ----
 -- =====================================================================
 -- iClub Management — migracja 0013: umowy (§44)
@@ -852,4 +839,118 @@ alter table public.contracts enable row level security;
 drop policy if exists contracts_all on public.contracts;
 create policy contracts_all on public.contracts for all to authenticated using (true) with check (true);
 
+-- ---- 0014_vehicles ----
+-- =====================================================================
+-- iClub Management — migracja 0014: flota (§31)
+-- Pojazdy + przypisanie do zleceń (jeden zlecenie może mieć kilka pojazdów).
+-- =====================================================================
+
+create table if not exists public.vehicles (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  registration text,
+  type text,                        -- Bus / Ciężarowy / Osobowy
+  fuel_type text,                   -- Benzyna / Diesel / LPG
+  consumption numeric(6,2),         -- spalanie l/100km
+  capacity text,                    -- ładowność / pojemność
+  mileage integer,                  -- przebieg
+  insurance_date date,
+  inspection_date date,
+  notes text,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_vehicles_updated_at on public.vehicles;
+create trigger trg_vehicles_updated_at before update on public.vehicles
+  for each row execute function public.set_updated_at();
+
+alter table public.vehicles enable row level security;
+drop policy if exists vehicles_select on public.vehicles;
+create policy vehicles_select on public.vehicles for select to authenticated using (true);
+drop policy if exists vehicles_write on public.vehicles;
+create policy vehicles_write on public.vehicles for all to authenticated
+  using (public.is_owner()) with check (public.is_owner());
+
+-- --- Przypisanie pojazdu do zlecenia ---
+create table if not exists public.job_vehicles (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  vehicle_id uuid not null references public.vehicles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (job_id, vehicle_id)
+);
+
+create index if not exists idx_job_vehicles_job on public.job_vehicles (job_id);
+create index if not exists idx_job_vehicles_vehicle on public.job_vehicles (vehicle_id);
+
+alter table public.job_vehicles enable row level security;
+drop policy if exists job_vehicles_all on public.job_vehicles;
+create policy job_vehicles_all on public.job_vehicles for all to authenticated using (true) with check (true);
+
+-- seed: jeden pojazd startowy
+insert into public.vehicles (name, registration, type, fuel_type, consumption, capacity)
+values ('Iveco Daily', 'PO 00000', 'Bus', 'Diesel', 11.5, 'do 3.5 t')
+on conflict do nothing;
+
+-- ---- 0015_transport ----
+-- =====================================================================
+-- iClub Management — migracja 0015: transport i koszt paliwa (§33, §34)
+-- Kalkulacja per zlecenie: dystans (ręczny), spalanie, cena paliwa → koszt.
+-- Optymalizacja tras / geokodowanie (Google Maps) — osobny etap z kluczem API.
+-- =====================================================================
+
+create table if not exists public.transport_calculations (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  vehicle_id uuid references public.vehicles(id) on delete set null,
+  kind text not null default 'PLAN',   -- PLAN / ACTUAL
+  distance_km numeric(10,2),
+  consumption numeric(6,2),            -- l/100km (snapshot)
+  fuel_price numeric(6,2),             -- zł/l
+  fuel_cost numeric(10,2),             -- wyliczony koszt paliwa
+  client_price numeric(10,2),          -- cena transportu dla klienta (opcjonalnie)
+  note text,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_transport_job on public.transport_calculations (job_id);
+
+alter table public.transport_calculations enable row level security;
+
+drop policy if exists transport_all on public.transport_calculations;
+create policy transport_all on public.transport_calculations for all to authenticated using (true) with check (true);
+
+-- ---- 0016_notifications ----
+-- =====================================================================
+-- iClub Management — migracja 0016: powiadomienia in-app (§8)
+-- Kanały push / e-mail / SMS — osobny etap (dostawcy).
+-- =====================================================================
+
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  recipient uuid not null references public.profiles(id) on delete cascade,
+  type text,                         -- ASSIGNMENT / STATUS / ...
+  title text not null,
+  body text,
+  job_id uuid references public.jobs(id) on delete set null,
+  read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_notifications_recipient on public.notifications (recipient, read);
+create index if not exists idx_notifications_created_at on public.notifications (created_at desc);
+
+alter table public.notifications enable row level security;
+
+-- Odbiorca widzi i oznacza swoje; utworzyć powiadomienie może każdy zalogowany
+-- (system tworzy je dla innych, np. przy przypisaniu).
+drop policy if exists notifications_select on public.notifications;
+create policy notifications_select on public.notifications for select to authenticated using (recipient = auth.uid());
+drop policy if exists notifications_insert on public.notifications;
+create policy notifications_insert on public.notifications for insert to authenticated with check (true);
+drop policy if exists notifications_update on public.notifications;
+create policy notifications_update on public.notifications for update to authenticated using (recipient = auth.uid()) with check (recipient = auth.uid());
 

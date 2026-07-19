@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Icon, type IconName } from "@/components/icons";
 
 const LINKS: { href: string; label: string; icon: IconName }[] = [
+  { href: "/notifications", label: "Powiadomienia", icon: "inbox" },
   { href: "/customers", label: "Klienci", icon: "users" },
   { href: "/inquiries", label: "Zapytania", icon: "inbox" },
   { href: "/availability", label: "Dostępność", icon: "calendar" },

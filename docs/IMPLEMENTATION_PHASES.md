@@ -11,7 +11,7 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 | 3 | Rezerwacja iClub (część 1: zasoby, rezerwacja → auto zlecenie + etapy) | 🟡 |
 | 4 | Magazyn i dostępność (część 1: sprzęt w bazie, magazyn na danych, kontrola konfliktu namiotu) | 🟡 |
 | 5 | Pracownicy, stawki, premie, dostępność, przypisania, przewidywany zarobek (część 1: stawki/premie; część 2: przypisania, lider, bonus, zarobek; część 3: dostępność + ostrzeżenie przy przypisaniu) | 🟡 |
-| 6 | Kalendarz wspólny i osobisty, automatyczne zadania, powiadomienia (część 1: kalendarz na prawdziwych rezerwacjach + nawigacja miesięcy) | 🟡 |
+| 6 | Kalendarz wspólny i osobisty, automatyczne zadania, powiadomienia (część 1: kalendarz na prawdziwych rezerwacjach; część 2: powiadomienia in-app + badge, powiadomienie przy przypisaniu; push/e-mail/SMS czekają na dostawców) | 🟡 |
 | 7 | Flota, Google Maps, paliwo, plany transportowe, optymalizacja tras (część 1: flota; część 2: transport + koszt paliwa (ręczny dystans, wzór §34); Maps/geokodowanie/optymalizacja czekają na klucz Google Maps API) | 🟡 |
 | 8 | Pakowanie (część 1: checklista pakowania per zlecenie, generowana z namiotu/pakietu/dodatków, odhaczanie, zakończenie mimo braków z wyjaśnieniem) | 🟡 |
 | 9 | Realizacja iClub (część 1: mobilny ekran terenowy na prawdziwych danych, etapy do odhaczania, Zadzwoń/Nawiguj) | 🟡 |
