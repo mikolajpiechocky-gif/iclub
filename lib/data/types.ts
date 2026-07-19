@@ -217,6 +217,37 @@ export const STAGE_STATUS_META: Record<StageStatus, { label: string; fg: string;
   SKIPPED: { label: "Pominięte", fg: "#6b7180", bg: "#1a1c24" },
 };
 
+export type RateModel = "FLAT" | "HOURLY" | "FLAT_PLUS_BONUS" | "HOURLY_PLUS_BONUS" | "MIXED";
+
+export const RATE_MODEL_LABELS: Record<RateModel, string> = {
+  FLAT: "Ryczałt",
+  HOURLY: "Godzinowo",
+  FLAT_PLUS_BONUS: "Ryczałt + premie",
+  HOURLY_PLUS_BONUS: "Godzinowo + premie",
+  MIXED: "Mieszany",
+};
+
+export const RATE_MODEL_ORDER: RateModel[] = [
+  "FLAT", "HOURLY", "FLAT_PLUS_BONUS", "HOURLY_PLUS_BONUS", "MIXED",
+];
+
+export interface EmployeeRate {
+  profile_id: string;
+  rate_model: RateModel;
+  hourly_rate: number | null;
+  iclub_flat: number | null;
+  far_bonus: number | null;
+  gastro_bonus: number | null;
+  review_bonus: number | null;
+  reel_bonus: number | null;
+  upsell_percent: number | null;
+  notes: string | null;
+}
+
+export interface EmployeeWithRate extends ProfileRecord {
+  rate: EmployeeRate | null;
+}
+
 export type EquipmentStatus = "AVAILABLE" | "SERVICE" | "DAMAGED";
 
 export interface EquipmentRecord {

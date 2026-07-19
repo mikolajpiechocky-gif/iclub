@@ -1,0 +1,92 @@
+"use client";
+// Formularz stawek/premii pracownika (tylko OWNER). §10 instrukcji master.
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { PageHeader } from "@/components/layout";
+import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
+import type { EmployeeWithRate } from "@/lib/data/types";
+import { RATE_MODEL_ORDER, RATE_MODEL_LABELS } from "@/lib/data/types";
+import { saveEmployeeRateAction, type RateFormValues } from "./actions";
+
+const str = (v: number | null | undefined) => (v == null ? "" : String(v));
+
+export function RateForm({ employee }: { employee: EmployeeWithRate }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const r = employee.rate;
+
+  const [v, setV] = useState<RateFormValues>({
+    rate_model: r?.rate_model ?? "FLAT",
+    hourly_rate: str(r?.hourly_rate),
+    iclub_flat: str(r?.iclub_flat),
+    far_bonus: str(r?.far_bonus),
+    gastro_bonus: str(r?.gastro_bonus),
+    review_bonus: str(r?.review_bonus),
+    reel_bonus: str(r?.reel_bonus),
+    upsell_percent: r?.upsell_percent != null ? String(r.upsell_percent) : "15",
+    notes: r?.notes ?? "",
+  });
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const set = <K extends keyof RateFormValues>(k: K, val: RateFormValues[K]) => setV((s) => ({ ...s, [k]: val }));
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setSaved(false);
+    startTransition(async () => {
+      const res = await saveEmployeeRateAction(employee.id, v);
+      if (res.ok) {
+        setSaved(true);
+        router.refresh();
+        return;
+      }
+      if (res.error) setFormError(res.error);
+    });
+  };
+
+  return (
+    <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
+      <PageHeader
+        title={employee.full_name || "Pracownik"}
+        subtitle="Model rozliczenia, stawki i premie"
+        back={{ href: "/employees", label: "Pracownicy" }}
+      />
+
+      {formError && <div className="mb-4"><Alert tone="bad" title="Nie udało się zapisać">{formError}</Alert></div>}
+      {saved && <div className="mb-4"><Alert tone="ok" title="Zapisano">Stawki zostały zapisane.</Alert></div>}
+
+      <form onSubmit={submit}>
+        <SectionCard title="Model rozliczenia i stawki" className="p-5">
+          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
+            <SelectField label="Model rozliczenia" value={v.rate_model} onChange={(e) => set("rate_model", e.target.value as RateFormValues["rate_model"])}>
+              {RATE_MODEL_ORDER.map((m) => <option key={m} value={m}>{RATE_MODEL_LABELS[m]}</option>)}
+            </SelectField>
+            <TextField label="Stawka godzinowa (zł/h)" inputMode="numeric" placeholder="40" value={v.hourly_rate} onChange={(e) => set("hourly_rate", e.target.value)} />
+            <TextField label="Ryczałt za iClub (zł)" inputMode="numeric" placeholder="250" value={v.iclub_flat} onChange={(e) => set("iclub_flat", e.target.value)} hint="1 realizacja iClub = 8 godzin (do statystyk)" />
+            <TextField label="Premia za dosprzedaż (%)" inputMode="numeric" placeholder="15" value={v.upsell_percent} onChange={(e) => set("upsell_percent", e.target.value)} />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Premie" className="mt-4 p-5">
+          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
+            <TextField label="Daleki wyjazd (zł)" inputMode="numeric" placeholder="100" value={v.far_bonus} onChange={(e) => set("far_bonus", e.target.value)} />
+            <TextField label="Namiot gastronomiczny (zł)" inputMode="numeric" placeholder="80" value={v.gastro_bonus} onChange={(e) => set("gastro_bonus", e.target.value)} />
+            <TextField label="Opinia (zł)" inputMode="numeric" placeholder="30" value={v.review_bonus} onChange={(e) => set("review_bonus", e.target.value)} />
+            <TextField label="Rolka (zł)" inputMode="numeric" placeholder="30" value={v.reel_bonus} onChange={(e) => set("reel_bonus", e.target.value)} />
+            <div className="sm:col-span-2 flex flex-col gap-1.5">
+              <label htmlFor="notes" className="text-[12.5px] font-semibold text-ink-2">Notatki</label>
+              <textarea id="notes" rows={2} value={v.notes} onChange={(e) => set("notes", e.target.value)} className="rounded-field border border-border bg-surface-2 px-3.5 py-3 text-[14px] text-ink outline-none focus:border-accent" placeholder="Ustalenia, wyjątki…" />
+            </div>
+          </div>
+        </SectionCard>
+
+        <div className="mt-4 flex justify-end gap-2.5">
+          <SecondaryButton type="button" onClick={() => router.push("/employees")}>Wróć</SecondaryButton>
+          <PrimaryButton type="submit" icon="check" disabled={pending}>{pending ? "Zapisywanie…" : "Zapisz stawki"}</PrimaryButton>
+        </div>
+      </form>
+    </div>
+  );
+}

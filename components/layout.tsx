@@ -31,7 +31,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
     { href: "/customers", label: "Klienci", icon: "users" },
     { href: "/inventory", label: "Magazyn", icon: "box" },
     { href: "/inventory#gear", label: "Sprzęt", icon: "cube" },
-    { href: "#", label: "Pracownicy", icon: "users" },
+    { href: "/employees", label: "Pracownicy", icon: "users" },
   ]},
   { group: "Finanse", tint: "#22c55e", ownerOnly: true, items: [
     { href: "/costs/new", label: "Koszty", icon: "coins" },
