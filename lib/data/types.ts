@@ -249,6 +249,45 @@ export interface EmployeeWithRate extends ProfileRecord {
   rate: EmployeeRate | null;
 }
 
+export type IncidentPriority = "LOW" | "MEDIUM" | "HIGH";
+export type IncidentStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED";
+
+export const INCIDENT_CATEGORIES = [
+  "Uszkodzenie", "Awaria", "Brak sprzętu", "Pogoda", "Klient", "Obiekt",
+  "Zasilanie", "Dmuchawa", "Palenie", "Zapotrzebowanie", "Pojazd", "Inne",
+];
+
+export const INCIDENT_PRIORITY_LABELS: Record<IncidentPriority, string> = {
+  LOW: "Niska", MEDIUM: "Średnia", HIGH: "Wysoka",
+};
+export const INCIDENT_PRIORITY_META: Record<IncidentPriority, { label: string; fg: string; bg: string }> = {
+  LOW: { label: "Niska", fg: "#9aa0b2", bg: "#22242e" },
+  MEDIUM: { label: "Średnia", fg: "#ebb05a", bg: "#332814" },
+  HIGH: { label: "Wysoka", fg: "#f58585", bg: "#341a1d" },
+};
+export const INCIDENT_STATUS_META: Record<IncidentStatus, { label: string; fg: string; bg: string }> = {
+  OPEN: { label: "Otwarte", fg: "#f58585", bg: "#341a1d" },
+  IN_PROGRESS: { label: "W toku", fg: "#ebb05a", bg: "#332814" },
+  RESOLVED: { label: "Rozwiązane", fg: "#5fd68b", bg: "#16301f" },
+};
+
+export interface IncidentRecord {
+  id: string;
+  job_id: string | null;
+  category: string;
+  description: string | null;
+  equipment: string | null;
+  priority: IncidentPriority;
+  status: IncidentStatus;
+  resolution: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IncidentWithJob extends IncidentRecord {
+  job: { id: string; title: string | null } | null;
+}
+
 export interface ChecklistItemRecord {
   id: string;
   job_id: string;

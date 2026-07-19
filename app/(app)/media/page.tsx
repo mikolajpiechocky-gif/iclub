@@ -1,69 +1,60 @@
-"use client";
-// app/(app)/media/page.tsx — Zdjęcia i szkody (MOBILE).
-// Zdjęcia obowiązkowe: po montażu i podczas demontażu.
-// Zgłoszenie szkody: zdjęcie, opis, sprzęt, pilność, zapis offline.
-import Link from "next/link";
-import { useState } from "react";
-import { PrimaryButton, SelectField, Alert } from "@/components/ui";
-import { Icon } from "@/components/icons";
+// app/(app)/media/page.tsx — Zgłoszenia i szkody (RSC + formularz kliencki).
+import { PageHeader } from "@/components/layout";
+import { EmptyState, Pill } from "@/components/ui";
+import { listIncidents } from "@/lib/data/incidents";
+import { listJobs } from "@/lib/data/jobs";
+import { getCurrentProfile } from "@/lib/data/profiles";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { INCIDENT_PRIORITY_META, INCIDENT_STATUS_META } from "@/lib/data/types";
+import { IncidentForm } from "./incident-form";
+import { IncidentStatusButtons } from "./status-buttons";
 
-const PHOTO_SLOTS = [
-  { slot: "PO MONTAŻU", required: true, count: "3 zdjęcia", ok: true },
-  { slot: "PODCZAS DEMONTAŻU", required: true, count: "brak — wymagane", ok: false },
-  { slot: "DODATKOWE", required: false, count: "opcjonalne", ok: true },
-];
-const URGENCY = ["Niska", "Średnia", "Wysoka"] as const;
+export const dynamic = "force-dynamic";
 
-export default function MediaPage() {
-  const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>("Wysoka");
-  const [desc, setDesc] = useState("");
-  const [saved, setSaved] = useState(false);
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" });
+
+export default async function MediaPage() {
+  const [incidents, jobsRaw, profile] = await Promise.all([listIncidents(), listJobs(), getCurrentProfile()]);
+  const demo = !isSupabaseConfigured();
+  const isOwner = profile?.role === "OWNER";
+  const jobs = jobsRaw.map((j) => ({ id: j.id, label: `${j.reservation?.customer?.name ?? j.title ?? "Zlecenie"}${j.event_date ? " · " + j.event_date : ""}` }));
 
   return (
     <div className="mx-auto max-w-md px-4 py-4 pb-8">
-      <div className="mb-3 flex items-center gap-2.5">
-        <Link href="/field" className="text-[13px] font-bold text-ink-2">‹ Realizacja</Link>
-        <span className="ml-auto text-[12px] font-semibold text-ink-2">Zlecenie #1042</span>
-      </div>
-      <h1 className="mb-4 font-display text-[22px] font-bold text-white">Zdjęcia i szkody</h1>
+      <PageHeader title="Zgłoszenia i szkody" subtitle="Zgłoś problem — właściciel go obsłuży" />
 
-      {/* Zdjęcia */}
-      <div className="mb-3 text-[13px] font-bold text-white">Zdjęcia realizacji</div>
-      <div className="mb-5 grid grid-cols-3 gap-2.5">
-        {PHOTO_SLOTS.map((p) => (
-          <button key={p.slot} className="flex h-[104px] flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2a2d3a]" style={{ background: "repeating-linear-gradient(135deg,#1b1d27,#1b1d27 8px,#21232e 8px,#21232e 16px)" }}>
-            <Icon name="camera" className="h-5 w-5 text-[#3a3d4a]" />
-            <span className="px-1 text-center font-mono text-[8.5px] leading-tight text-muted">{p.slot}</span>
-            <span className="text-[10px] font-semibold" style={{ color: p.ok ? "#5fd68b" : "#f58585" }}>{p.count}</span>
-          </button>
-        ))}
-      </div>
+      {demo && (
+        <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12px] text-warn">Tryb demo — dane przykładowe.</div>
+      )}
 
-      {/* Zgłoszenie szkody */}
-      <div className="rounded-card-lg border border-[#3a1c1f] bg-surface p-4">
-        <div className="mb-3 flex items-center gap-2 text-bad"><Icon name="warning" className="h-5 w-5" /><span className="font-display text-[15px] font-bold">Zgłoś szkodę</span></div>
+      <IncidentForm jobs={jobs} />
 
-        {saved ? (
-          <Alert tone="ok" title="Szkoda zapisana na telefonie">Zgłoszenie wyśle się automatycznie, gdy wróci zasięg. Nie musisz nic robić.</Alert>
+      <div className="mt-5">
+        <div className="mb-2 text-[13px] font-bold text-white">Zgłoszenia ({incidents.length})</div>
+        {incidents.length === 0 ? (
+          <EmptyState icon="warning" title="Brak zgłoszeń" desc="Zgłoszone szkody i incydenty pojawią się tutaj." />
         ) : (
-          <div className="flex flex-col gap-3">
-            <button className="flex h-[100px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#3a3d4a]" style={{ background: "repeating-linear-gradient(135deg,#171922,#171922 9px,#1f212c 9px,#1f212c 18px)" }}>
-              <Icon name="camera" className="h-6 w-6 text-ink-2" /><span className="text-[12.5px] font-semibold text-ink-2">Zrób zdjęcie szkody</span>
-            </button>
-            <SelectField label="Sprzęt"><option>Namiot 6×8 Green — poszycie</option><option>Kolumna aktywna</option><option>Głowica LED</option><option>Stół koktajlowy</option></SelectField>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[12.5px] font-semibold text-ink-2">Opis problemu</label>
-              <textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} className="rounded-field border border-border bg-surface-2 px-3.5 py-3 text-[14px] text-ink outline-none focus:border-accent" placeholder="Np. rozdarcie ~15 cm przy wejściu" />
-            </div>
-            <div>
-              <div className="mb-2 text-[12.5px] font-semibold text-ink-2">Pilność</div>
-              <div className="flex gap-2">
-                {URGENCY.map((u) => (
-                  <button key={u} onClick={() => setUrgency(u)} className={`flex-1 rounded-[10px] border py-2.5 text-[12.5px] font-bold transition ${urgency === u ? "border-bad bg-[#341a1d] text-bad" : "border-border bg-surface-2 text-ink-2"}`}>{u}</button>
-                ))}
-              </div>
-            </div>
-            <PrimaryButton block icon="warning" disabled={desc.trim().length < 3} onClick={() => setSaved(true)}>Zapisz zgłoszenie</PrimaryButton>
+          <div className="flex flex-col gap-2.5">
+            {incidents.map((it) => {
+              const pm = INCIDENT_PRIORITY_META[it.priority];
+              const sm = INCIDENT_STATUS_META[it.status];
+              return (
+                <div key={it.id} className="rounded-card border border-border bg-surface p-3.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-[13.5px] font-bold text-ink">{it.category}{it.equipment ? ` · ${it.equipment}` : ""}</div>
+                    <Pill label={pm.label} fg={pm.fg} bg={pm.bg} />
+                  </div>
+                  {it.description && <div className="mt-1 text-[12.5px] text-ink-2">{it.description}</div>}
+                  <div className="mt-2.5 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-[11.5px] text-muted">
+                      <Pill label={sm.label} fg={sm.fg} bg={sm.bg} />
+                      <span>{it.job?.title ?? "—"} · {fmtDate(it.created_at)}</span>
+                    </div>
+                    {isOwner && <IncidentStatusButtons id={it.id} status={it.status} />}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
