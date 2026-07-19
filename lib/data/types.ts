@@ -178,6 +178,45 @@ export const RESERVATION_STATUS_ORDER: ReservationStatus[] = [
   "TEMPORARY", "CONFIRMED", "CANCELLED", "EXPIRED",
 ];
 
+export interface JobRecord {
+  id: string;
+  reservation_id: string | null;
+  business_line: BusinessLine;
+  title: string | null;
+  event_date: string | null;
+  status: JobStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobStageRecord {
+  id: string;
+  job_id: string;
+  stage_key: string;
+  title: string;
+  status: StageStatus;
+  sort: number;
+  planned_at: string | null;
+}
+
+export interface JobWithReservation extends JobRecord {
+  reservation: ReservationWithRefs | null;
+}
+
+export const JOB_STATUS_META: Record<JobStatus, { label: string; fg: string; bg: string }> = {
+  PLANNED: { label: "Zaplanowane", fg: "#7fa8f5", bg: "#182238" },
+  IN_PROGRESS: { label: "W realizacji", fg: "#b98cf5", bg: "#271b3f" },
+  DONE: { label: "Zakończone", fg: "#5fd68b", bg: "#16301f" },
+  CANCELLED: { label: "Anulowane", fg: "#9aa0b2", bg: "#22242e" },
+};
+
+export const STAGE_STATUS_META: Record<StageStatus, { label: string; fg: string; bg: string }> = {
+  TODO: { label: "Do zrobienia", fg: "#9aa0b2", bg: "#22242e" },
+  IN_PROGRESS: { label: "W toku", fg: "#b98cf5", bg: "#271b3f" },
+  DONE: { label: "Gotowe", fg: "#5fd68b", bg: "#16301f" },
+  SKIPPED: { label: "Pominięte", fg: "#6b7180", bg: "#1a1c24" },
+};
+
 export type EquipmentStatus = "AVAILABLE" | "SERVICE" | "DAMAGED";
 
 export interface EquipmentRecord {

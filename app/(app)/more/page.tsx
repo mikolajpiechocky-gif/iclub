@@ -7,7 +7,7 @@ const LINKS: { href: string; label: string; icon: IconName }[] = [
   { href: "/customers", label: "Klienci", icon: "users" },
   { href: "/inquiries", label: "Zapytania", icon: "inbox" },
   { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },
-  { href: "/jobs/1042", label: "Zlecenia", icon: "clipboard" },
+  { href: "/jobs", label: "Zlecenia", icon: "clipboard" },
   { href: "/costs/new", label: "Dodaj koszt", icon: "coins" },
   { href: "/payments", label: "Płatności", icon: "card" },
   { href: "/media", label: "Zdjęcia i szkody", icon: "camera" },

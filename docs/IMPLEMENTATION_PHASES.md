@@ -29,6 +29,8 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 - Tworzenie rezerwacji iClub → automatyczne zlecenie + etapy
   (Przygotowanie → … → Serwis).
 - Lista i formularz rezerwacji, powiązanie z klientem, wybór pakietu/namiotu/dodatków.
+- Lista zleceń i szczegóły zlecenia z etapami (widok na prawdziwych danych).
+- Kalendarz wspólny na prawdziwych rezerwacjach (Faza 6 część 1).
 
 **Część 2 (następne w tej fazie / Faza 4):**
 - Automatyczna lista sprzętu z pakietu i dodatków.

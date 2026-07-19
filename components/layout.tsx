@@ -24,7 +24,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
   { group: "Sprzedaż", tint: "#7c3aed", items: [
     { href: "/inquiries", label: "Zapytania", icon: "inbox" },
     { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },
-    { href: "/jobs/1042", label: "Zlecenia", icon: "clipboard" },
+    { href: "/jobs", label: "Zlecenia", icon: "clipboard" },
     { href: "/field/1042", label: "Realizacje", icon: "truck" },
   ]},
   { group: "Zasoby", tint: "#3b82f6", items: [

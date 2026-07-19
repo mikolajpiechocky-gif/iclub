@@ -37,7 +37,7 @@ export default function DashboardPage() {
             className="p-1.5 pb-2"
           >
             {DEMO_UPCOMING.map((r) => (
-              <JobCard key={r.id} href={`/jobs/${r.id}`} day={r.day} time={r.time} client={r.client} place={r.place} tent={r.tent} team={r.team} status={r.status} />
+              <JobCard key={r.id} href="/jobs" day={r.day} time={r.time} client={r.client} place={r.place} tent={r.tent} team={r.team} status={r.status} />
             ))}
           </SectionCard>
 
