@@ -14,7 +14,7 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 | 6 | Kalendarz wspólny i osobisty, automatyczne zadania, powiadomienia (część 1: kalendarz na prawdziwych rezerwacjach + nawigacja miesięcy) | 🟡 |
 | 7 | Flota, Google Maps, paliwo, plany transportowe, optymalizacja tras | ⬜ |
 | 8 | Pakowanie | ⬜ |
-| 9 | Realizacja iClub | ⬜ |
+| 9 | Realizacja iClub (część 1: mobilny ekran terenowy na prawdziwych danych, etapy do odhaczania, Zadzwoń/Nawiguj) | 🟡 |
 | 10 | Demontaż i rozpakowanie | ⬜ |
 | 11 | Wypożyczalnia (odbiór osobisty i dostawa) | ⬜ |
 | 12 | Finanse i rentowność | ⬜ |

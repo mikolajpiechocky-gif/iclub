@@ -14,7 +14,7 @@ export default function NewCostPage() {
   return (
     <div className="mx-auto max-w-md px-4 py-4 pb-28">
       <div className="mb-3 flex items-center gap-2.5">
-        <Link href="/field/1042" className="text-[13px] font-bold text-ink-2">‹ Realizacja</Link>
+        <Link href="/field" className="text-[13px] font-bold text-ink-2">‹ Realizacja</Link>
         <span className="ml-auto text-[12px] font-semibold text-ink-2">Zlecenie #1042</span>
       </div>
       <h1 className="mb-4 font-display text-[22px] font-bold text-white">Dodaj koszt</h1>

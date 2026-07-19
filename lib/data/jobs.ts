@@ -66,3 +66,9 @@ export async function getJobStages(jobId: string): Promise<JobStageRecord[]> {
   if (error) throw new Error(error.message);
   return (data ?? []) as JobStageRecord[];
 }
+
+export async function setStageStatus(stageId: string, status: StageStatus): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("job_stages").update({ status }).eq("id", stageId);
+  if (error) throw new Error(error.message);
+}

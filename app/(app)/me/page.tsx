@@ -51,7 +51,7 @@ export default function EmployeeDashboardPage() {
             </div>
           ))}
         </div>
-        <Link href="/field/1042" className="bg-brand mt-3 flex min-h-[44px] w-full items-center justify-center rounded-[13px] text-[14px] font-bold text-white">Otwórz realizację</Link>
+        <Link href="/field" className="bg-brand mt-3 flex min-h-[44px] w-full items-center justify-center rounded-[13px] text-[14px] font-bold text-white">Otwórz realizację</Link>
       </div>
 
       {/* Sprzęt do zabrania */}

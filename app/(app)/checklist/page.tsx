@@ -28,7 +28,7 @@ export default function ChecklistPage() {
       {/* Sticky nagłówek z postępem */}
       <div className="sticky top-0 z-10 border-b border-border-soft bg-workspace px-4 py-3.5">
         <div className="mb-3 flex items-center gap-2.5">
-          <Link href="/field/1042" className="text-[13px] font-bold text-ink-2">‹ Realizacja</Link>
+          <Link href="/field" className="text-[13px] font-bold text-ink-2">‹ Realizacja</Link>
           <span className="ml-auto text-[13px] font-bold text-ink">{done} / {items.length}</span>
         </div>
         <div className="font-display text-[17px] font-bold text-white">Checklista pakowania</div>

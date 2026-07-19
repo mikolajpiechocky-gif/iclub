@@ -25,7 +25,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
     { href: "/inquiries", label: "Zapytania", icon: "inbox" },
     { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },
     { href: "/jobs", label: "Zlecenia", icon: "clipboard" },
-    { href: "/field/1042", label: "Realizacje", icon: "truck" },
+    { href: "/field", label: "Realizacje", icon: "truck" },
   ]},
   { group: "Zasoby", tint: "#3b82f6", items: [
     { href: "/customers", label: "Klienci", icon: "users" },
@@ -49,7 +49,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
 const BOTTOM_NAV: { href: string; label: string; icon: IconName }[] = [
   { href: "/me", label: "Start", icon: "home" },
   { href: "/calendar", label: "Kalendarz", icon: "calendar" },
-  { href: "/field/1042", label: "Realizacje", icon: "truck" },
+  { href: "/field", label: "Realizacje", icon: "truck" },
   { href: "/inventory", label: "Magazyn", icon: "box" },
   { href: "/more", label: "Więcej", icon: "more" },
 ];
