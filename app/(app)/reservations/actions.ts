@@ -4,9 +4,10 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createReservation, updateReservation, findTentConflicts, type ReservationInput } from "@/lib/data/reservations";
-import type { ReservationStatus } from "@/lib/data/types";
+import type { ReservationStatus, BusinessLine } from "@/lib/data/types";
 
 export interface ReservationFormValues {
+  business_line: BusinessLine;
   customer_id: string;
   event_type: string;
   event_date: string;
@@ -69,7 +70,7 @@ function toInput(v: ReservationFormValues): ReservationInput {
       ? new Date(Date.now() + DEFAULT_HOLD_HOURS * 3600 * 1000).toISOString()
       : null;
   return {
-    business_line: "ICLUB",
+    business_line: v.business_line === "EQUIPMENT_RENTAL" ? "EQUIPMENT_RENTAL" : "ICLUB",
     customer_id: v.customer_id.trim() ? v.customer_id.trim() : null,
     event_type: clean(v.event_type),
     event_date: clean(v.event_date),

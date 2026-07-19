@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, useEffect } from "react";
 import { PageHeader } from "@/components/layout";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
-import type { ReservationRecord, TentRecord, PackageRecord, AddonRecord, ReservationStatus } from "@/lib/data/types";
+import type { ReservationRecord, TentRecord, PackageRecord, AddonRecord, ReservationStatus, BusinessLine } from "@/lib/data/types";
 import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
 import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, type ReservationFormValues, type TentConflict } from "./actions";
 
@@ -32,6 +32,7 @@ export function ReservationForm({
   const isEdit = Boolean(initial);
 
   const [v, setV] = useState<ReservationFormValues>({
+    business_line: initial?.business_line ?? "ICLUB",
     customer_id: initial?.customer_id ?? "",
     event_type: initial?.event_type ?? "",
     event_date: initial?.event_date ?? "",
@@ -105,7 +106,7 @@ export function ReservationForm({
   return (
     <div className="mx-auto max-w-[900px] px-5 py-6 md:px-8">
       <PageHeader
-        title={isEdit ? "Edycja rezerwacji" : "Nowa rezerwacja iClub"}
+        title={isEdit ? "Edycja rezerwacji" : "Nowa rezerwacja"}
         subtitle={isEdit ? "Zaktualizuj dane rezerwacji" : "Zapisanie utworzy też zlecenie i etapy realizacji"}
         back={{ href: "/reservations", label: "Rezerwacje" }}
       />
@@ -117,6 +118,10 @@ export function ReservationForm({
       <form onSubmit={submit} className="flex flex-col gap-4">
         <SectionCard title="Klient i wydarzenie" className="p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
+            <SelectField label="Linia biznesowa" value={v.business_line} onChange={(e) => set("business_line", e.target.value as BusinessLine)}>
+              <option value="ICLUB">iClub (namioty)</option>
+              <option value="EQUIPMENT_RENTAL">Wypożyczalnia sprzętu</option>
+            </SelectField>
             <SelectField label="Klient" value={v.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
               <option value="">— bez klienta —</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

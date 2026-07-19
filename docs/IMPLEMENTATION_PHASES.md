@@ -16,7 +16,7 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 | 8 | Pakowanie (część 1: checklista pakowania per zlecenie, generowana z namiotu/pakietu/dodatków, odhaczanie, zakończenie mimo braków z wyjaśnieniem) | 🟡 |
 | 9 | Realizacja iClub (część 1: mobilny ekran terenowy na prawdziwych danych, etapy do odhaczania, Zadzwoń/Nawiguj) | 🟡 |
 | 10 | Demontaż i rozpakowanie | ⬜ |
-| 11 | Wypożyczalnia (odbiór osobisty i dostawa) | ⬜ |
+| 11 | Wypożyczalnia (część 1: rezerwacje 2. linii EQUIPMENT_RENTAL → zlecenie z etapami dostawy; wybór linii w formularzu) | 🟡 |
 | 12 | Finanse i rentowność (część 1: płatności i koszty przypisane do zleceń, metody/statusy, weryfikacja właściciela) | 🟡 |
 | 13 | Umowy, faktury, Google Calendar, SMS, e-mail, pogoda | ⬜ |
 | 14 | PWA i offline (wstępnie: ikona aplikacji + manifest do „Dodaj do ekranu głównego") | 🟡 |
