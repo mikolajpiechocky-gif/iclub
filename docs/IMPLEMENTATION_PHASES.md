@@ -12,7 +12,7 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 | 4 | Magazyn i dostępność (część 1: sprzęt w bazie, magazyn na danych, kontrola konfliktu namiotu) | 🟡 |
 | 5 | Pracownicy, stawki, premie, dostępność, przypisania, przewidywany zarobek (część 1: stawki/premie; część 2: przypisania, lider, bonus, zarobek; część 3: dostępność + ostrzeżenie przy przypisaniu) | 🟡 |
 | 6 | Kalendarz wspólny i osobisty, automatyczne zadania, powiadomienia (część 1: kalendarz na prawdziwych rezerwacjach + nawigacja miesięcy) | 🟡 |
-| 7 | Flota, Google Maps, paliwo, plany transportowe, optymalizacja tras (część 1: flota — pojazdy CRUD, przypisanie do zleceń, konflikt pojazdu; Maps/optymalizacja czekają na klucz API) | 🟡 |
+| 7 | Flota, Google Maps, paliwo, plany transportowe, optymalizacja tras (część 1: flota; część 2: transport + koszt paliwa (ręczny dystans, wzór §34); Maps/geokodowanie/optymalizacja czekają na klucz Google Maps API) | 🟡 |
 | 8 | Pakowanie (część 1: checklista pakowania per zlecenie, generowana z namiotu/pakietu/dodatków, odhaczanie, zakończenie mimo braków z wyjaśnieniem) | 🟡 |
 | 9 | Realizacja iClub (część 1: mobilny ekran terenowy na prawdziwych danych, etapy do odhaczania, Zadzwoń/Nawiguj) | 🟡 |
 | 10 | Demontaż i rozpakowanie | ⬜ |

@@ -11,8 +11,11 @@ import { predictedEarnings } from "@/lib/domain/earnings";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
 import { JOB_STATUS_META, STAGE_STATUS_META } from "@/lib/data/types";
+import { listTransportCalcs } from "@/lib/data/transport";
+import { DEFAULT_FUEL_PRICE } from "@/lib/domain/transport";
 import { JobTeam, type AssignmentView } from "../job-team";
 import { JobVehicles, type JobVehicleView } from "../job-vehicles";
+import { JobTransport } from "../job-transport";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +63,9 @@ export default async function JobDetailsPage({ params }: { params: Promise<{ id:
   const availableVehicles = vehicles.filter((v) => !assignedVehicleIds.has(v.id)).map((v) => ({ id: v.id, name: v.name }));
   const conflictArrays = await Promise.all(jobVehicles.map((jv) => findVehicleConflicts(jv.vehicle_id, job.event_date, job.id)));
   const vehicleConflicts = [...new Set(conflictArrays.flat())];
+
+  const transportCalcs = await listTransportCalcs(id);
+  const vehiclesForTransport = vehicles.map((v) => ({ id: v.id, name: v.name, consumption: v.consumption }));
 
   const cards: { h: string; rows: [string, string][] }[] = [
     { h: "Klient", rows: [["Klient", r?.customer?.name ?? "—"], ["Źródło", r?.source ?? "—"]] },
@@ -136,6 +142,14 @@ export default async function JobDetailsPage({ params }: { params: Promise<{ id:
         assigned={assignedVehicles}
         available={availableVehicles}
         conflicts={vehicleConflicts}
+      />
+
+      <JobTransport
+        jobId={job.id}
+        isOwner={isOwner}
+        calcs={transportCalcs}
+        vehicles={vehiclesForTransport}
+        defaultFuelPrice={DEFAULT_FUEL_PRICE}
       />
     </div>
   );
