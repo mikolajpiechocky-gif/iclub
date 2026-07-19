@@ -8,8 +8,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Pomijamy zasoby statyczne i pliki (fonty, obrazy).
+  // Pomijamy zasoby statyczne, pliki (fonty, obrazy) oraz ikony/manifest PWA.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|fonts/|logo-iclub.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|manifest.webmanifest|fonts/|logo-iclub.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2)$).*)",
   ],
 };

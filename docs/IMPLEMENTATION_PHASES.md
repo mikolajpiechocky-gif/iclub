@@ -11,7 +11,7 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 | 3 | Rezerwacja iClub (część 1: zasoby, rezerwacja → auto zlecenie + etapy) | 🟡 |
 | 4 | Magazyn i dostępność (część 1: sprzęt w bazie, magazyn na danych, kontrola konfliktu namiotu) | 🟡 |
 | 5 | Pracownicy, stawki, premie, dostępność, przypisania, przewidywany zarobek | ⬜ |
-| 6 | Kalendarz wspólny i osobisty, automatyczne zadania, powiadomienia | ⬜ |
+| 6 | Kalendarz wspólny i osobisty, automatyczne zadania, powiadomienia (część 1: kalendarz na prawdziwych rezerwacjach + nawigacja miesięcy) | 🟡 |
 | 7 | Flota, Google Maps, paliwo, plany transportowe, optymalizacja tras | ⬜ |
 | 8 | Pakowanie | ⬜ |
 | 9 | Realizacja iClub | ⬜ |
@@ -19,7 +19,7 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 | 11 | Wypożyczalnia (odbiór osobisty i dostawa) | ⬜ |
 | 12 | Finanse i rentowność | ⬜ |
 | 13 | Umowy, faktury, Google Calendar, SMS, e-mail, pogoda | ⬜ |
-| 14 | PWA i offline | ⬜ |
+| 14 | PWA i offline (wstępnie: ikona aplikacji + manifest do „Dodaj do ekranu głównego") | 🟡 |
 
 ## Faza 3 — zakres szczegółowy
 

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 // Fonty (Manrope + Space Grotesk) są self-hostowane lokalnie: pliki .woff2 w
@@ -10,6 +10,16 @@ export const metadata: Metadata = {
   title: "iClub Management",
   description:
     "Wewnętrzny system operacyjny firmy wynajmującej dmuchane namioty imprezowe i sprzęt eventowy.",
+  applicationName: "iClub",
+  appleWebApp: {
+    capable: true,
+    title: "iClub",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#08090d",
 };
 
 export default function RootLayout({
