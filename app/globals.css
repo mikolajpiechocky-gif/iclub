@@ -87,3 +87,11 @@ body { margin: 0; }
 
 @keyframes ic-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 .animate-ic-pulse { animation: ic-pulse 1.6s infinite; }
+
+/* Wydruk / PDF — ukryj nawigację i pokaż dokument na biało (np. umowa) */
+@media print {
+  aside, nav, .no-print { display: none !important; }
+  html, body { background: #fff !important; }
+  .contract-doc { background: #fff !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
+  .contract-doc, .contract-doc * { color: #111 !important; }
+}

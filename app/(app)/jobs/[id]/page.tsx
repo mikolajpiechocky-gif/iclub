@@ -66,7 +66,12 @@ export default async function JobDetailsPage({ params }: { params: Promise<{ id:
         title={job.title || "Zlecenie"}
         subtitle={`Zlecenie · ${job.reservation?.event_type ?? ""}`}
         back={{ href: "/jobs", label: "Zlecenia" }}
-        actions={r ? <Link href={`/reservations/${r.id}/edit`} className="rounded-field border border-border bg-surface-2 px-4 py-2.5 text-[13px] font-semibold text-ink">Edytuj rezerwację</Link> : undefined}
+        actions={
+          <>
+            {job.business_line === "ICLUB" && <Link href={`/jobs/${job.id}/contract`} className="rounded-field border border-border bg-surface-2 px-4 py-2.5 text-[13px] font-semibold text-ink">Umowa</Link>}
+            {r && <Link href={`/reservations/${r.id}/edit`} className="rounded-field border border-border bg-surface-2 px-4 py-2.5 text-[13px] font-semibold text-ink">Edytuj rezerwację</Link>}
+          </>
+        }
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-card-lg border border-border bg-surface p-5">

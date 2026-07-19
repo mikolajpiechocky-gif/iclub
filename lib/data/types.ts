@@ -249,6 +249,13 @@ export interface EmployeeWithRate extends ProfileRecord {
   rate: EmployeeRate | null;
 }
 
+export type ContractStatus = "DRAFT" | "SENT" | "SIGNED";
+export const CONTRACT_STATUS_META: Record<ContractStatus, { label: string; fg: string; bg: string }> = {
+  DRAFT: { label: "Szkic", fg: "#9aa0b2", bg: "#22242e" },
+  SENT: { label: "Wysłana", fg: "#7fa8f5", bg: "#182238" },
+  SIGNED: { label: "Podpisana", fg: "#5fd68b", bg: "#16301f" },
+};
+
 export type ServiceStatus = "OPEN" | "IN_PROGRESS" | "DONE";
 export const SERVICE_KINDS = ["Sprawdzenie", "Czyszczenie", "Naprawa", "Inne"];
 export const SERVICE_STATUS_META: Record<ServiceStatus, { label: string; fg: string; bg: string }> = {
