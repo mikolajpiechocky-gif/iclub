@@ -3,7 +3,7 @@
 // rezerwacji automatycznie generuje zlecenie i etapy (warstwa danych).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createReservation, updateReservation, type ReservationInput } from "@/lib/data/reservations";
+import { createReservation, updateReservation, findTentConflicts, type ReservationInput } from "@/lib/data/reservations";
 import type { ReservationStatus } from "@/lib/data/types";
 
 export interface ReservationFormValues {
@@ -89,6 +89,35 @@ function toInput(v: ReservationFormValues): ReservationInput {
     expires_at,
     notes: clean(v.notes),
   };
+}
+
+export interface TentConflict {
+  id: string;
+  label: string;
+}
+
+// Sprawdza dostępność namiotu w oknie montaż→demontaż (§8). Ostrzeżenie,
+// nie blokada — właściciel może świadomie zapisać mimo konfliktu.
+export async function checkTentAvailabilityAction(
+  tentId: string,
+  startDate: string,
+  endDate: string,
+  excludeId?: string
+): Promise<TentConflict[]> {
+  if (!tentId || !startDate) return [];
+  try {
+    const conflicts = await findTentConflicts(tentId, startDate, endDate || startDate, excludeId);
+    return conflicts.map((c) => {
+      const from = c.setup_date ?? c.event_date ?? "?";
+      const to = c.teardown_date && c.teardown_date !== from ? `–${c.teardown_date}` : "";
+      return {
+        id: c.id,
+        label: `${c.customer?.name ?? "bez klienta"} — ${c.event_type ?? "impreza"} (${from}${to})`,
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 export async function createReservationAction(values: ReservationFormValues): Promise<ActionResult> {

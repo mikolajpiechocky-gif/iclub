@@ -9,7 +9,7 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 | 1 | Fundament: Supabase, Auth, profile, role, ochrona tras, warstwa danych, tryb demo | ✅ |
 | 2 | Klienci i zapytania | ✅ |
 | 3 | Rezerwacja iClub (część 1: zasoby, rezerwacja → auto zlecenie + etapy) | 🟡 |
-| 4 | Magazyn i dostępność (lista sprzętu z pakietu, blokady, konflikty) | ⬜ |
+| 4 | Magazyn i dostępność (część 1: sprzęt w bazie, magazyn na danych, kontrola konfliktu namiotu) | 🟡 |
 | 5 | Pracownicy, stawki, premie, dostępność, przypisania, przewidywany zarobek | ⬜ |
 | 6 | Kalendarz wspólny i osobisty, automatyczne zadania, powiadomienia | ⬜ |
 | 7 | Flota, Google Maps, paliwo, plany transportowe, optymalizacja tras | ⬜ |

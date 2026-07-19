@@ -177,3 +177,18 @@ export const RESERVATION_STATUS_META: Record<ReservationStatus, { label: string;
 export const RESERVATION_STATUS_ORDER: ReservationStatus[] = [
   "TEMPORARY", "CONFIRMED", "CANCELLED", "EXPIRED",
 ];
+
+export type EquipmentStatus = "AVAILABLE" | "SERVICE" | "DAMAGED";
+
+export interface EquipmentRecord {
+  id: string;
+  code: string;
+  name: string;
+  category: string | null;
+  quantity: number;
+  tracking: string;
+  unit_cost: number | null;
+  status: EquipmentStatus;
+  notes: string | null;
+  active: boolean;
+}

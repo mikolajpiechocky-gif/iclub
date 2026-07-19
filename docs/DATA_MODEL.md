@@ -17,6 +17,7 @@ Pełna lista docelowych encji: §47 instrukcji master. Tabele powstają etapami
 | 0003 | `reservations` | rezerwacje (iClub), status, wygaśnięcie, zaliczka, FV |
 | 0003 | `jobs` | zlecenie tworzone automatycznie z rezerwacji |
 | 0003 | `job_stages` | etapy zlecenia (z szablonu domenowego) |
+| 0004 | `equipment` | sprzęt liczony ilościowo (magazyn) |
 
 ## Typy wyliczeniowe
 

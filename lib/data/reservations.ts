@@ -92,3 +92,49 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
   const { error } = await supabase.from("reservations").update(input).eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+// --- Dostępność / konflikty namiotu (§8, §15) ---
+// Zakres okna rezerwacji: od montażu (lub daty imprezy) do demontażu.
+function reservationRange(r: { setup_date: string | null; teardown_date: string | null; event_date: string | null }) {
+  const start = r.setup_date ?? r.event_date;
+  const end = r.teardown_date ?? r.event_date ?? start;
+  return { start, end };
+}
+
+// Porównanie dat ISO (YYYY-MM-DD) działa leksykograficznie.
+function rangesOverlap(aStart: string, aEnd: string, bStart: string | null, bEnd: string | null): boolean {
+  if (!bStart) return false;
+  return aStart <= (bEnd ?? bStart) && aEnd >= bStart;
+}
+
+// Zwraca aktywne rezerwacje tego samego namiotu nakładające się terminem.
+export async function findTentConflicts(
+  tentId: string | null,
+  startDate: string | null,
+  endDate: string | null,
+  excludeId?: string
+): Promise<ReservationWithRefs[]> {
+  if (!tentId || !startDate) return [];
+  const end = endDate ?? startDate;
+
+  let rows: ReservationWithRefs[];
+  if (!isSupabaseConfigured()) {
+    rows = DEMO_RESERVATIONS.filter((r) => r.tent_id === tentId);
+  } else {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("reservations")
+      .select("*, customer:customers(id,name), tent:tents(id,name), package:packages(id,name)")
+      .eq("tent_id", tentId)
+      .in("status", ["TEMPORARY", "CONFIRMED"]);
+    if (error) throw new Error(error.message);
+    rows = (data ?? []) as ReservationWithRefs[];
+  }
+
+  return rows.filter((r) => {
+    if (r.id === excludeId) return false;
+    if (r.status !== "TEMPORARY" && r.status !== "CONFIRMED") return false;
+    const rg = reservationRange(r);
+    return rangesOverlap(startDate, end, rg.start, rg.end);
+  });
+}

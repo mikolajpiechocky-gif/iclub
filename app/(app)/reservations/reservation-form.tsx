@@ -2,12 +2,12 @@
 // Formularz rezerwacji iClub (dodawanie / edycja). Wybór pakietu, namiotu,
 // dodatków; walidacja; komunikaty. Zapis tworzy też zlecenie i etapy.
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { PageHeader } from "@/components/layout";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
 import type { ReservationRecord, TentRecord, PackageRecord, AddonRecord, ReservationStatus } from "@/lib/data/types";
 import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
-import { createReservationAction, updateReservationAction, type ReservationFormValues } from "./actions";
+import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, type ReservationFormValues, type TentConflict } from "./actions";
 
 type CustomerOption = { id: string; name: string };
 
@@ -52,6 +52,24 @@ export function ReservationForm({
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<TentConflict[]>([]);
+
+  // Kontrola dostępności namiotu (ostrzeżenie, nie blokada).
+  useEffect(() => {
+    let active = true;
+    const run = async (): Promise<TentConflict[]> => {
+      const start = v.setup_date || v.event_date;
+      if (!v.tent_id || !start) return [];
+      const end = v.teardown_date || v.event_date || start;
+      return checkTentAvailabilityAction(v.tent_id, start, end, initial?.id);
+    };
+    run().then((res) => {
+      if (active) setConflicts(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, [v.tent_id, v.setup_date, v.teardown_date, v.event_date, initial?.id]);
 
   const set = <K extends keyof ReservationFormValues>(k: K, val: ReservationFormValues[K]) =>
     setV((s) => ({ ...s, [k]: val }));
@@ -128,6 +146,17 @@ export function ReservationForm({
               {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </SelectField>
           </div>
+          {conflicts.length > 0 && (
+            <div className="px-5 pb-4">
+              <Alert tone="warn" title={`Możliwy konflikt namiotu (${conflicts.length})`}>
+                Ten namiot ma nakładające się rezerwacje w podanym terminie:
+                <ul className="mt-1.5 list-disc pl-4">
+                  {conflicts.map((c) => <li key={c.id}>{c.label}</li>)}
+                </ul>
+                <span className="mt-1.5 block">Możesz zapisać mimo to — ostateczna decyzja należy do właściciela.</span>
+              </Alert>
+            </div>
+          )}
           <div className="px-5 pb-5">
             <div className="mb-2 text-[12.5px] font-semibold text-ink-2">Dodatki {addonsTotal > 0 && <span className="text-ink">· {fmtPLN(addonsTotal)}</span>}</div>
             <div className="flex flex-wrap gap-2">
