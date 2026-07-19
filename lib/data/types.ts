@@ -249,6 +249,18 @@ export interface EmployeeWithRate extends ProfileRecord {
   rate: EmployeeRate | null;
 }
 
+export interface ChecklistItemRecord {
+  id: string;
+  job_id: string;
+  category: string;
+  label: string;
+  qty: string | null;
+  required: boolean;
+  done: boolean;
+  problem: boolean;
+  sort: number;
+}
+
 export type PaymentMethod = "CASH" | "TRANSFER" | "BLIK" | "CARD";
 export type PaymentStatus = "PLANNED" | "REPORTED" | "PAID" | "OVERDUE" | "REFUNDED";
 export type CostStatus = "PENDING" | "VERIFIED";

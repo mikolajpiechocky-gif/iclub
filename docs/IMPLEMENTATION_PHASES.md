@@ -13,7 +13,7 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 | 5 | Pracownicy, stawki, premie, dostępność, przypisania, przewidywany zarobek (część 1: stawki/premie; część 2: przypisania do zleceń, samodzielne podjęcie, lider, bonus, przewidywany zarobek) | 🟡 |
 | 6 | Kalendarz wspólny i osobisty, automatyczne zadania, powiadomienia (część 1: kalendarz na prawdziwych rezerwacjach + nawigacja miesięcy) | 🟡 |
 | 7 | Flota, Google Maps, paliwo, plany transportowe, optymalizacja tras | ⬜ |
-| 8 | Pakowanie | ⬜ |
+| 8 | Pakowanie (część 1: checklista pakowania per zlecenie, generowana z namiotu/pakietu/dodatków, odhaczanie, zakończenie mimo braków z wyjaśnieniem) | 🟡 |
 | 9 | Realizacja iClub (część 1: mobilny ekran terenowy na prawdziwych danych, etapy do odhaczania, Zadzwoń/Nawiguj) | 🟡 |
 | 10 | Demontaż i rozpakowanie | ⬜ |
 | 11 | Wypożyczalnia (odbiór osobisty i dostawa) | ⬜ |

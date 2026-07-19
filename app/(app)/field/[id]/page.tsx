@@ -1,6 +1,7 @@
 // app/(app)/field/[id]/page.tsx — Realizacja terenowa (mobile, dane + etapy).
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Icon } from "@/components/icons";
 import { Pill } from "@/components/ui";
 import { getJob, getJobStages } from "@/lib/data/jobs";
 import { getCustomer } from "@/lib/data/customers";
@@ -56,6 +57,13 @@ export default async function FieldRealizationPage({ params }: { params: Promise
             <span key={c as string} className="rounded-[10px] border border-border bg-surface px-2.5 py-2 text-[12px] font-semibold text-ink">{c}</span>
           ))}
         </div>
+
+        {/* Checklista pakowania */}
+        <Link href={`/field/${job.id}/checklist`} className="mb-3.5 flex items-center gap-3 rounded-[14px] border border-border bg-surface px-3.5 py-3">
+          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-[#271b3f] text-[#b98cf5]"><Icon name="clipboard" className="h-4 w-4" /></span>
+          <div className="flex-1"><div className="text-[13.5px] font-bold text-ink">Checklista pakowania</div><div className="text-[11px] text-ink-2">Sprzęt do zabrania — odhacz przed wyjazdem</div></div>
+          <Icon name="chevron-right" className="h-4 w-4 text-ink-2" />
+        </Link>
 
         {/* Etapy */}
         <FieldStages jobId={job.id} stages={stages} />
