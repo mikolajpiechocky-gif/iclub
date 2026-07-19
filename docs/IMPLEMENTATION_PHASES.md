@@ -17,7 +17,7 @@ fragmentem, testami, lintem, buildem i raportem. Legenda: ✅ gotowe ·
 | 9 | Realizacja iClub (część 1: mobilny ekran terenowy na prawdziwych danych, etapy do odhaczania, Zadzwoń/Nawiguj) | 🟡 |
 | 10 | Demontaż i rozpakowanie | ⬜ |
 | 11 | Wypożyczalnia (odbiór osobisty i dostawa) | ⬜ |
-| 12 | Finanse i rentowność | ⬜ |
+| 12 | Finanse i rentowność (część 1: płatności i koszty przypisane do zleceń, metody/statusy, weryfikacja właściciela) | 🟡 |
 | 13 | Umowy, faktury, Google Calendar, SMS, e-mail, pogoda | ⬜ |
 | 14 | PWA i offline (wstępnie: ikona aplikacji + manifest do „Dodaj do ekranu głównego") | 🟡 |
 

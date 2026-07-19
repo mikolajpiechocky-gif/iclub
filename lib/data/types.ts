@@ -249,6 +249,65 @@ export interface EmployeeWithRate extends ProfileRecord {
   rate: EmployeeRate | null;
 }
 
+export type PaymentMethod = "CASH" | "TRANSFER" | "BLIK" | "CARD";
+export type PaymentStatus = "PLANNED" | "REPORTED" | "PAID" | "OVERDUE" | "REFUNDED";
+export type CostStatus = "PENDING" | "VERIFIED";
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  CASH: "Gotówka", TRANSFER: "Przelew", BLIK: "BLIK", CARD: "Karta",
+};
+
+export const PAYMENT_STATUS_META: Record<PaymentStatus, { label: string; fg: string; bg: string }> = {
+  PLANNED: { label: "Zaplanowana", fg: "#7fa8f5", bg: "#182238" },
+  REPORTED: { label: "Zgłoszono odbiór", fg: "#ebb05a", bg: "#332814" },
+  PAID: { label: "Zapłacone", fg: "#5fd68b", bg: "#16301f" },
+  OVERDUE: { label: "Zaległa", fg: "#f58585", bg: "#341a1d" },
+  REFUNDED: { label: "Zwrot", fg: "#9aa0b2", bg: "#22242e" },
+};
+export const PAYMENT_STATUS_ORDER: PaymentStatus[] = ["PLANNED", "REPORTED", "PAID", "OVERDUE", "REFUNDED"];
+
+export const COST_STATUS_META: Record<CostStatus, { label: string; fg: string; bg: string }> = {
+  PENDING: { label: "Do weryfikacji", fg: "#ebb05a", bg: "#332814" },
+  VERIFIED: { label: "Zweryfikowany", fg: "#5fd68b", bg: "#16301f" },
+};
+
+export const COST_CATEGORIES = [
+  "Paliwo", "Autostrada", "Parking", "Hotel", "Dieta", "Wynagrodzenie",
+  "Premia", "Serwis", "Czyszczenie", "Zakup", "Materiały", "Inne",
+];
+
+export interface PaymentRecord {
+  id: string;
+  job_id: string | null;
+  title: string | null;
+  method: PaymentMethod;
+  amount: number;
+  status: PaymentStatus;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaymentWithJob extends PaymentRecord {
+  job: { id: string; title: string | null } | null;
+}
+
+export interface CostRecord {
+  id: string;
+  job_id: string | null;
+  category: string;
+  amount: number;
+  spent_on: string | null;
+  note: string | null;
+  status: CostStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CostWithJob extends CostRecord {
+  job: { id: string; title: string | null } | null;
+}
+
 export type EquipmentStatus = "AVAILABLE" | "SERVICE" | "DAMAGED";
 
 export interface EquipmentRecord {

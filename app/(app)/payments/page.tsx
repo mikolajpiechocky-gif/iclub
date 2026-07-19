@@ -1,49 +1,62 @@
-// app/(app)/payments/page.tsx — Płatności (RSC).
-// Pokazuje różnicę: zgłoszono odbiór / zweryfikowano / oczekuje / zaległa.
+// app/(app)/payments/page.tsx — Płatności (RSC, Supabase lub demo).
+import Link from "next/link";
 import { PageHeader } from "@/components/layout";
-import { SectionCard, StatusBadge, PrimaryButton, SecondaryButton } from "@/components/ui";
-import { DEMO_PAYMENTS, formatPLN } from "@/lib/demo-data";
+import { PrimaryButton, EmptyState, Pill } from "@/components/ui";
 import { Icon } from "@/components/icons";
+import { listPayments } from "@/lib/data/payments";
+import { getCurrentProfile } from "@/lib/data/profiles";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { PAYMENT_STATUS_META, PAYMENT_METHOD_LABELS } from "@/lib/data/types";
+import { VerifyPaymentButton } from "./verify-button";
 
-const LEGEND = [
-  { status: "reported" as const, hint: "pracownik zgłosił odbiór gotówki" },
-  { status: "paid" as const, hint: "właściciel zweryfikował" },
-  { status: "pending" as const, hint: "czeka na płatność" },
-  { status: "conflict" as const, hint: "po terminie (zaległa)" },
-];
+export const dynamic = "force-dynamic";
 
-export default function PaymentsPage() {
+const fmtPLN = (v: number) =>
+  new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
+
+export default async function PaymentsPage() {
+  const [payments, profile] = await Promise.all([listPayments(), getCurrentProfile()]);
+  const demo = !isSupabaseConfigured();
+  const isOwner = profile?.role === "OWNER";
+
   return (
-    <div className="mx-auto max-w-[900px] px-5 py-6 md:px-8">
-      <PageHeader title="Płatności" subtitle="Metody: gotówka, przelew, BLIK, karta" />
+    <div className="mx-auto max-w-[980px] px-5 py-6 md:px-8">
+      <PageHeader
+        title="Płatności"
+        subtitle="Metody: gotówka, przelew, BLIK, karta"
+        actions={<Link href="/payments/new"><PrimaryButton icon="plus">Dodaj płatność</PrimaryButton></Link>}
+      />
 
-      <div className="mb-4 flex flex-wrap gap-x-4 gap-y-2 rounded-card border border-border bg-surface px-4 py-3">
-        {LEGEND.map((l) => (
-          <span key={l.status} className="inline-flex items-center gap-2 text-[12px] text-ink-2"><StatusBadge status={l.status} /> {l.hint}</span>
-        ))}
-      </div>
-
-      <SectionCard title="Zlecenie #1042 — Osiemnastka Julia N." className="p-4">
-        <div className="px-4 pb-4">
-          {DEMO_PAYMENTS.map((p) => (
-            <div key={p.id} className="flex flex-wrap items-center gap-3 border-t border-border-soft py-3 first:border-t-0">
-              <div className="min-w-0 flex-1">
-                <div className="text-[13.5px] font-bold text-ink">{p.title}</div>
-                <div className="mt-0.5 text-[12px] text-ink-2">{p.meta}</div>
-              </div>
-              <div className="font-display text-[15px] font-bold text-white">{formatPLN(p.amount)}</div>
-              <StatusBadge status={p.status} />
-              {/* Akcja weryfikacji widoczna tylko dla właściciela — TODO(backend): kontrola roli */}
-              {p.status === "reported" && <PrimaryButton className="!min-h-[38px] !px-3 !text-[12px]">Zweryfikuj</PrimaryButton>}
-              {p.status === "conflict" && <SecondaryButton className="!min-h-[38px] !px-3 !text-[12px]">Ponaglij</SecondaryButton>}
-            </div>
-          ))}
+      {demo && (
+        <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
+          Tryb demo — dane przykładowe.
         </div>
-      </SectionCard>
+      )}
+
+      {payments.length === 0 ? (
+        <EmptyState icon="card" title="Brak płatności" desc="Dodaj pierwszą płatność do zlecenia." action={<Link href="/payments/new"><PrimaryButton icon="plus">Dodaj płatność</PrimaryButton></Link>} />
+      ) : (
+        <div className="overflow-hidden rounded-card border border-border bg-surface">
+          {payments.map((p) => {
+            const m = PAYMENT_STATUS_META[p.status];
+            return (
+              <div key={p.id} className="flex flex-wrap items-center gap-3 border-b border-border-soft px-4 py-3.5 last:border-0">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13.5px] font-bold text-ink">{p.title || "Płatność"} {p.job?.title && <span className="text-ink-2">· {p.job.title}</span>}</div>
+                  <div className="mt-0.5 text-[12px] text-ink-2">{PAYMENT_METHOD_LABELS[p.method]}{p.note ? ` · ${p.note}` : ""}</div>
+                </div>
+                <div className="font-display text-[15px] font-bold text-white">{fmtPLN(p.amount)}</div>
+                <Pill label={m.label} fg={m.fg} bg={m.bg} />
+                {isOwner && p.status === "REPORTED" && <VerifyPaymentButton id={p.id} />}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mt-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
         <Icon name="warning" className="h-4 w-4 flex-none" />
-        Gotówka „zgłoszona przez pracownika” nie jest jeszcze potwierdzona — wymaga weryfikacji właściciela.
+        Gotówka „zgłoszona przez pracownika” wymaga weryfikacji właściciela, zanim zostanie uznana za zapłaconą.
       </div>
     </div>
   );
