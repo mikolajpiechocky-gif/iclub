@@ -1,9 +1,10 @@
 -- =============================================================
--- iClub Management — KOMPLETNY SETUP BAZY (migracje 0001–0010)
--- Wklej calosc i uruchom. Idempotentne (mozna puscic ponownie).
+-- iClub Management — KOMPLETNY SETUP BAZY (migracje 0001–0013)
+-- Wklej calosc i uruchom. Idempotentne — mozna puscic ponownie,
+-- niezaleznie od tego co juz uruchomiles.
 -- =============================================================
 
--- ---- migracja 0001_init_profiles_customers_inquiries ----
+-- ---- 0001_init_profiles_customers_inquiries ----
 -- =====================================================================
 -- iClub Management — migracja MVP 1
 -- Zakres: profiles, customers, inquiries (+ enumy, RLS, triggery).
@@ -207,7 +208,7 @@ create policy inquiries_delete on public.inquiries
   for delete to authenticated using (true);
 
 
--- ---- migracja 0002_resources ----
+-- ---- 0002_resources ----
 -- =====================================================================
 -- iClub Management — migracja 0002: zasoby konfigurowalne
 -- Namioty, pakiety i dodatki. Ceny i skład są w BAZIE (nie w kodzie) —
@@ -321,7 +322,7 @@ insert into public.addons (code, name, price, sort) values
 on conflict (code) do nothing;
 
 
--- ---- migracja 0003_reservations_jobs ----
+-- ---- 0003_reservations_jobs ----
 -- =====================================================================
 -- iClub Management — migracja 0003: rezerwacje, zlecenia, etapy
 -- Rezerwacja iClub → automatyczne zlecenie (job) i podstawowe etapy.
@@ -428,7 +429,7 @@ drop policy if exists job_stages_all on public.job_stages;
 create policy job_stages_all on public.job_stages for all to authenticated using (true) with check (true);
 
 
--- ---- migracja 0004_equipment ----
+-- ---- 0004_equipment ----
 -- =====================================================================
 -- iClub Management — migracja 0004: sprzęt (magazyn, część 1)
 -- Sprzęt liczony ilościowo. Pełny model (numery seryjne, serwis, rentowność,
@@ -479,7 +480,7 @@ insert into public.equipment (code, name, category, quantity, unit_cost) values
 on conflict (code) do nothing;
 
 
--- ---- migracja 0005_employee_rates ----
+-- ---- 0005_employee_rates ----
 -- =====================================================================
 -- iClub Management — migracja 0005: stawki i premie pracowników (§10)
 -- Dane poufne — dostęp tylko dla OWNER (RLS). Pracownik nie widzi stawek innych.
@@ -517,7 +518,7 @@ create policy employee_rates_owner on public.employee_rates for all to authentic
   using (public.is_owner()) with check (public.is_owner());
 
 
--- ---- migracja 0006_job_assignments ----
+-- ---- 0006_job_assignments ----
 -- =====================================================================
 -- iClub Management — migracja 0006: przypisania pracowników do zleceń (§9)
 -- + ręczny bonus właściciela do zlecenia (§10).
@@ -570,7 +571,7 @@ create policy job_assignments_delete on public.job_assignments for delete to aut
   using (public.is_owner());
 
 
--- ---- migracja 0007_payments_costs ----
+-- ---- 0007_payments_costs ----
 -- =====================================================================
 -- iClub Management — migracja 0007: płatności i koszty (§21, §45)
 -- Płatność: metoda, status (zgłoszenie gotówki → weryfikacja właściciela).
@@ -645,7 +646,7 @@ drop policy if exists costs_all on public.costs;
 create policy costs_all on public.costs for all to authenticated using (true) with check (true);
 
 
--- ---- migracja 0008_checklist_items ----
+-- ---- 0008_checklist_items ----
 -- =====================================================================
 -- iClub Management — migracja 0008: checklisty pakowania (§17)
 -- Pozycje checklisty przypisane do zlecenia; generowane z konfiguracji.
@@ -677,7 +678,7 @@ drop policy if exists checklist_items_all on public.checklist_items;
 create policy checklist_items_all on public.checklist_items for all to authenticated using (true) with check (true);
 
 
--- ---- migracja 0009_incidents ----
+-- ---- 0009_incidents ----
 -- =====================================================================
 -- iClub Management — migracja 0009: zgłoszenia i szkody / incydenty (§22, §30)
 -- Jeden rejestr zgłoszeń: szkody, awarie, braki, zgłoszenia pracownika.
@@ -719,7 +720,7 @@ drop policy if exists incidents_all on public.incidents;
 create policy incidents_all on public.incidents for all to authenticated using (true) with check (true);
 
 
--- ---- migracja 0010_employee_availability ----
+-- ---- 0010_employee_availability ----
 -- =====================================================================
 -- iClub Management — migracja 0010: dostępność pracowników (§11)
 -- Pracownik oznacza niedostępność (zakres dni + opis). Blokuje sugestie
@@ -757,5 +758,98 @@ create policy emp_avail_update on public.employee_availability for update to aut
 drop policy if exists emp_avail_delete on public.employee_availability;
 create policy emp_avail_delete on public.employee_availability for delete to authenticated
   using (public.is_owner() or profile_id = auth.uid());
+
+
+-- ---- 0011_signatures ----
+-- =====================================================================
+-- iClub Management — migracja 0011: podpis klienta (§21)
+-- Podpis zapisywany jako obraz (data URL) przy zleceniu.
+-- =====================================================================
+
+create table if not exists public.signatures (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid references public.jobs(id) on delete cascade,
+  data_url text not null,          -- podpis jako obraz PNG (base64)
+  signer_name text,
+  signed_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_signatures_job on public.signatures (job_id);
+
+alter table public.signatures enable row level security;
+
+drop policy if exists signatures_all on public.signatures;
+create policy signatures_all on public.signatures for all to authenticated using (true) with check (true);
+
+
+-- ---- 0012_service_tasks ----
+-- =====================================================================
+-- iClub Management — migracja 0012: zadania serwisowe (§29)
+-- Czyszczenie / naprawa / sprawdzenie sprzętu. Cykl tygodniowy (przypomnienia)
+-- dojdzie z modułem powiadomień.
+-- =====================================================================
+
+do $$ begin
+  create type public.service_status as enum ('OPEN', 'IN_PROGRESS', 'DONE');
+exception when duplicate_object then null; end $$;
+
+create table if not exists public.service_tasks (
+  id uuid primary key default gen_random_uuid(),
+  equipment text,                   -- czego dotyczy (sprzęt / namiot)
+  kind text not null default 'Sprawdzenie',  -- Czyszczenie / Naprawa / Sprawdzenie / Inne
+  description text,
+  status public.service_status not null default 'OPEN',
+  due_date date,
+  incident_id uuid references public.incidents(id) on delete set null,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_service_status on public.service_tasks (status);
+create index if not exists idx_service_due on public.service_tasks (due_date);
+
+drop trigger if exists trg_service_tasks_updated_at on public.service_tasks;
+create trigger trg_service_tasks_updated_at before update on public.service_tasks
+  for each row execute function public.set_updated_at();
+
+alter table public.service_tasks enable row level security;
+
+drop policy if exists service_tasks_all on public.service_tasks;
+create policy service_tasks_all on public.service_tasks for all to authenticated using (true) with check (true);
+
+
+-- ---- 0013_contracts ----
+-- =====================================================================
+-- iClub Management — migracja 0013: umowy (§44)
+-- Status umowy przy zleceniu (treść generowana z rezerwacji z szablonu).
+-- Wersjonowanie i podpis elektroniczny — kolejny etap.
+-- =====================================================================
+
+do $$ begin
+  create type public.contract_status as enum ('DRAFT', 'SENT', 'SIGNED');
+exception when duplicate_object then null; end $$;
+
+create table if not exists public.contracts (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null unique references public.jobs(id) on delete cascade,
+  status public.contract_status not null default 'DRAFT',
+  sent_at timestamptz,
+  signed_at timestamptz,
+  note text,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_contracts_updated_at on public.contracts;
+create trigger trg_contracts_updated_at before update on public.contracts
+  for each row execute function public.set_updated_at();
+
+alter table public.contracts enable row level security;
+
+drop policy if exists contracts_all on public.contracts;
+create policy contracts_all on public.contracts for all to authenticated using (true) with check (true);
 
 
