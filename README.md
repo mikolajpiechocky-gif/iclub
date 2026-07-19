@@ -63,6 +63,7 @@ npm.cmd run build
 - [Plan implementacji](docs/IMPLEMENTATION_PLAN.md)
 - [Konfiguracja Supabase](docs/SUPABASE_SETUP.md)
 - [Wdrożenie (Vercel + domena)](docs/DEPLOYMENT.md)
+- [Integracje (Google Maps, InFakt…)](docs/INTEGRATIONS.md)
 - [Model danych MVP 1](docs/DATA_MODEL_MVP1.md)
 - [Model danych (stan bieżący)](docs/DATA_MODEL.md)
 - [Pełny zakres produktu](docs/FULL_PRODUCT_SCOPE.md)

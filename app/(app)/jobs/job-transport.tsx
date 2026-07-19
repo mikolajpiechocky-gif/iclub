@@ -2,10 +2,10 @@
 // Transport zlecenia: kalkulacje kosztu paliwa (§33, §34). OWNER dodaje/usuwa.
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { SectionCard, TextField, SelectField, PrimaryButton, Alert } from "@/components/ui";
+import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
 import { fuelCost } from "@/lib/domain/transport";
 import type { TransportCalcRecord } from "@/lib/data/transport";
-import { createTransportAction, removeTransportAction, type TransportFormValues } from "./transport-actions";
+import { createTransportAction, removeTransportAction, computeDistanceAction, type TransportFormValues } from "./transport-actions";
 
 const fmtPLN = (v: number | null) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
@@ -22,7 +22,21 @@ export function JobTransport({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [mapMsg, setMapMsg] = useState<string | null>(null);
   const [v, setV] = useState<TransportFormValues>({ vehicle_id: "", kind: "PLAN", distance_km: "", consumption: "", fuel_price: String(defaultFuelPrice), client_price: "", note: "" });
+
+  const calcFromMap = () => {
+    setMapMsg(null);
+    startTransition(async () => {
+      const res = await computeDistanceAction(jobId);
+      if (res.ok && res.km != null) {
+        setV((s) => ({ ...s, distance_km: String(res.km) }));
+        setMapMsg(`≈ ${res.km} km (${res.minutes} min) · ${res.address ?? ""}`);
+      } else {
+        setMapMsg(res.error ?? "Błąd");
+      }
+    });
+  };
 
   const set = <K extends keyof TransportFormValues>(k: K, val: TransportFormValues[K]) => setV((s) => ({ ...s, [k]: val }));
 
@@ -91,6 +105,10 @@ export function JobTransport({
             <TextField label="Spalanie (l/100km)" inputMode="decimal" placeholder="11.5" value={v.consumption} onChange={(e) => set("consumption", e.target.value)} />
             <TextField label="Cena paliwa (zł/l)" inputMode="decimal" value={v.fuel_price} onChange={(e) => set("fuel_price", e.target.value)} />
             <TextField label="Cena dla klienta (zł)" inputMode="numeric" placeholder="opcjonalnie" value={v.client_price} onChange={(e) => set("client_price", e.target.value)} />
+            <div className="col-span-2 flex flex-wrap items-center gap-2">
+              <SecondaryButton type="button" onClick={calcFromMap} disabled={pending}>Oblicz z mapy</SecondaryButton>
+              {mapMsg && <span className="text-[11.5px] text-ink-2">{mapMsg}</span>}
+            </div>
             <div className="col-span-2 flex items-center justify-between">
               <span className="text-[12.5px] font-semibold text-ink-2">Szac. koszt paliwa: <span className="text-warn">{fmtPLN(preview)}</span></span>
               <PrimaryButton type="submit" icon="plus" disabled={pending}>{pending ? "Zapisywanie…" : "Dodaj kalkulację"}</PrimaryButton>
