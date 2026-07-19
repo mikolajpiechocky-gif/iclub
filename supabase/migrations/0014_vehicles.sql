@@ -47,7 +47,7 @@ alter table public.job_vehicles enable row level security;
 drop policy if exists job_vehicles_all on public.job_vehicles;
 create policy job_vehicles_all on public.job_vehicles for all to authenticated using (true) with check (true);
 
--- seed: jeden pojazd startowy
+-- seed: jeden pojazd startowy (tylko gdy tabela pusta — idempotentne)
 insert into public.vehicles (name, registration, type, fuel_type, consumption, capacity)
-values ('Iveco Daily', 'PO 00000', 'Bus', 'Diesel', 11.5, 'do 3.5 t')
-on conflict do nothing;
+select 'Iveco Daily', 'PO 00000', 'Bus', 'Diesel', 11.5, 'do 3.5 t'
+where not exists (select 1 from public.vehicles);
