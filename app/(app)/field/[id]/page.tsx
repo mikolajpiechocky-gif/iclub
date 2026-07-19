@@ -65,6 +65,13 @@ export default async function FieldRealizationPage({ params }: { params: Promise
           <Icon name="chevron-right" className="h-4 w-4 text-ink-2" />
         </Link>
 
+        {/* Podpis klienta */}
+        <Link href={`/field/${job.id}/signature`} className="mb-3.5 flex items-center gap-3 rounded-[14px] border border-border bg-surface px-3.5 py-3">
+          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-[#182238] text-[#7fa8f5]"><Icon name="signature" className="h-4 w-4" /></span>
+          <div className="flex-1"><div className="text-[13.5px] font-bold text-ink">Podpis klienta</div><div className="text-[11px] text-ink-2">Protokół odbioru i rozliczenie</div></div>
+          <Icon name="chevron-right" className="h-4 w-4 text-ink-2" />
+        </Link>
+
         {/* Etapy */}
         <FieldStages jobId={job.id} stages={stages} />
 
