@@ -133,7 +133,7 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
       </div>
 
       {job ? (
-        <ReservationOps job={job} isOwner={isOwner} profile={profile} />
+        <SafeReservationOps job={job} isOwner={isOwner} profile={profile} />
       ) : (
         <SectionCard title="Realizacja" className="mt-4 p-5">
           <p className="px-5 pb-5 text-[13px] text-ink-2">Brak powiązanego zlecenia. Zapisz ponownie rezerwację, aby wygenerować etapy realizacji.</p>
@@ -143,16 +143,34 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
   );
 }
 
+interface OpsProps {
+  job: NonNullable<Awaited<ReturnType<typeof getJobByReservation>>>;
+  isOwner: boolean;
+  profile: Awaited<ReturnType<typeof getCurrentProfile>>;
+}
+
+// Bezpiecznik: gdyby ładowanie sekcji realizacji rzuciło wyjątek, nie wywalamy
+// całej strony — pokazujemy komunikat (i logujemy), zamiast błędu „page couldn't load".
+async function SafeReservationOps(props: OpsProps) {
+  try {
+    return await ReservationOps(props);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("ReservationOps failed:", e);
+    return (
+      <div className="mt-4 rounded-card border border-[#3a1c1f] bg-[#251215] p-4 text-[12.5px] text-bad">
+        Nie udało się załadować sekcji realizacji. Szczegóły: {msg}
+      </div>
+    );
+  }
+}
+
 /* Sekcje operacyjne (etapy, zespół, pojazdy, transport) — wymagają zlecenia. */
 async function ReservationOps({
   job,
   isOwner,
   profile,
-}: {
-  job: NonNullable<Awaited<ReturnType<typeof getJobByReservation>>>;
-  isOwner: boolean;
-  profile: Awaited<ReturnType<typeof getCurrentProfile>>;
-}) {
+}: OpsProps) {
   const [stages, assignments, employees, settings] = await Promise.all([
     getJobStages(job.id),
     listJobAssignments(job.id),
