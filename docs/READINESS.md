@@ -14,6 +14,7 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Flota** (pojazdy, przypisanie do zleceń, konflikt pojazdu)
 - **Transport + koszt paliwa** (wzór; ręczny dystans lub „Oblicz z mapy")
 - **Realizacje mobilne** — osobne bloki: Pakowanie + kroki z własnymi czynnościami (W drodze / Montaż / Szkolenie klienta / Zdjęcia / Rozliczenie / Demontaż), Zadzwoń/Nawiguj, zgłoszenie odbioru płatności
+- **Zdjęcia z realizacji** — pracownik robi zdjęcia w terenie, zapisują się do chmury (Supabase Storage, prywatny bucket), właściciel widzi je w rezerwacji
 - **Checklisty pakowania** (generowane z konfiguracji, zakończenie mimo braków)
 - **Zgłoszenia i szkody / incydenty**
 - **Serwis** (zadania serwisowe)
@@ -32,7 +33,6 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Google Maps — auto-dystans** — działa lokalnie; na produkcji potrzebna zmienna `GOOGLE_MAPS_API_KEY` na Vercelu.
 
 ## ⬜ Jeszcze nie napisane (kolejne etapy)
-- **Zdjęcia z realizacji do chmury (Supabase Storage)** — teraz miejsca na zdjęcia działają lokalnie na urządzeniu; wysyłka i podgląd u właściciela to osobny etap.
 - **Google Maps: Places Autocomplete** (podpowiadanie adresów) i **Route Optimization** (optymalizacja wielu dostaw) — §37.
 - **Faktury (InFakt)** — §43.
 - **Push / SMS / e-mail** — dostawcy — §8.

@@ -9,6 +9,8 @@ import { getCustomer } from "@/lib/data/customers";
 import { listChecklistItems } from "@/lib/data/checklist";
 import { listPayments } from "@/lib/data/payments";
 import { getSignature } from "@/lib/data/signatures";
+import { listJobPhotos } from "@/lib/data/photos";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { JOB_STATUS_META } from "@/lib/data/types";
 import { PackingBlock, RealizationFlow, type RealizationContext } from "../realization-flow";
 
@@ -23,11 +25,12 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   if (!job) notFound();
 
   const r = job.reservation;
-  const [customer, checklist, payments, signature] = await Promise.all([
+  const [customer, checklist, payments, signature, photos] = await Promise.all([
     r?.customer_id ? getCustomer(r.customer_id) : Promise.resolve(null),
     listChecklistItems(job.id),
     listPayments(),
     getSignature(job.id),
+    listJobPhotos(job.id),
   ]);
   const m = JOB_STATUS_META[job.status];
 
@@ -48,6 +51,8 @@ export default async function FieldRealizationPage({ params }: { params: Promise
     hasSignature: Boolean(signature),
     paymentReported,
     signatureHref: `/field/${job.id}/signature`,
+    photos: photos.map((p) => ({ id: p.id, url: p.url })),
+    canUpload: isSupabaseConfigured(),
   };
 
   return (

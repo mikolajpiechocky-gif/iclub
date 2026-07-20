@@ -11,9 +11,12 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Icon } from "@/components/icons";
 import { Alert } from "@/components/ui";
+import { createClient } from "@/lib/supabase/client";
 import type { JobStageRecord, PaymentMethod } from "@/lib/data/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/data/types";
+import { REALIZATIONS_BUCKET } from "@/lib/config/storage";
 import { advanceStageAction, reportFieldPaymentAction } from "./actions";
+import { createJobPhotoAction } from "./photo-actions";
 
 const fmtPLN = (v: number | null) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
@@ -80,6 +83,8 @@ export interface RealizationContext {
   hasSignature: boolean;
   paymentReported: boolean;
   signatureHref: string;
+  photos: { id: string; url: string }[];
+  canUpload: boolean;
 }
 
 const TRAINING_POINTS = [
@@ -88,8 +93,6 @@ const TRAINING_POINTS = [
   "Zakaz samodzielnej zmiany ustawień sprzętu",
   "Kontakt awaryjny do iClub",
 ];
-
-const PHOTO_SLOTS = ["Namiot z zewnątrz", "Wnętrze i oświetlenie", "Podłączenia / detale"];
 
 export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: JobStageRecord[]; ctx: RealizationContext }) {
   const router = useRouter();
@@ -193,7 +196,7 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: string; s
       return <TrainingPanel pending={pending} onDone={onDone} />;
 
     case "PHOTOS":
-      return <PhotosPanel pending={pending} onDone={onDone} />;
+      return <PhotosPanel jobId={jobId} ctx={ctx} pending={pending} onDone={onDone} />;
 
     case "SETTLEMENT":
       return <SettlementPanel jobId={jobId} ctx={ctx} pending={pending} onDone={onDone} />;
@@ -244,33 +247,66 @@ function TrainingPanel({ pending, onDone }: { pending: boolean; onDone: () => vo
   );
 }
 
-function PhotosPanel({ pending, onDone }: { pending: boolean; onDone: () => void }) {
-  const [previews, setPreviews] = useState<(string | null)[]>(PHOTO_SLOTS.map(() => null));
-  const onPick = (i: number, file: File | null) => {
+function PhotosPanel({ jobId, ctx, pending, onDone }: { jobId: string; ctx: RealizationContext; pending: boolean; onDone: () => void }) {
+  const router = useRouter();
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [localPreviews, setLocalPreviews] = useState<string[]>([]);
+
+  const onPick = async (file: File | null) => {
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setPreviews((p) => p.map((v, j) => (j === i ? url : v)));
+    setError(null);
+    // Tryb demo (brak Supabase): tylko podgląd lokalny.
+    if (!ctx.canUpload) {
+      setLocalPreviews((p) => [URL.createObjectURL(file), ...p]);
+      return;
+    }
+    setUploading(true);
+    const supabase = createClient();
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `${jobId}/${crypto.randomUUID()}.${ext}`;
+    let uploaded = false;
+    try {
+      const { error: upErr } = await supabase.storage.from(REALIZATIONS_BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
+      if (upErr) throw new Error(upErr.message);
+      uploaded = true;
+      const res = await createJobPhotoAction(jobId, path);
+      if (!res.ok) throw new Error(res.error ?? "Nie udało się zapisać.");
+      uploaded = false; // sukces — plik ma już wiersz w job_photos
+      router.refresh();
+    } catch (e) {
+      // Rollback: usuń osierocony plik, gdy zapis metadanych zawiódł (best-effort).
+      if (uploaded) await supabase.storage.from(REALIZATIONS_BUCKET).remove([path]).catch(() => {});
+      setError(e instanceof Error ? e.message : "Nie udało się wysłać zdjęcia.");
+    } finally {
+      setUploading(false);
+    }
   };
+
   return (
     <div>
       <p className="mb-2.5 text-[12.5px] text-ink-2">Zrób zdjęcia gotowego ustawienia:</p>
       <div className="mb-2 grid grid-cols-3 gap-2">
-        {PHOTO_SLOTS.map((slot, i) => (
-          <label key={slot} className="flex aspect-square cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[11px] border border-dashed border-[#3a3d4a] bg-surface text-center">
-            {previews[i] ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={previews[i] as string} alt={slot} className="h-full w-full object-cover" />
-            ) : (
-              <>
-                <Icon name="camera" className="mb-1 h-5 w-5 text-ink-2" />
-                <span className="px-1 text-[10px] font-semibold leading-tight text-ink-2">{slot}</span>
-              </>
-            )}
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPick(i, e.target.files?.[0] ?? null)} />
-          </label>
+        {ctx.photos.map((ph) => (
+          <div key={ph.id} className="aspect-square overflow-hidden rounded-[11px] border border-border bg-surface">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={ph.url} alt="Zdjęcie realizacji" className="h-full w-full object-cover" />
+          </div>
         ))}
+        {localPreviews.map((url, i) => (
+          <div key={`local-${i}`} className="aspect-square overflow-hidden rounded-[11px] border border-border bg-surface">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="Podgląd" className="h-full w-full object-cover opacity-80" />
+          </div>
+        ))}
+        <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-[11px] border border-dashed border-[#3a3d4a] bg-surface text-center">
+          <Icon name={uploading ? "refresh" : "camera"} className={`mb-1 h-5 w-5 text-ink-2 ${uploading ? "animate-spin" : ""}`} />
+          <span className="px-1 text-[10px] font-semibold leading-tight text-ink-2">{uploading ? "Wysyłanie…" : "Dodaj zdjęcie"}</span>
+          <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading} onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
+        </label>
       </div>
-      <p className="mb-3 text-[10.5px] text-ink-2/70">Zdjęcia zostają na urządzeniu — wysyłka do chmury w kolejnym etapie.</p>
+      {error && <div className="mb-2"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
+      {!ctx.canUpload && <p className="mb-3 text-[10.5px] text-ink-2/70">Tryb demo — zdjęcia tylko podglądowo (bez zapisu).</p>}
       <DoneButton pending={pending} onClick={onDone} label="Zdjęcia gotowe" block />
     </div>
   );

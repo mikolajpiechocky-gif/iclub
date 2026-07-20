@@ -13,6 +13,7 @@ import { getCurrentProfile } from "@/lib/data/profiles";
 import { predictedEarnings } from "@/lib/domain/earnings";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
+import { listJobPhotos } from "@/lib/data/photos";
 import { RESERVATION_STATUS_META, STAGE_STATUS_META } from "@/lib/data/types";
 import { listTransportCalcs } from "@/lib/data/transport";
 import { getSettings } from "@/lib/data/settings";
@@ -133,6 +134,8 @@ async function ReservationOps({
   const transportCalcs = await listTransportCalcs(job.id);
   const vehiclesForTransport = vehicles.map((v) => ({ id: v.id, name: v.name, consumption: v.consumption }));
 
+  const photos = await listJobPhotos(job.id);
+
   return (
     <>
       <SectionCard title="Etapy realizacji" className="mt-4 p-5">
@@ -170,6 +173,23 @@ async function ReservationOps({
       <JobVehicles jobId={job.id} isOwner={isOwner} assigned={assignedVehicles} available={availableVehicles} conflicts={vehicleConflicts} />
 
       <JobTransport jobId={job.id} isOwner={isOwner} calcs={transportCalcs} vehicles={vehiclesForTransport} defaultFuelPrice={settings.fuel_price_diesel} />
+
+      <SectionCard title="Zdjęcia z realizacji" className="mt-4 p-5">
+        <div className="px-5 pb-5">
+          {photos.length === 0 ? (
+            <p className="text-[13px] text-ink-2">Brak zdjęć. Pracownik dodaje je w kroku „Zdjęcia” podczas realizacji.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
+              {photos.map((ph) => (
+                <a key={ph.id} href={ph.url} target="_blank" rel="noopener noreferrer" className="aspect-square overflow-hidden rounded-[12px] border border-border bg-surface-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={ph.url} alt="Zdjęcie realizacji" className="h-full w-full object-cover" />
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </SectionCard>
     </>
   );
 }

@@ -46,6 +46,10 @@ Kierunek i propozycja MVP są opisane. Poniższe odpowiedzi są potrzebne przed 
 - Jaki ma być kontrakt przyszłego przekazywania czasu pracy do Taurusa, bez dostępu do jego projektu?
 - Jakie są priorytety Google Calendar, InFakt, map, SMS, e-mail i push?
 
+## Dług techniczny do domknięcia
+
+- **Czyszczenie Storage przy usuwaniu:** gdy powstanie funkcja usuwania rezerwacji/zlecenia lub pojedynczego zdjęcia, trzeba usuwać też pliki z bucketu `realizations` (dziś `job_photos` kasuje się kaskadowo, ale obiekty w Storage zostają). Upload z realizacji ma już rollback przy błędzie zapisu metadanych.
+
 ## Pytania o interfejs — do późniejszego etapu
 
 - Jak powinien wyglądać główny ekran właściciela?
