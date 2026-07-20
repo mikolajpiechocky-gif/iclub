@@ -17,8 +17,12 @@ export interface ReservationFormValues {
   location: string;
   guests: string;
   tent_id: string;
+  tent_id_2: string;
   package_id: string;
   addon_ids: string[];
+  rental_items: string;
+  delivery_time: string;
+  payment_upfront: boolean;
   price: string;
   discount: string;
   deposit: string;
@@ -80,8 +84,12 @@ function toInput(v: ReservationFormValues): ReservationInput {
     location: clean(v.location),
     guests: toNumber(v.guests) ?? null,
     tent_id: v.tent_id.trim() ? v.tent_id.trim() : null,
+    tent_id_2: v.tent_id_2.trim() ? v.tent_id_2.trim() : null,
     package_id: v.package_id.trim() ? v.package_id.trim() : null,
     addon_ids: v.addon_ids,
+    rental_items: clean(v.rental_items),
+    delivery_time: clean(v.delivery_time),
+    payment_upfront: v.payment_upfront,
     price: toNumber(v.price),
     discount: toNumber(v.discount) ?? 0,
     deposit: toNumber(v.deposit) ?? 0,
@@ -101,22 +109,25 @@ export interface TentConflict {
 // Sprawdza dostępność namiotu w oknie montaż→demontaż (§8). Ostrzeżenie,
 // nie blokada — właściciel może świadomie zapisać mimo konfliktu.
 export async function checkTentAvailabilityAction(
-  tentId: string,
+  tentIds: string[],
   startDate: string,
   endDate: string,
   excludeId?: string
 ): Promise<TentConflict[]> {
-  if (!tentId || !startDate) return [];
+  const ids = tentIds.filter(Boolean);
+  if (!ids.length || !startDate) return [];
   try {
-    const conflicts = await findTentConflicts(tentId, startDate, endDate || startDate, excludeId);
-    return conflicts.map((c) => {
-      const from = c.setup_date ?? c.event_date ?? "?";
-      const to = c.teardown_date && c.teardown_date !== from ? `–${c.teardown_date}` : "";
-      return {
-        id: c.id,
-        label: `${c.customer?.name ?? "bez klienta"} — ${c.event_type ?? "impreza"} (${from}${to})`,
-      };
-    });
+    // Sprawdzamy oba namioty (slot 1 i 2); scalamy i deduplikujemy po id rezerwacji.
+    const byId = new Map<string, TentConflict>();
+    for (const tentId of ids) {
+      const conflicts = await findTentConflicts(tentId, startDate, endDate || startDate, excludeId);
+      for (const c of conflicts) {
+        const from = c.setup_date ?? c.event_date ?? "?";
+        const to = c.teardown_date && c.teardown_date !== from ? `–${c.teardown_date}` : "";
+        byId.set(c.id, { id: c.id, label: `${c.customer?.name ?? "bez klienta"} — ${c.event_type ?? "impreza"} (${from}${to})` });
+      }
+    }
+    return [...byId.values()];
   } catch {
     return [];
   }

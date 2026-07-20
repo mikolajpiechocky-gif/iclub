@@ -42,8 +42,12 @@ export function ReservationForm({
     location: initial?.location ?? "",
     guests: initial?.guests != null ? String(initial.guests) : "",
     tent_id: initial?.tent_id ?? "",
+    tent_id_2: initial?.tent_id_2 ?? "",
     package_id: initial?.package_id ?? "",
     addon_ids: initial?.addon_ids ?? [],
+    rental_items: initial?.rental_items ?? "",
+    delivery_time: initial?.delivery_time ?? "",
+    payment_upfront: initial?.payment_upfront ?? false,
     price: initial?.price != null ? String(initial.price) : "",
     discount: initial?.discount != null ? String(initial.discount) : "",
     deposit: initial?.deposit != null ? String(initial.deposit) : "",
@@ -61,9 +65,10 @@ export function ReservationForm({
     let active = true;
     const run = async (): Promise<TentConflict[]> => {
       const start = v.setup_date || v.event_date;
-      if (!v.tent_id || !start) return [];
+      const ids = [v.tent_id, v.tent_id_2].filter(Boolean);
+      if (!ids.length || !start) return [];
       const end = v.teardown_date || v.event_date || start;
-      return checkTentAvailabilityAction(v.tent_id, start, end, initial?.id);
+      return checkTentAvailabilityAction(ids, start, end, initial?.id);
     };
     run().then((res) => {
       if (active) setConflicts(res);
@@ -71,7 +76,7 @@ export function ReservationForm({
     return () => {
       active = false;
     };
-  }, [v.tent_id, v.setup_date, v.teardown_date, v.event_date, initial?.id]);
+  }, [v.tent_id, v.tent_id_2, v.setup_date, v.teardown_date, v.event_date, initial?.id]);
 
   const set = <K extends keyof ReservationFormValues>(k: K, val: ReservationFormValues[K]) =>
     setV((s) => ({ ...s, [k]: val }));
@@ -140,52 +145,79 @@ export function ReservationForm({
             <AddressAutocomplete label="Lokalizacja" placeholder="Tarnowo Podgórne, ul. …" value={v.location} onChange={(val) => set("location", val)} />
             <TextField label="Data montażu" type="date" value={v.setup_date} onChange={(e) => set("setup_date", e.target.value)} />
             <TextField label="Data demontażu" type="date" value={v.teardown_date} onChange={(e) => set("teardown_date", e.target.value)} />
+            <TextField label="Godzina dostawy (opcjonalnie)" type="time" value={v.delivery_time} onChange={(e) => set("delivery_time", e.target.value)} hint="Puste = wydarzenie całodniowe" />
           </div>
         </SectionCard>
 
-        <SectionCard title="Namiot i pakiet" className="p-5">
-          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
-            <SelectField label="Namiot" value={v.tent_id} onChange={(e) => set("tent_id", e.target.value)}>
-              <option value="">— wybierz namiot —</option>
-              {tents.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}{t.has_back_door ? " (drzwi z tyłu)" : ""}</option>
-              ))}
-            </SelectField>
-            <SelectField label="Pakiet" value={v.package_id} onChange={(e) => set("package_id", e.target.value)}>
-              <option value="">— wybierz pakiet —</option>
-              {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </SelectField>
-          </div>
-          {conflicts.length > 0 && (
-            <div className="px-5 pb-4">
-              <Alert tone="warn" title={`Możliwy konflikt namiotu (${conflicts.length})`}>
-                Ten namiot ma nakładające się rezerwacje w podanym terminie:
-                <ul className="mt-1.5 list-disc pl-4">
-                  {conflicts.map((c) => <li key={c.id}>{c.label}</li>)}
-                </ul>
-                <span className="mt-1.5 block">Możesz zapisać mimo to — ostateczna decyzja należy do właściciela.</span>
-              </Alert>
+        {v.business_line === "ICLUB" ? (
+          <SectionCard title="Namiot i pakiet" className="p-5">
+            <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
+              <SelectField label="Namiot" value={v.tent_id} onChange={(e) => set("tent_id", e.target.value)}>
+                <option value="">— wybierz namiot —</option>
+                {tents.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}{t.has_back_door ? " (drzwi z tyłu)" : ""}</option>
+                ))}
+              </SelectField>
+              <SelectField label="Namiot 2 (opcjonalnie)" value={v.tent_id_2} onChange={(e) => set("tent_id_2", e.target.value)}>
+                <option value="">— brak (drugi namiot) —</option>
+                {tents.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}{t.has_back_door ? " (drzwi z tyłu)" : ""}</option>
+                ))}
+              </SelectField>
+              <SelectField label="Pakiet" value={v.package_id} onChange={(e) => set("package_id", e.target.value)}>
+                <option value="">— wybierz pakiet —</option>
+                {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </SelectField>
             </div>
-          )}
-          <div className="px-5 pb-5">
-            <div className="mb-2 text-[12.5px] font-semibold text-ink-2">Dodatki {addonsTotal > 0 && <span className="text-ink">· {fmtPLN(addonsTotal)}</span>}</div>
-            <div className="flex flex-wrap gap-2">
-              {addons.map((a) => {
-                const on = v.addon_ids.includes(a.id);
-                return (
-                  <button
-                    type="button"
-                    key={a.id}
-                    onClick={() => toggleAddon(a.id)}
-                    className={`rounded-[10px] border px-3 py-2 text-[12.5px] font-semibold transition ${on ? "border-[#3a2a55] bg-[#271b3f] text-[#e0c8ff]" : "border-border bg-surface text-ink-2"}`}
-                  >
-                    {a.name}{a.price > 0 ? ` · ${fmtPLN(a.price)}` : ""}
-                  </button>
-                );
-              })}
+            {conflicts.length > 0 && (
+              <div className="px-5 pb-4">
+                <Alert tone="warn" title={`Możliwy konflikt namiotu (${conflicts.length})`}>
+                  Ten namiot ma nakładające się rezerwacje w podanym terminie:
+                  <ul className="mt-1.5 list-disc pl-4">
+                    {conflicts.map((c) => <li key={c.id}>{c.label}</li>)}
+                  </ul>
+                  <span className="mt-1.5 block">Możesz zapisać mimo to — ostateczna decyzja należy do właściciela.</span>
+                </Alert>
+              </div>
+            )}
+            <div className="px-5 pb-5">
+              <div className="mb-2 text-[12.5px] font-semibold text-ink-2">Dodatki {addonsTotal > 0 && <span className="text-ink">· {fmtPLN(addonsTotal)}</span>}</div>
+              <div className="flex flex-wrap gap-2">
+                {addons.map((a) => {
+                  const on = v.addon_ids.includes(a.id);
+                  return (
+                    <button
+                      type="button"
+                      key={a.id}
+                      onClick={() => toggleAddon(a.id)}
+                      className={`rounded-[10px] border px-3 py-2 text-[12.5px] font-semibold transition ${on ? "border-[#3a2a55] bg-[#271b3f] text-[#e0c8ff]" : "border-border bg-surface text-ink-2"}`}
+                    >
+                      {a.name}{a.price > 0 ? ` · ${fmtPLN(a.price)}` : ""}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </SectionCard>
+          </SectionCard>
+        ) : (
+          <SectionCard title="Sprzęt do wynajęcia" className="p-5">
+            <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <TextField
+                  label="Sprzęt (pozycje)"
+                  placeholder="Krzesła   —   albo:   Stoły, krzesła, parasole"
+                  value={v.rental_items}
+                  onChange={(e) => set("rental_items", e.target.value)}
+                  hint="Jedna pozycja → trafia w tytuł; kilka po przecinku → tytuł „Wynajem sprzętu”, szczegóły w opisie"
+                />
+              </div>
+              <SelectField label="Płatność" value={v.payment_upfront ? "UP" : "PICKUP"} onChange={(e) => set("payment_upfront", e.target.value === "UP")}>
+                <option value="PICKUP">Przy odbiorze</option>
+                <option value="UP">Opłacone z góry</option>
+              </SelectField>
+            </div>
+          </SectionCard>
+        )}
 
         <SectionCard title="Rozliczenie" className="p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-3">

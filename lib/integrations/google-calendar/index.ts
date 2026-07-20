@@ -42,22 +42,28 @@ async function getAccessToken(): Promise<string | null> {
   }
 }
 
+// Data całodniowa ({date}) albo z godziną ({dateTime, timeZone}).
+export type CalDate = { date: string } | { dateTime: string; timeZone: string };
+
 export interface CalendarEvent {
   summary: string;
   description?: string;
   location?: string;
-  startDate: string; // YYYY-MM-DD
-  endDateExclusive: string; // YYYY-MM-DD (dzień po ostatnim — wydarzenie całodniowe)
+  colorId?: string; // kolor Google Calendar (np. "3" Winogrono, "4" Flaming, "2" Szałwia)
+  start: CalDate;
+  end: CalDate;
 }
 
-function eventBody(e: CalendarEvent) {
-  return {
+function eventBody(e: CalendarEvent): Record<string, unknown> {
+  const body: Record<string, unknown> = {
     summary: e.summary,
     description: e.description ?? "",
     location: e.location ?? "",
-    start: { date: e.startDate },
-    end: { date: e.endDateExclusive },
+    start: e.start,
+    end: e.end,
   };
+  if (e.colorId) body.colorId = e.colorId;
+  return body;
 }
 
 const eventsUrl = () => `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(GCAL_CALENDAR_ID!)}/events`;

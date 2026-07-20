@@ -1019,3 +1019,9 @@ alter table public.reservations add column if not exists invoice_number text;
 -- ================= 0023: powiązanie z Google Calendar =================
 alter table public.reservations add column if not exists gcal_event_id text;
 
+-- ================= 0024: pola pod format wydarzeń kalendarza =================
+alter table public.reservations add column if not exists tent_id_2 uuid references public.tents(id) on delete set null;
+alter table public.reservations add column if not exists rental_items text;
+alter table public.reservations add column if not exists delivery_time text;
+alter table public.reservations add column if not exists payment_upfront boolean not null default false;
+

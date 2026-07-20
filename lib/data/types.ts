@@ -140,8 +140,12 @@ export interface ReservationRecord {
   location: string | null;
   guests: number | null;
   tent_id: string | null;
+  tent_id_2: string | null;
   package_id: string | null;
   addon_ids: string[];
+  rental_items: string | null;
+  delivery_time: string | null;
+  payment_upfront: boolean;
   price: number | null;
   discount: number;
   deposit: number;

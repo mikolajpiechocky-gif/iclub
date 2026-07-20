@@ -45,6 +45,6 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Rankingi/oceny** (§24).
 
 ## Wymagane do pełnych testów (kolejność)
-1. **Uruchom komplet SQL** w Supabase: otwórz `supabase/setup_all.sql` (migracje 0001–0022), skopiuj całość, wklej w SQL Editor, Run. Idempotentne. **To odblokowuje Magazyn, Pracowników, Flotę, Płatności, Koszty, Serwis, Ustawienia, Cennik, zdjęcia, faktury itd.**
+1. **Uruchom komplet SQL** w Supabase: otwórz `supabase/setup_all.sql` (migracje 0001–0024), skopiuj całość, wklej w SQL Editor, Run. Idempotentne. **To odblokowuje Magazyn, Pracowników, Flotę, Płatności, Koszty, Serwis, Ustawienia, Cennik, zdjęcia, faktury, Kalendarz itd.**
 2. **Rola OWNER** dla Twojego konta (zrobione).
 3. **Zmienne env na hostingu** (Supabase + opcjonalnie Google Maps) — najlepiej na **własnym projekcie Vercel** (iClub niezależny od Taurusa).

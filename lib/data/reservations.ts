@@ -17,8 +17,12 @@ export interface ReservationInput {
   location?: string | null;
   guests?: number | null;
   tent_id: string | null;
+  tent_id_2?: string | null;
   package_id: string | null;
   addon_ids: string[];
+  rental_items?: string | null;
+  delivery_time?: string | null;
+  payment_upfront?: boolean;
   price?: number | null;
   discount?: number;
   deposit?: number;
@@ -141,15 +145,16 @@ export async function findTentConflicts(
   if (!tentId || !startDate) return [];
   const end = endDate ?? startDate;
 
+  // Namiot może być w slocie 1 (tent_id) albo 2 (tent_id_2) — sprawdzamy oba.
   let rows: ReservationWithRefs[];
   if (!isSupabaseConfigured()) {
-    rows = DEMO_RESERVATIONS.filter((r) => r.tent_id === tentId);
+    rows = DEMO_RESERVATIONS.filter((r) => r.tent_id === tentId || r.tent_id_2 === tentId);
   } else {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("reservations")
       .select("*, customer:customers(id,name), tent:tents(id,name), package:packages(id,name)")
-      .eq("tent_id", tentId)
+      .or(`tent_id.eq.${tentId},tent_id_2.eq.${tentId}`)
       .in("status", ["TEMPORARY", "CONFIRMED"]);
     if (error) throw new Error(error.message);
     rows = (data ?? []) as ReservationWithRefs[];
