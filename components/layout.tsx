@@ -20,6 +20,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
   { group: "Główne", tint: "#14b8c4", items: [
     { href: "/dashboard", label: "Pulpit", icon: "home" },
     { href: "/calendar", label: "Kalendarz", icon: "calendar" },
+    { href: "/planner", label: "Planer tras", icon: "navigation", ownerOnly: true },
     { href: "/notifications", label: "Powiadomienia", icon: "inbox" },
   ]},
   { group: "Sprzedaż", tint: "#7c3aed", items: [

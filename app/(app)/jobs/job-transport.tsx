@@ -3,26 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
-import { fuelCost, amortizationCost } from "@/lib/domain/transport";
+import { fuelCost, amortizationCost, fuelPriceForType, type FuelPrices } from "@/lib/domain/transport";
 import type { TransportCalcRecord } from "@/lib/data/transport";
 import { createTransportAction, removeTransportAction, computeDistanceAction, type TransportFormValues } from "./transport-actions";
 
 const fmtPLN = (v: number | null) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
-
-export interface FuelPrices {
-  petrol: number;
-  diesel: number;
-  lpg: number;
-}
-
-// Dobór ceny paliwa wg typu pojazdu (z Ustawień). Domyślnie diesel.
-function priceForFuelType(fuelType: string | null, prices: FuelPrices): number {
-  const t = (fuelType ?? "").toLowerCase();
-  if (t.includes("benz")) return prices.petrol;
-  if (t.includes("lpg")) return prices.lpg;
-  return prices.diesel;
-}
 
 export function JobTransport({
   jobId, isOwner, calcs, vehicles, fuelPrices, amortizationPerKm,
@@ -62,7 +48,7 @@ export function JobTransport({
       vehicle_id: id,
       consumption: veh?.consumption != null && !s.consumption ? String(veh.consumption) : s.consumption,
       // Cena paliwa dobrana wg typu pojazdu (benzyna/diesel/LPG) z Ustawień.
-      fuel_price: veh ? String(priceForFuelType(veh.fuel_type, fuelPrices)) : s.fuel_price,
+      fuel_price: veh ? String(fuelPriceForType(veh.fuel_type, fuelPrices)) : s.fuel_price,
     }));
   };
 

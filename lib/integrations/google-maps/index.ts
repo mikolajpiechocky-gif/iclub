@@ -96,6 +96,49 @@ export async function routeLeg(origin: GeoPoint, dest: GeoPoint): Promise<{ km: 
   }
 }
 
+// Optymalizacja kolejności wielu przystanków (§37) — Routes API z
+// optimizeWaypointOrder. Trasa: baza → przystanki (w optymalnej kolejności) → baza.
+// Bez klucza / przy błędzie zwraca null.
+export interface OptimizedRoute {
+  order: number[]; // permutacja indeksów przystanków (optymalna kolejność)
+  km: number;
+  minutes: number;
+}
+
+export async function optimizeRoute(baseAddress: string, stops: string[]): Promise<OptimizedRoute | null> {
+  if (!isGoogleMapsConfigured() || stops.length === 0) return null;
+  try {
+    const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.optimizedIntermediateWaypointIndex",
+      },
+      body: JSON.stringify({
+        origin: { address: baseAddress },
+        destination: { address: baseAddress },
+        intermediates: stops.map((a) => ({ address: a })),
+        travelMode: "DRIVE",
+        routingPreference: "TRAFFIC_UNAWARE",
+        optimizeWaypointOrder: true,
+      }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const route = json?.routes?.[0];
+    if (!route) return null;
+    const order: number[] = Array.isArray(route.optimizedIntermediateWaypointIndex)
+      ? route.optimizedIntermediateWaypointIndex
+      : stops.map((_, i) => i);
+    const km = (route.distanceMeters ?? 0) / 1000;
+    const secs = route.duration ? parseInt(String(route.duration).replace("s", ""), 10) : 0;
+    return { order, km: Math.round(km * 10) / 10, minutes: Math.round((secs || 0) / 60) };
+  } catch {
+    return null;
+  }
+}
+
 // Runda: baza → adres → baza (jeden przejazd tam i z powrotem).
 export interface RoundTripResult {
   km: number;
