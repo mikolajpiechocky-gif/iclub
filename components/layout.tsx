@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
 import { StatusBadge } from "./ui";
 import { UserMenu } from "./auth/user-menu";
+import { PullToRefresh } from "./pull-to-refresh";
 import type { StatusKey } from "@/lib/types";
 import type { ProfileRecord } from "@/lib/data/types";
 
@@ -134,6 +135,7 @@ export function MobileBottomNavigation({ isOwner = false }: { isOwner?: boolean 
 export function AppShell({ children, profile, unread = 0 }: { children: ReactNode; profile: ProfileRecord | null; unread?: number }) {
   return (
     <div className="flex min-h-screen bg-workspace">
+      <PullToRefresh />
       <AppSidebar profile={profile} unread={unread} />
       <main className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
       <MobileBottomNavigation isOwner={profile?.role === "OWNER"} />
