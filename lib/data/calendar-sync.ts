@@ -45,7 +45,11 @@ interface ResRow {
   package: { name: string | null } | null;
 }
 
-export async function syncReservationToCalendar(reservationId: string): Promise<void> {
+// allowCreate=true tylko przy ZAKŁADANIU rezerwacji w apce — wtedy wolno utworzyć
+// nowe wydarzenie. Przy edycji/anulowaniu allowCreate=false: aktualizujemy tylko
+// istniejące wydarzenie, a starych/zaimportowanych (bez gcal_event_id) nie ruszamy.
+export async function syncReservationToCalendar(reservationId: string, opts: { allowCreate?: boolean } = {}): Promise<void> {
+  const allowCreate = opts.allowCreate ?? false;
   if (!isSupabaseConfigured() || !isGoogleCalendarConfigured()) return;
   const supabase = await createClient();
 
@@ -140,8 +144,11 @@ export async function syncReservationToCalendar(reservationId: string): Promise<
       const result = await updateCalendarEvent(r.gcal_event_id, event);
       if (result === "ok") return;
       if (result === "error") return; // błąd przejściowy — nie duplikuj, ponowimy przy edycji
-      // result === "gone" — wydarzenie skasowano w kalendarzu, tworzymy na nowo poniżej.
+      // result === "gone" — wydarzenie skasowano w kalendarzu.
     }
+    // Nowe wydarzenia tylko przy zakładaniu rezerwacji w apce; stare/importowane
+    // (bez gcal_event_id) NIE trafiają do kalendarza — nawet przy edycji.
+    if (!allowCreate) return;
     const id = await createCalendarEvent(event);
     if (id) await supabase.from("reservations").update({ gcal_event_id: id }).eq("id", reservationId);
   } catch {

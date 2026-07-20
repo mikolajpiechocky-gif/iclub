@@ -139,7 +139,8 @@ export async function createReservationAction(values: ReservationFormValues): Pr
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
   try {
     const { id } = await createReservation(toInput(values));
-    try { await syncReservationToCalendar(id); } catch {}
+    // Nowa rezerwacja z apki → wolno utworzyć wydarzenie w kalendarzu.
+    try { await syncReservationToCalendar(id, { allowCreate: true }); } catch {}
     revalidatePath("/reservations");
     return { ok: true, id };
   } catch (e) {
