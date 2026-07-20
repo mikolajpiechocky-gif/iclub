@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout";
 import { SectionCard, Pill } from "@/components/ui";
 import { getReservation } from "@/lib/data/reservations";
+import { getCustomer } from "@/lib/data/customers";
 import { getJobByReservation, getJobStages } from "@/lib/data/jobs";
 import { listJobAssignments } from "@/lib/data/assignments";
 import { listEmployees } from "@/lib/data/employees";
@@ -19,6 +20,7 @@ import { RESERVATION_STATUS_META, STAGE_STATUS_META } from "@/lib/data/types";
 import { listTransportCalcs } from "@/lib/data/transport";
 import { getSettings } from "@/lib/data/settings";
 import { ClientConfirmToggle } from "../confirm-toggle";
+import { InvoiceStatus } from "../invoice-status";
 import { JobTeam, type AssignmentView } from "../../jobs/job-team";
 import { JobVehicles, type JobVehicleView } from "../../jobs/job-vehicles";
 import { JobTransport } from "../../jobs/job-transport";
@@ -46,6 +48,11 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
   const weather = reservation.event_date && reservation.location
     ? await getEventWeather(reservation.location, reservation.event_date)
     : null;
+
+  // Faktura VAT (§43): NIP klienta + stawka VAT z ustawień.
+  const [invoiceCustomer, invoiceSettings] = reservation.is_invoice
+    ? await Promise.all([reservation.customer_id ? getCustomer(reservation.customer_id) : Promise.resolve(null), getSettings()])
+    : [null, null];
 
   const cards: { h: string; rows: [string, string][] }[] = [
     { h: "Klient", rows: [["Klient", (r as { customer?: { name?: string } }).customer?.name ?? "—"], ["Źródło", reservation.source ?? "—"]] },
@@ -76,6 +83,18 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
       </div>
 
       <ClientConfirmToggle id={reservation.id} confirmed={reservation.client_confirmed} confirmedAt={reservation.client_confirmed_at} />
+
+      {reservation.is_invoice && (
+        <InvoiceStatus
+          id={reservation.id}
+          issued={reservation.invoice_issued}
+          issuedAt={reservation.invoice_issued_at}
+          invoiceNumber={reservation.invoice_number}
+          hasTaxId={Boolean(invoiceCustomer?.tax_id)}
+          gross={reservation.price}
+          vatRate={invoiceSettings?.vat_rate ?? 23}
+        />
+      )}
 
       {weather && (
         <div className={`mb-4 rounded-card-lg border p-4 ${weather.warnings.length ? "border-[#3d3216] bg-[#241e10]" : "border-border bg-surface"}`}>

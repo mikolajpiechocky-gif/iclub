@@ -152,6 +152,9 @@ export interface ReservationRecord {
   notes: string | null;
   client_confirmed: boolean;
   client_confirmed_at: string | null;
+  invoice_issued: boolean;
+  invoice_issued_at: string | null;
+  invoice_number: string | null;
   created_at: string;
   updated_at: string;
 }

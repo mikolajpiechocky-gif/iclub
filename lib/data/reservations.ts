@@ -103,6 +103,20 @@ export async function setReservationConfirmed(id: string, confirmed: boolean): P
   if (error) throw new Error(error.message);
 }
 
+// Wystawienie faktury VAT (§43) — szkielet pod InFakt. Osobno od edycji.
+export async function setInvoiceIssued(id: string, issued: boolean, invoiceNumber: string | null): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("reservations")
+    .update({
+      invoice_issued: issued,
+      invoice_issued_at: issued ? new Date().toISOString() : null,
+      invoice_number: issued ? invoiceNumber : null,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // --- Dostępność / konflikty namiotu (§8, §15) ---
 // Zakres okna rezerwacji: od montażu (lub daty imprezy) do demontażu.
 function reservationRange(r: { setup_date: string | null; teardown_date: string | null; event_date: string | null }) {

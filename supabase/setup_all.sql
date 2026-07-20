@@ -1011,3 +1011,8 @@ alter table public.app_settings add column if not exists fuel_updated_at timesta
 alter table public.reservations add column if not exists client_confirmed boolean not null default false;
 alter table public.reservations add column if not exists client_confirmed_at timestamptz;
 
+-- ================= 0022: szkielet faktur VAT =================
+alter table public.reservations add column if not exists invoice_issued boolean not null default false;
+alter table public.reservations add column if not exists invoice_issued_at timestamptz;
+alter table public.reservations add column if not exists invoice_number text;
+

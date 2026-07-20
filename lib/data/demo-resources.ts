@@ -35,7 +35,8 @@ export const DEMO_RESERVATIONS: ReservationWithRefs[] = [
     package_id: "demo-p2", package: { id: "demo-p2", name: "Premium" },
     addon_ids: ["demo-a1", "demo-a2"], price: 6800, discount: 0, deposit: 2000,
     is_invoice: false, source: "INSTAGRAM", status: "CONFIRMED", expires_at: null,
-    notes: null, client_confirmed: true, client_confirmed_at: now, created_at: now, updated_at: now,
+    notes: null, client_confirmed: true, client_confirmed_at: now,
+    invoice_issued: false, invoice_issued_at: null, invoice_number: null, created_at: now, updated_at: now,
   },
   {
     id: "demo-r2", business_line: "ICLUB",
@@ -47,6 +48,7 @@ export const DEMO_RESERVATIONS: ReservationWithRefs[] = [
     package_id: "demo-p3", package: { id: "demo-p3", name: "VIP" },
     addon_ids: ["demo-a2", "demo-a3"], price: null, discount: 0, deposit: 0,
     is_invoice: false, source: "REFERRAL", status: "TEMPORARY", expires_at: "2026-07-20T10:00:00.000Z",
-    notes: "Brak zadatku — rezerwacja tymczasowa.", client_confirmed: false, client_confirmed_at: null, created_at: now, updated_at: now,
+    notes: "Brak zadatku — rezerwacja tymczasowa.", client_confirmed: false, client_confirmed_at: null,
+    invoice_issued: false, invoice_issued_at: null, invoice_number: null, created_at: now, updated_at: now,
   },
 ];

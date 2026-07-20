@@ -85,6 +85,12 @@ export default async function DashboardPage() {
   for (const r of toConfirm.slice(0, 4)) {
     attention.push({ tone: "warn", title: "Potwierdź z klientem (≤7 dni)", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}` });
   }
+  const invoicesToDo = reservations.filter(
+    (r) => r.is_invoice && !r.invoice_issued && r.status !== "CANCELLED" && r.event_date && r.event_date <= todayStr,
+  );
+  for (const r of invoicesToDo.slice(0, 4)) {
+    attention.push({ tone: "warn", title: "Wystaw fakturę VAT", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}` });
+  }
   for (const r of noDeposit.slice(0, 4)) {
     attention.push({ tone: "warn", title: "Rezerwacja bez zadatku", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}/edit` });
   }

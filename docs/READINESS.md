@@ -26,6 +26,7 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Powiadomienia in-app** (+ badge, powiadomienie przy przypisaniu)
 - **Potwierdzenie klienta przed realizacją** — pulpit pokazuje realizacje ≤7 dni czekające na potwierdzenie; oznaczanie „potwierdzone" w rezerwacji (wysyłkę SMS/e-mail dołożymy przy dostawcach)
 - **Pogoda w rezerwacji** — prognoza (Open-Meteo, darmowe) + ostrzeżenia (wiatr >20 km/h, opady, temp >25°C) dla dat w zasięgu ~14 dni. Współrzędne z geokodowania Google (klucz Map).
+- **Faktury VAT (szkielet)** — rezerwacje na FV: status „do wystawienia / wystawiona" (+ numer), rozbicie brutto/netto/VAT, wymóg NIP klienta, przypomnienie na pulpicie po realizacji. Automatyczne wystawianie w InFakt — po podaniu klucza API.
 - **Ustawienia** (tylko właściciel) — adres bazy, ceny paliwa (benzyna/diesel/LPG), godziny realizacji iClub, VAT. Wartości nie są zaszyte w kodzie — transport, prefill paliwa i wyliczenia zarobku czytają z ustawień.
 - **Cennik** (tylko właściciel) — ceny pakietów (Standard/Premium/VIP) i dodatków; rezerwacja podpowiada wartość z cennika (pakiet + dodatki).
 - **Pulpit** i **ekran pracownika** na prawdziwych danych
@@ -37,13 +38,13 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Planer tras / optymalizacja (Route Optimization)** — wybór dnia + pojazdu → optymalna kolejność realizacji + dystans/czas/koszt wewnętrzny. Używa Routes API (klucz masz ustawiony). Bez klucza pokazuje komunikat, nie liczy.
 
 ## ⬜ Jeszcze nie napisane (kolejne etapy)
-- **Faktury (InFakt)** — §43.
+- **Faktury — pełna integracja InFakt** (automatyczne wystawianie/wysyłka; szkielet już gotowy — patrz ✅) — wymaga konta i klucza API InFakt — §43.
 - **Push / SMS / e-mail** — dostawcy (w tym wysyłka próśb o potwierdzenie do klienta) — §8, §42.
 - **Google Calendar** — synchronizacja — §53.
 - **PWA offline** — kolejka synchronizacji, praca bez zasięgu — §14.
 - **Rankingi/oceny** (§24).
 
 ## Wymagane do pełnych testów (kolejność)
-1. **Uruchom komplet SQL** w Supabase: otwórz `supabase/setup_all.sql` (migracje 0001–0016, 24 tabele), skopiuj całość, wklej w SQL Editor, Run. Idempotentne. **To odblokowuje Magazyn, Pracowników, Flotę, Płatności, Koszty, Serwis itd.**
+1. **Uruchom komplet SQL** w Supabase: otwórz `supabase/setup_all.sql` (migracje 0001–0022), skopiuj całość, wklej w SQL Editor, Run. Idempotentne. **To odblokowuje Magazyn, Pracowników, Flotę, Płatności, Koszty, Serwis, Ustawienia, Cennik, zdjęcia, faktury itd.**
 2. **Rola OWNER** dla Twojego konta (zrobione).
 3. **Zmienne env na hostingu** (Supabase + opcjonalnie Google Maps) — najlepiej na **własnym projekcie Vercel** (iClub niezależny od Taurusa).
