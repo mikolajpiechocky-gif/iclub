@@ -132,7 +132,8 @@ async function ReservationOps({
   const vehicleConflicts = [...new Set(conflictArrays.flat())];
 
   const transportCalcs = await listTransportCalcs(job.id);
-  const vehiclesForTransport = vehicles.map((v) => ({ id: v.id, name: v.name, consumption: v.consumption }));
+  const vehiclesForTransport = vehicles.map((v) => ({ id: v.id, name: v.name, consumption: v.consumption, fuel_type: v.fuel_type }));
+  const fuelPrices = { petrol: settings.fuel_price_petrol, diesel: settings.fuel_price_diesel, lpg: settings.fuel_price_lpg };
 
   const photos = await listJobPhotos(job.id);
 
@@ -172,7 +173,7 @@ async function ReservationOps({
 
       <JobVehicles jobId={job.id} isOwner={isOwner} assigned={assignedVehicles} available={availableVehicles} conflicts={vehicleConflicts} />
 
-      <JobTransport jobId={job.id} isOwner={isOwner} calcs={transportCalcs} vehicles={vehiclesForTransport} defaultFuelPrice={settings.fuel_price_diesel} />
+      <JobTransport jobId={job.id} isOwner={isOwner} calcs={transportCalcs} vehicles={vehiclesForTransport} fuelPrices={fuelPrices} />
 
       <SectionCard title="Zdjęcia z realizacji" className="mt-4 p-5">
         <div className="px-5 pb-5">

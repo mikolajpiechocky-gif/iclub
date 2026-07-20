@@ -10,20 +10,34 @@ import { createTransportAction, removeTransportAction, computeDistanceAction, ty
 const fmtPLN = (v: number | null) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
 
+export interface FuelPrices {
+  petrol: number;
+  diesel: number;
+  lpg: number;
+}
+
+// Dobór ceny paliwa wg typu pojazdu (z Ustawień). Domyślnie diesel.
+function priceForFuelType(fuelType: string | null, prices: FuelPrices): number {
+  const t = (fuelType ?? "").toLowerCase();
+  if (t.includes("benz")) return prices.petrol;
+  if (t.includes("lpg")) return prices.lpg;
+  return prices.diesel;
+}
+
 export function JobTransport({
-  jobId, isOwner, calcs, vehicles, defaultFuelPrice,
+  jobId, isOwner, calcs, vehicles, fuelPrices,
 }: {
   jobId: string;
   isOwner: boolean;
   calcs: TransportCalcRecord[];
-  vehicles: { id: string; name: string; consumption: number | null }[];
-  defaultFuelPrice: number;
+  vehicles: { id: string; name: string; consumption: number | null; fuel_type: string | null }[];
+  fuelPrices: FuelPrices;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [mapMsg, setMapMsg] = useState<string | null>(null);
-  const [v, setV] = useState<TransportFormValues>({ vehicle_id: "", kind: "PLAN", distance_km: "", consumption: "", fuel_price: String(defaultFuelPrice), client_price: "", note: "" });
+  const [v, setV] = useState<TransportFormValues>({ vehicle_id: "", kind: "PLAN", distance_km: "", consumption: "", fuel_price: String(fuelPrices.diesel), client_price: "", note: "" });
 
   const calcFromMap = () => {
     setMapMsg(null);
@@ -42,7 +56,13 @@ export function JobTransport({
 
   const onVehicle = (id: string) => {
     const veh = vehicles.find((x) => x.id === id);
-    setV((s) => ({ ...s, vehicle_id: id, consumption: veh?.consumption != null && !s.consumption ? String(veh.consumption) : s.consumption }));
+    setV((s) => ({
+      ...s,
+      vehicle_id: id,
+      consumption: veh?.consumption != null && !s.consumption ? String(veh.consumption) : s.consumption,
+      // Cena paliwa dobrana wg typu pojazdu (benzyna/diesel/LPG) z Ustawień.
+      fuel_price: veh ? String(priceForFuelType(veh.fuel_type, fuelPrices)) : s.fuel_price,
+    }));
   };
 
   const preview = fuelCost(Number(v.distance_km.replace(",", ".")) || 0, Number(v.consumption.replace(",", ".")) || 0, Number(v.fuel_price.replace(",", ".")) || 0);
@@ -52,7 +72,7 @@ export function JobTransport({
     setError(null);
     startTransition(async () => {
       const res = await createTransportAction(jobId, v);
-      if (res.ok) { setV({ vehicle_id: "", kind: "PLAN", distance_km: "", consumption: "", fuel_price: String(defaultFuelPrice), client_price: "", note: "" }); router.refresh(); return; }
+      if (res.ok) { setV({ vehicle_id: "", kind: "PLAN", distance_km: "", consumption: "", fuel_price: String(fuelPrices.diesel), client_price: "", note: "" }); router.refresh(); return; }
       setError(res.error ?? "Błąd");
     });
   };
