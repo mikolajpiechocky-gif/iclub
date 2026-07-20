@@ -44,6 +44,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
   { group: "System", tint: "#64748b", items: [
     { href: "/media", label: "Zgłoszenia i szkody", icon: "camera" },
     { href: "/service", label: "Serwis", icon: "refresh" },
+    { href: "/users", label: "Użytkownicy", icon: "users", ownerOnly: true },
     { href: "/settings", label: "Ustawienia", icon: "gear", ownerOnly: true },
   ]},
 ];
