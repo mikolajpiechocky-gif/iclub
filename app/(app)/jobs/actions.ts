@@ -95,9 +95,11 @@ export async function approveAssignmentAction(id: string, jobId: string, profile
   const err = await ownerError();
   if (err) return { ok: false, error: err };
   try {
-    await approveAssignment(id);
-    const job = await getJob(jobId);
-    await createNotification(profileId, "Przypisanie zaakceptowane", `Właściciel zaakceptował Twoje przypisanie: ${jobLabel(job)}${job?.event_date ? " · " + job.event_date : ""}`, "ASSIGNMENT", jobId);
+    const approved = await approveAssignment(id);
+    if (approved) {
+      const job = await getJob(jobId);
+      await createNotification(profileId, "Przypisanie zaakceptowane", `Właściciel zaakceptował Twoje przypisanie: ${jobLabel(job)}${job?.event_date ? " · " + job.event_date : ""}`, "ASSIGNMENT", jobId);
+    }
     revalidatePath(`/jobs/${jobId}`);
     return { ok: true };
   } catch (e) {
@@ -111,9 +113,11 @@ export async function rejectAssignmentAction(id: string, jobId: string, profileI
   const err = await ownerError();
   if (err) return { ok: false, error: err };
   try {
-    await removeAssignment(id);
-    const job = await getJob(jobId);
-    await createNotification(profileId, "Prośba o przypisanie odrzucona", `Zlecenie: ${jobLabel(job)}`, "ASSIGNMENT", jobId);
+    const removed = await removeAssignment(id);
+    if (removed) {
+      const job = await getJob(jobId);
+      await createNotification(profileId, "Prośba o przypisanie odrzucona", `Zlecenie: ${jobLabel(job)}`, "ASSIGNMENT", jobId);
+    }
     revalidatePath(`/jobs/${jobId}`);
     return { ok: true };
   } catch (e) {

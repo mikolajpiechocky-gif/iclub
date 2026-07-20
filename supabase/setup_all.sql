@@ -1179,7 +1179,7 @@ exception when duplicate_object then null; end $$;
 -- Insert: właściciel dowolne; pracownik tylko samego siebie i tylko jako REQUESTED.
 drop policy if exists job_assignments_insert on public.job_assignments;
 create policy job_assignments_insert on public.job_assignments for insert to authenticated
-  with check (public.is_owner() or (profile_id = auth.uid() and status = 'REQUESTED'));
+  with check (public.is_owner() or (profile_id = auth.uid() and status = 'REQUESTED' and is_lead = false));
 
 -- Delete: właściciel dowolne; pracownik może wycofać WŁASNĄ prośbę (tylko REQUESTED).
 drop policy if exists job_assignments_delete on public.job_assignments;

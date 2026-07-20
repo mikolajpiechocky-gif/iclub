@@ -59,17 +59,20 @@ export async function assignEmployee(jobId: string, profileId: string, isLead = 
   if (error) throw new Error(error.message);
 }
 
-// Właściciel akceptuje prośbę pracownika o przypisanie.
-export async function approveAssignment(id: string): Promise<void> {
+// Właściciel akceptuje prośbę pracownika o przypisanie. Zwraca, czy wiersz istniał
+// (do pominięcia powiadomienia, gdy prośba w międzyczasie zniknęła — wyścig).
+export async function approveAssignment(id: string): Promise<boolean> {
   const supabase = await createClient();
-  const { error } = await supabase.from("job_assignments").update({ status: "APPROVED" }).eq("id", id);
+  const { data, error } = await supabase.from("job_assignments").update({ status: "APPROVED" }).eq("id", id).select("id");
   if (error) throw new Error(error.message);
+  return (data?.length ?? 0) > 0;
 }
 
-export async function removeAssignment(id: string): Promise<void> {
+export async function removeAssignment(id: string): Promise<boolean> {
   const supabase = await createClient();
-  const { error } = await supabase.from("job_assignments").delete().eq("id", id);
+  const { data, error } = await supabase.from("job_assignments").delete().eq("id", id).select("id");
   if (error) throw new Error(error.message);
+  return (data?.length ?? 0) > 0;
 }
 
 export async function setAssignmentLead(id: string, isLead: boolean): Promise<void> {

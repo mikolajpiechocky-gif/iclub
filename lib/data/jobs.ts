@@ -55,7 +55,7 @@ export async function listAssignedJobs(profileId: string): Promise<JobWithReserv
     .select(`job:jobs(${RESV_SELECT})`)
     .eq("profile_id", profileId)
     .eq("status", "APPROVED");
-  if (error) throw new Error(error.message);
+  if (error) return []; // degraduj łagodnie (np. okno migracji) zamiast crashować ekran „Start"
   const rows = (data ?? []) as unknown as { job: JobWithReservation | null }[];
   return rows.map((r) => r.job).filter((j): j is JobWithReservation => Boolean(j));
 }
