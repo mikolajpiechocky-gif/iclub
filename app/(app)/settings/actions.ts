@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { updateSettings, type AppSettings } from "@/lib/data/settings";
+import { updateSettings, getSettings, type AppSettings } from "@/lib/data/settings";
 
 export interface SettingsFormValues {
   base_address: string;
@@ -61,9 +61,16 @@ export async function updateSettingsAction(v: SettingsFormValues): Promise<Actio
     iclub_hours: parsed.iclub_hours,
     vat_rate: parsed.vat_rate,
   };
+  // Odśwież znacznik przypomnienia tylko, gdy realnie zmieniono ceny paliwa.
+  const current = await getSettings();
+  const fuelChanged =
+    current.fuel_price_petrol !== input.fuel_price_petrol ||
+    current.fuel_price_diesel !== input.fuel_price_diesel ||
+    current.fuel_price_lpg !== input.fuel_price_lpg;
   try {
-    await updateSettings(input);
+    await updateSettings(input, fuelChanged);
     revalidatePath("/settings");
+    revalidatePath("/dashboard");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };

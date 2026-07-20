@@ -1004,3 +1004,6 @@ create policy "realizations delete" on storage.objects for delete to authenticat
 alter table public.app_settings add column if not exists amortization_per_km numeric(6,2) not null default 0.05;
 alter table public.transport_calculations add column if not exists amortization numeric(10,2);
 
+-- ================= 0020: przypomnienie o aktualizacji cen paliwa =================
+alter table public.app_settings add column if not exists fuel_updated_at timestamptz not null default now();
+

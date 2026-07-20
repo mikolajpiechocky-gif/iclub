@@ -50,8 +50,21 @@ export async function getSettings(): Promise<AppSettings> {
 }
 
 // Zapis: upsert singletona (id=true). RLS wymusza rolę OWNER.
-export async function updateSettings(input: AppSettings): Promise<void> {
+// bumpFuel = true, gdy zmieniono ceny paliwa — odświeża znacznik przypomnienia.
+export async function updateSettings(input: AppSettings, bumpFuel = false): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.from("app_settings").upsert({ id: true, ...input });
+  const patch: Record<string, unknown> = { id: true, ...input };
+  if (bumpFuel) patch.fuel_updated_at = new Date().toISOString();
+  const { error } = await supabase.from("app_settings").upsert(patch);
   if (error) throw new Error(error.message);
+}
+
+// Czy minęły 2 tygodnie od ostatniej aktualizacji cen paliwa (przypomnienie).
+export async function fuelReminderDue(): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const supabase = await createClient();
+  const { data } = await supabase.from("app_settings").select("fuel_updated_at").eq("id", true).maybeSingle();
+  if (!data?.fuel_updated_at) return false;
+  const days = (Date.now() - new Date(data.fuel_updated_at as string).getTime()) / 86_400_000;
+  return days >= 14;
 }

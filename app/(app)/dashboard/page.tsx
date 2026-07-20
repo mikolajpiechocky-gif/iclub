@@ -6,6 +6,8 @@ import { listReservations } from "@/lib/data/reservations";
 import { listInquiries } from "@/lib/data/inquiries";
 import { listCustomers } from "@/lib/data/customers";
 import { listJobs } from "@/lib/data/jobs";
+import { getCurrentProfile } from "@/lib/data/profiles";
+import { fuelReminderDue } from "@/lib/data/settings";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { RESERVATION_STATUS_META, type ReservationWithRefs } from "@/lib/data/types";
 
@@ -38,13 +40,16 @@ function countTentConflicts(reservations: ReservationWithRefs[]): number {
 }
 
 export default async function DashboardPage() {
-  const [reservations, inquiries, customers, jobs] = await Promise.all([
+  const [reservations, inquiries, customers, jobs, profile, fuelDue] = await Promise.all([
     listReservations(),
     listInquiries(),
     listCustomers(),
     listJobs(),
+    getCurrentProfile(),
+    fuelReminderDue(),
   ]);
   const demo = !isSupabaseConfigured();
+  const isOwner = profile?.role === "OWNER";
 
   const now = new Date();
   const todayStr = isoDay(now);
@@ -74,6 +79,7 @@ export default async function DashboardPage() {
   ];
 
   const attention: { tone: "bad" | "warn"; title: string; desc: string; href: string }[] = [];
+  if (isOwner && fuelDue) attention.push({ tone: "warn", title: "Zaktualizuj ceny paliwa", desc: "Minęły 2 tygodnie od ostatniej aktualizacji cen paliwa.", href: "/settings" });
   if (conflicts > 0) attention.push({ tone: "bad", title: `Konflikt namiotu (${conflicts})`, desc: "Nakładające się rezerwacje tego samego namiotu.", href: "/calendar" });
   for (const r of noDeposit.slice(0, 4)) {
     attention.push({ tone: "warn", title: "Rezerwacja bez zadatku", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}/edit` });
