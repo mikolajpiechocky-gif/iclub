@@ -93,6 +93,16 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
   if (error) throw new Error(error.message);
 }
 
+// Potwierdzenie szczegółów przez klienta (§42) — osobno od edycji rezerwacji.
+export async function setReservationConfirmed(id: string, confirmed: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("reservations")
+    .update({ client_confirmed: confirmed, client_confirmed_at: confirmed ? new Date().toISOString() : null })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // --- Dostępność / konflikty namiotu (§8, §15) ---
 // Zakres okna rezerwacji: od montażu (lub daty imprezy) do demontażu.
 function reservationRange(r: { setup_date: string | null; teardown_date: string | null; event_date: string | null }) {

@@ -150,6 +150,8 @@ export interface ReservationRecord {
   status: ReservationStatus;
   expires_at: string | null;
   notes: string | null;
+  client_confirmed: boolean;
+  client_confirmed_at: string | null;
   created_at: string;
   updated_at: string;
 }

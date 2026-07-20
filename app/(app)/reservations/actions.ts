@@ -3,7 +3,7 @@
 // rezerwacji automatycznie generuje zlecenie i etapy (warstwa danych).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createReservation, updateReservation, findTentConflicts, type ReservationInput } from "@/lib/data/reservations";
+import { createReservation, updateReservation, setReservationConfirmed, findTentConflicts, type ReservationInput } from "@/lib/data/reservations";
 import type { ReservationStatus, BusinessLine } from "@/lib/data/types";
 
 export interface ReservationFormValues {
@@ -131,6 +131,18 @@ export async function createReservationAction(values: ReservationFormValues): Pr
     return { ok: true, id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać rezerwacji." };
+  }
+}
+
+export async function markReservationConfirmedAction(id: string, confirmed: boolean): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  try {
+    await setReservationConfirmed(id, confirmed);
+    revalidatePath(`/reservations/${id}`);
+    revalidatePath("/dashboard");
+    return { ok: true, id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać potwierdzenia." };
   }
 }
 

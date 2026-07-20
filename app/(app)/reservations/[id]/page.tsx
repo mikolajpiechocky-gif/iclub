@@ -17,6 +17,7 @@ import { listJobPhotos } from "@/lib/data/photos";
 import { RESERVATION_STATUS_META, STAGE_STATUS_META } from "@/lib/data/types";
 import { listTransportCalcs } from "@/lib/data/transport";
 import { getSettings } from "@/lib/data/settings";
+import { ClientConfirmToggle } from "../confirm-toggle";
 import { JobTeam, type AssignmentView } from "../../jobs/job-team";
 import { JobVehicles, type JobVehicleView } from "../../jobs/job-vehicles";
 import { JobTransport } from "../../jobs/job-transport";
@@ -68,6 +69,8 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
         <Pill label={rm.label} fg={rm.fg} bg={rm.bg} />
         {reservation.location && <span className="text-[13px] font-semibold text-ink-2">📍 {reservation.location}</span>}
       </div>
+
+      <ClientConfirmToggle id={reservation.id} confirmed={reservation.client_confirmed} confirmedAt={reservation.client_confirmed_at} />
 
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (

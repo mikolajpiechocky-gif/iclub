@@ -62,6 +62,7 @@ export default async function DashboardPage() {
     .sort((a, b) => (a.event_date! < b.event_date! ? -1 : 1));
 
   const near7 = upcoming.filter((r) => r.event_date! <= plus7Str).length;
+  const toConfirm = upcoming.filter((r) => r.event_date! <= plus7Str && !r.client_confirmed);
   const newInquiries = inquiries.filter((q) => q.status === "NEW").length;
   const noDeposit = reservations.filter(
     (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && (!r.deposit || r.deposit === 0)
@@ -70,7 +71,7 @@ export default async function DashboardPage() {
   const plannedJobs = jobs.filter((j) => j.status === "PLANNED").length;
 
   const kpis = [
-    { label: "Najbliższe (7 dni)", value: String(near7), sub: `${upcoming.length} nadchodzących`, tone: "neutral" as const },
+    { label: "Najbliższe (7 dni)", value: String(near7), sub: toConfirm.length ? `${toConfirm.length} do potwierdzenia` : `${upcoming.length} nadchodzących`, tone: (toConfirm.length ? "warn" : "neutral") as "warn" | "neutral" },
     { label: "Nowe zapytania", value: String(newInquiries), sub: `${inquiries.length} łącznie`, tone: "neutral" as const },
     { label: "Rezerwacje bez zadatku", value: String(noDeposit.length), sub: noDeposit.length ? "wymaga uwagi" : "brak", tone: (noDeposit.length ? "warn" : "neutral") as "warn" | "neutral" },
     { label: "Konflikty namiotu", value: String(conflicts), sub: conflicts ? "sprawdź terminy" : "brak", tone: (conflicts ? "bad" : "neutral") as "bad" | "neutral" },
@@ -81,6 +82,9 @@ export default async function DashboardPage() {
   const attention: { tone: "bad" | "warn"; title: string; desc: string; href: string }[] = [];
   if (isOwner && fuelDue) attention.push({ tone: "warn", title: "Zaktualizuj ceny paliwa", desc: "Minęły 2 tygodnie od ostatniej aktualizacji cen paliwa.", href: "/settings" });
   if (conflicts > 0) attention.push({ tone: "bad", title: `Konflikt namiotu (${conflicts})`, desc: "Nakładające się rezerwacje tego samego namiotu.", href: "/calendar" });
+  for (const r of toConfirm.slice(0, 4)) {
+    attention.push({ tone: "warn", title: "Potwierdź z klientem (≤7 dni)", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}` });
+  }
   for (const r of noDeposit.slice(0, 4)) {
     attention.push({ tone: "warn", title: "Rezerwacja bez zadatku", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}/edit` });
   }

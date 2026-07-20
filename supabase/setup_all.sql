@@ -1007,3 +1007,7 @@ alter table public.transport_calculations add column if not exists amortization 
 -- ================= 0020: przypomnienie o aktualizacji cen paliwa =================
 alter table public.app_settings add column if not exists fuel_updated_at timestamptz not null default now();
 
+-- ================= 0021: potwierdzenie klienta przed realizacją =================
+alter table public.reservations add column if not exists client_confirmed boolean not null default false;
+alter table public.reservations add column if not exists client_confirmed_at timestamptz;
+
