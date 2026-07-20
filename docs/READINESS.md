@@ -23,6 +23,7 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Koszty** (kategorie, weryfikacja)
 - **Raporty / rentowność** (przychód − koszty, per zlecenie i per linia)
 - **Powiadomienia in-app** (+ badge, powiadomienie przy przypisaniu)
+- **Ustawienia** (tylko właściciel) — adres bazy, ceny paliwa (benzyna/diesel/LPG), godziny realizacji iClub, VAT. Wartości nie są zaszyte w kodzie — transport, prefill paliwa i wyliczenia zarobku czytają z ustawień.
 - **Pulpit** i **ekran pracownika** na prawdziwych danych
 - **Ikona/PWA** (dodanie do ekranu głównego)
 
@@ -30,7 +31,7 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Google Maps — auto-dystans** — działa lokalnie; na produkcji potrzebna zmienna `GOOGLE_MAPS_API_KEY` na Vercelu.
 
 ## ⬜ Jeszcze nie napisane (kolejne etapy)
-- **Ustawienia** — ekran konfiguracji (ceny pakietów/dodatków, cena paliwa, baza, progi, VAT) — §51.
+- **Cennik pakietów/dodatków** — edycja cen pakietów i dodatków z panelu (dziś w bazie, bez ekranu edycji). Rozszerzenie Ustawień.
 - **Zdjęcia z realizacji do chmury (Supabase Storage)** — teraz miejsca na zdjęcia działają lokalnie na urządzeniu; wysyłka i podgląd u właściciela to osobny etap.
 - **Google Maps: Places Autocomplete** (podpowiadanie adresów) i **Route Optimization** (optymalizacja wielu dostaw) — §37.
 - **Faktury (InFakt)** — §43.

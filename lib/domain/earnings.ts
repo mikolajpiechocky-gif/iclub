@@ -15,7 +15,8 @@ export interface EarningsBreakdown {
 export function predictedEarnings(
   rate: EmployeeRate | null,
   businessLine: BusinessLine,
-  ownerBonus = 0
+  ownerBonus = 0,
+  hours: number = ICLUB_HOURS
 ): EarningsBreakdown {
   let base = 0;
   let baseLabel = "brak stawki";
@@ -29,8 +30,8 @@ export function predictedEarnings(
       base = rate.iclub_flat!;
       baseLabel = "Ryczałt iClub";
     } else if (rate.hourly_rate != null) {
-      base = rate.hourly_rate * ICLUB_HOURS;
-      baseLabel = `${ICLUB_HOURS}h × ${rate.hourly_rate} zł`;
+      base = rate.hourly_rate * hours;
+      baseLabel = `${hours}h × ${rate.hourly_rate} zł`;
     } else if (rate.iclub_flat != null) {
       base = rate.iclub_flat;
       baseLabel = "Ryczałt";

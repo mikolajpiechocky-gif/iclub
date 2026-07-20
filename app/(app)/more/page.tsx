@@ -16,6 +16,7 @@ const LINKS: { href: string; label: string; icon: IconName }[] = [
   { href: "/reports", label: "Raporty", icon: "chart" },
   { href: "/media", label: "Zgłoszenia i szkody", icon: "camera" },
   { href: "/service", label: "Serwis", icon: "refresh" },
+  { href: "/settings", label: "Ustawienia", icon: "gear" },
 ];
 
 export default function MorePage() {

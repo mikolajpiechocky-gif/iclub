@@ -7,7 +7,7 @@ import { fuelCost } from "@/lib/domain/transport";
 import { getJob } from "@/lib/data/jobs";
 import { computeRoundTrip } from "@/lib/integrations/google-maps";
 import { isGoogleMapsConfigured } from "@/lib/integrations/google-maps/config";
-import { BASE_ADDRESS } from "@/lib/config/base";
+import { getSettings } from "@/lib/data/settings";
 
 export interface TransportFormValues {
   vehicle_id: string;
@@ -74,7 +74,8 @@ export async function computeDistanceAction(jobId: string): Promise<DistanceResu
   if (!location) return { ok: false, error: "Zlecenie nie ma adresu (uzupełnij lokalizację w rezerwacji)." };
   if (!isGoogleMapsConfigured())
     return { ok: false, error: "Podłącz klucz Google Maps (docs/INTEGRATIONS.md), aby liczyć dystans automatycznie." };
-  const res = await computeRoundTrip(BASE_ADDRESS, location);
+  const { base_address } = await getSettings();
+  const res = await computeRoundTrip(base_address, location);
   if (!res) return { ok: false, error: "Nie udało się wyznaczyć trasy — sprawdź adres zlecenia." };
   return { ok: true, km: res.km, minutes: res.minutes, address: res.destFormatted };
 }

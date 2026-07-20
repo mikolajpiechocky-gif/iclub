@@ -15,7 +15,7 @@ import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
 import { RESERVATION_STATUS_META, STAGE_STATUS_META } from "@/lib/data/types";
 import { listTransportCalcs } from "@/lib/data/transport";
-import { DEFAULT_FUEL_PRICE } from "@/lib/domain/transport";
+import { getSettings } from "@/lib/data/settings";
 import { JobTeam, type AssignmentView } from "../../jobs/job-team";
 import { JobVehicles, type JobVehicleView } from "../../jobs/job-vehicles";
 import { JobTransport } from "../../jobs/job-transport";
@@ -100,10 +100,11 @@ async function ReservationOps({
   isOwner: boolean;
   profile: Awaited<ReturnType<typeof getCurrentProfile>>;
 }) {
-  const [stages, assignments, employees] = await Promise.all([
+  const [stages, assignments, employees, settings] = await Promise.all([
     getJobStages(job.id),
     listJobAssignments(job.id),
     listEmployees(),
+    getSettings(),
   ]);
   const done = stages.filter((s) => s.status === "DONE").length;
   const ownerBonus = job.owner_bonus ?? 0;
@@ -113,12 +114,12 @@ async function ReservationOps({
     profile_id: a.profile_id,
     full_name: a.employee?.full_name ?? "—",
     is_lead: a.is_lead,
-    earnings: a.rate ? predictedEarnings(a.rate, job.business_line, ownerBonus) : null,
+    earnings: a.rate ? predictedEarnings(a.rate, job.business_line, ownerBonus, settings.iclub_hours) : null,
   }));
   const assignedIds = new Set(assignments.map((a) => a.profile_id));
   const availableEmployees = employees.filter((e) => !assignedIds.has(e.id)).map((e) => ({ id: e.id, full_name: e.full_name || "—" }));
   const myRate = employees.find((e) => e.id === profile?.id)?.rate ?? null;
-  const myEarnings = myRate ? predictedEarnings(myRate, job.business_line, ownerBonus) : null;
+  const myEarnings = myRate ? predictedEarnings(myRate, job.business_line, ownerBonus, settings.iclub_hours) : null;
   const amIAssigned = profile ? assignedIds.has(profile.id) : false;
   const unavailableIds = await getUnavailableProfileIds(job.event_date);
 
@@ -168,7 +169,7 @@ async function ReservationOps({
 
       <JobVehicles jobId={job.id} isOwner={isOwner} assigned={assignedVehicles} available={availableVehicles} conflicts={vehicleConflicts} />
 
-      <JobTransport jobId={job.id} isOwner={isOwner} calcs={transportCalcs} vehicles={vehiclesForTransport} defaultFuelPrice={DEFAULT_FUEL_PRICE} />
+      <JobTransport jobId={job.id} isOwner={isOwner} calcs={transportCalcs} vehicles={vehiclesForTransport} defaultFuelPrice={settings.fuel_price_diesel} />
     </>
   );
 }

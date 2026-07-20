@@ -16,7 +16,7 @@ import type { StatusKey } from "@/lib/types";
 import type { ProfileRecord } from "@/lib/data/types";
 
 /* Konfiguracja nawigacji — pełna dla sidebar desktop, pogrupowana. */
-const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { href: string; label: string; icon: IconName; badge?: string }[] }[] = [
+const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { href: string; label: string; icon: IconName; badge?: string; ownerOnly?: boolean }[] }[] = [
   { group: "Główne", tint: "#14b8c4", items: [
     { href: "/dashboard", label: "Pulpit", icon: "home" },
     { href: "/calendar", label: "Kalendarz", icon: "calendar" },
@@ -42,6 +42,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
   { group: "System", tint: "#64748b", items: [
     { href: "/media", label: "Zgłoszenia i szkody", icon: "camera" },
     { href: "/service", label: "Serwis", icon: "refresh" },
+    { href: "/settings", label: "Ustawienia", icon: "gear", ownerOnly: true },
   ]},
 ];
 
@@ -71,10 +72,13 @@ export function AppSidebar({ profile, unread = 0 }: { profile: ProfileRecord | n
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-iclub.png" alt="iClub" className="h-10 w-auto" />
       </Link>
-      {groups.map((g) => (
+      {groups.map((g) => {
+        const items = g.items.filter((it) => !it.ownerOnly || isOwner);
+        if (items.length === 0) return null;
+        return (
         <div key={g.group}>
           <div className="mt-4 mb-2 px-2.5 text-[10px] font-bold uppercase tracking-[1.2px] text-[#4a4f60]">{g.group}</div>
-          {g.items.map((it) => {
+          {items.map((it) => {
             const active = isActive(pathname, it.href);
             const badge = it.href === "/notifications" ? (unread > 0 ? String(unread) : undefined) : it.badge;
             return (
@@ -95,7 +99,8 @@ export function AppSidebar({ profile, unread = 0 }: { profile: ProfileRecord | n
             );
           })}
         </div>
-      ))}
+        );
+      })}
       <UserMenu profile={profile} />
     </aside>
   );
