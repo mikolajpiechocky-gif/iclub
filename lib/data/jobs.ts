@@ -67,6 +67,15 @@ export async function getJob(id: string): Promise<JobWithReservation | null> {
   return data as unknown as JobWithReservation;
 }
 
+// Zlecenie 1:1 z rezerwacją — pobierane po id rezerwacji (rezerwacja = realizacja).
+export async function getJobByReservation(reservationId: string): Promise<JobWithReservation | null> {
+  if (!isSupabaseConfigured()) return DEMO_JOBS.find((j) => j.reservation_id === reservationId) ?? null;
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("jobs").select(RESV_SELECT).eq("reservation_id", reservationId).maybeSingle();
+  if (error) return null;
+  return (data as unknown as JobWithReservation) ?? null;
+}
+
 export async function getJobStages(jobId: string): Promise<JobStageRecord[]> {
   if (!isSupabaseConfigured()) return demoStages(jobId);
   const supabase = await createClient();

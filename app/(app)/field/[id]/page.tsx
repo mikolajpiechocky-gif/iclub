@@ -1,12 +1,16 @@
-// app/(app)/field/[id]/page.tsx — Realizacja terenowa (mobile, dane + etapy).
+// app/(app)/field/[id]/page.tsx — Realizacja terenowa (mobile).
+// Pakowanie jest osobnym blokiem, a właściwa realizacja to kroki z własnymi
+// czynnościami (W drodze / Montaż / Szkolenie / Zdjęcia / Rozliczenie / Demontaż).
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Icon } from "@/components/icons";
 import { Pill } from "@/components/ui";
 import { getJob, getJobStages } from "@/lib/data/jobs";
 import { getCustomer } from "@/lib/data/customers";
+import { listChecklistItems } from "@/lib/data/checklist";
+import { listPayments } from "@/lib/data/payments";
+import { getSignature } from "@/lib/data/signatures";
 import { JOB_STATUS_META } from "@/lib/data/types";
-import { FieldStages } from "../field-stages";
+import { PackingBlock, RealizationFlow, type RealizationContext } from "../realization-flow";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +23,32 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   if (!job) notFound();
 
   const r = job.reservation;
-  const customer = r?.customer_id ? await getCustomer(r.customer_id) : null;
+  const [customer, checklist, payments, signature] = await Promise.all([
+    r?.customer_id ? getCustomer(r.customer_id) : Promise.resolve(null),
+    listChecklistItems(job.id),
+    listPayments(),
+    getSignature(job.id),
+  ]);
   const m = JOB_STATUS_META[job.status];
 
   const phone = customer?.phone ?? null;
   const address = r?.location || customer?.address || customer?.city || null;
   const navUrl = address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
+
+  // Pakowanie = osobny blok; reszta kroków to właściwa realizacja.
+  const packing = stages.find((s) => s.stage_key === "PACKING") ?? null;
+  const flowSteps = stages.filter((s) => s.stage_key !== "PACKING");
+
+  const toPay = r?.price != null ? r.price - (r.deposit ?? 0) : null;
+  const paymentReported = payments.some((p) => p.job_id === job.id);
+
+  const ctx: RealizationContext = {
+    navUrl,
+    toPay,
+    hasSignature: Boolean(signature),
+    paymentReported,
+    signatureHref: `/field/${job.id}/signature`,
+  };
 
   return (
     <div className="mx-auto max-w-md pb-6">
@@ -58,27 +82,21 @@ export default async function FieldRealizationPage({ params }: { params: Promise
           ))}
         </div>
 
-        {/* Checklista pakowania */}
-        <Link href={`/field/${job.id}/checklist`} className="mb-3.5 flex items-center gap-3 rounded-[14px] border border-border bg-surface px-3.5 py-3">
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-[#271b3f] text-[#b98cf5]"><Icon name="clipboard" className="h-4 w-4" /></span>
-          <div className="flex-1"><div className="text-[13.5px] font-bold text-ink">Checklista pakowania</div><div className="text-[11px] text-ink-2">Sprzęt do zabrania — odhacz przed wyjazdem</div></div>
-          <Icon name="chevron-right" className="h-4 w-4 text-ink-2" />
-        </Link>
+        {/* Blok: Pakowanie (osobny etap, dzień przed) */}
+        <PackingBlock
+          jobId={job.id}
+          stage={packing}
+          checklistHref={`/field/${job.id}/checklist`}
+          progress={{ done: checklist.filter((i) => i.done).length, total: checklist.length }}
+        />
 
-        {/* Podpis klienta */}
-        <Link href={`/field/${job.id}/signature`} className="mb-3.5 flex items-center gap-3 rounded-[14px] border border-border bg-surface px-3.5 py-3">
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-[#182238] text-[#7fa8f5]"><Icon name="signature" className="h-4 w-4" /></span>
-          <div className="flex-1"><div className="text-[13.5px] font-bold text-ink">Podpis klienta</div><div className="text-[11px] text-ink-2">Protokół odbioru i rozliczenie</div></div>
-          <Icon name="chevron-right" className="h-4 w-4 text-ink-2" />
-        </Link>
-
-        {/* Etapy */}
-        <FieldStages jobId={job.id} stages={stages} />
+        {/* Blok: Realizacja (kroki z własnymi czynnościami) */}
+        <RealizationFlow jobId={job.id} steps={flowSteps} ctx={ctx} />
 
         {/* Akcje stałe */}
         <div className="mt-3.5 flex gap-2.5">
           <Link href="/media" className="flex-1 rounded-[13px] border border-[#3a1c1f] bg-[#251215] py-3 text-center text-[13px] font-bold text-bad">⚠ Zgłoś szkodę</Link>
-          <Link href={`/jobs/${job.id}`} className="flex-1 rounded-[13px] border border-border bg-surface py-3 text-center text-[13px] font-bold text-ink-2">Szczegóły zlecenia</Link>
+          <Link href={`/reservations/${r?.id ?? ""}`} className="flex-1 rounded-[13px] border border-border bg-surface py-3 text-center text-[13px] font-bold text-ink-2">Szczegóły rezerwacji</Link>
         </div>
       </div>
     </div>

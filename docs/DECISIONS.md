@@ -179,6 +179,22 @@ Powód:
 Konsekwencje:  
 Status:
 
+### 20. Rezerwacja = realizacja (zniesienie osobnych „Zleceń”)
+
+Data: 2026-07-19  
+Decyzja: Jedno wydarzenie to jedna rezerwacja. Właściciel zarządza nim w „Rezerwacjach” (sprzedaż + operacje: etapy, zespół, pojazdy, transport, umowa w jednym miejscu), a pracownik widzi je jako „Realizację” w terenie. Osobna zakładka „Zlecenia” zniknęła.  
+Powód: Rezerwacja, zlecenie i realizacja opisywały tę samą rzecz — trzy nazwy myliły użytkownika.  
+Konsekwencje: Rekord `jobs` pozostaje techniczny (1:1 z rezerwacją, tworzony automatycznie), ale nie ma własnej zakładki. Trasy `/jobs` i `/jobs/[id]` przekierowują do rezerwacji. Hub rezerwacji: `/reservations/[id]`.  
+Status: zatwierdzona
+
+### 21. Panel pracownika: osobne bloki i kroki z własnymi czynnościami
+
+Data: 2026-07-19  
+Decyzja: Realizacja terenowa dzieli się na osobne bloki zamiast jednej listy „do odhaczenia”. „Pakowanie” to osobny blok (dzień przed), a właściwa realizacja to kroki, z których każdy ma własne czynności: W drodze (nawigacja + „Jestem na miejscu”), Montaż, Szkolenie klienta (punkty do omówienia), Zdjęcia (miejsca na zdjęcia), Rozliczenie (metoda płatności + zgłoszenie odbioru + podpis), Demontaż i powrót.  
+Powód: Każdy etap to inne działanie, nie tylko zaznaczenie ptaszka; kroki mają „aktywować się” po kolei w dniu realizacji.  
+Konsekwencje: Zmieniono szablon etapów iClub (`ICLUB_STAGES`). Wysyłka zdjęć do chmury (Storage) to osobny, późniejszy etap — na razie zdjęcia zostają na urządzeniu.  
+Status: zatwierdzona
+
 ## Rozwój iteracyjny
 
 Rejestr będzie aktualizowany po każdej ważnej decyzji produktowej lub technicznej.

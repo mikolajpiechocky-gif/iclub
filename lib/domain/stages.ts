@@ -10,16 +10,18 @@ export interface StageTemplate {
   title: string;
 }
 
-// iClub: pełny cykl realizacji (§28).
+// iClub: przebieg dnia realizacji (§19/§28). Pakowanie jest osobnym blokiem
+// (dzień przed), pozostałe kroki to właściwa realizacja w terenie — każdy krok
+// ma inne czynności, dlatego w panelu pracownika renderują się jako osobne
+// zadania, a nie jedna lista „do odhaczenia”.
 export const ICLUB_STAGES: StageTemplate[] = [
-  { key: "PREP", title: "Przygotowanie" },
   { key: "PACKING", title: "Pakowanie" },
+  { key: "TRAVEL", title: "W drodze" },
   { key: "SETUP", title: "Montaż" },
-  { key: "HANDOVER", title: "Przekazanie" },
-  { key: "TEARDOWN", title: "Demontaż" },
-  { key: "RETURN", title: "Powrót" },
-  { key: "UNPACK", title: "Rozpakowanie" },
-  { key: "SERVICE", title: "Serwis" },
+  { key: "TRAINING", title: "Szkolenie klienta" },
+  { key: "PHOTOS", title: "Zdjęcia" },
+  { key: "SETTLEMENT", title: "Rozliczenie" },
+  { key: "TEARDOWN", title: "Demontaż i powrót" },
 ];
 
 // Wypożyczalnia z dostawą (§28) — użyjemy przy module wypożyczalni (Faza 11).

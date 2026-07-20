@@ -6,15 +6,14 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Logowanie, role OWNER/EMPLOYEE, ochrona tras**
 - **Klienci** (lista, dodawanie, edycja)
 - **Zapytania** (lista, dodawanie, edycja, statusy)
-- **Rezerwacje** (iClub + wypożyczalnia) → automatyczne **Zlecenie + etapy**
-- **Zlecenia** (szczegóły, etapy, zespół, przewidywany zarobek, bonus, pojazdy, transport, umowa)
+- **Rezerwacje = realizacje** — jedno wydarzenie w jednym miejscu. Hub rezerwacji (`/reservations/[id]`) łączy sprzedaż + operacje: etapy, zespół, przewidywany zarobek, bonus, pojazdy, transport, umowa. Osobna zakładka „Zlecenia” zniesiona.
 - **Kalendarz** (na prawdziwych rezerwacjach, nawigacja miesięcy)
 - **Magazyn** (namioty + sprzęt)
 - **Pracownicy** (stawki, premie — tylko OWNER)
 - **Dostępność** pracowników (+ ostrzeżenie przy przypisaniu)
 - **Flota** (pojazdy, przypisanie do zleceń, konflikt pojazdu)
 - **Transport + koszt paliwa** (wzór; ręczny dystans lub „Oblicz z mapy")
-- **Realizacje mobilne** (etapy do odhaczania, Zadzwoń/Nawiguj)
+- **Realizacje mobilne** — osobne bloki: Pakowanie + kroki z własnymi czynnościami (W drodze / Montaż / Szkolenie klienta / Zdjęcia / Rozliczenie / Demontaż), Zadzwoń/Nawiguj, zgłoszenie odbioru płatności
 - **Checklisty pakowania** (generowane z konfiguracji, zakończenie mimo braków)
 - **Zgłoszenia i szkody / incydenty**
 - **Serwis** (zadania serwisowe)
@@ -32,6 +31,7 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 
 ## ⬜ Jeszcze nie napisane (kolejne etapy)
 - **Ustawienia** — ekran konfiguracji (ceny pakietów/dodatków, cena paliwa, baza, progi, VAT) — §51.
+- **Zdjęcia z realizacji do chmury (Supabase Storage)** — teraz miejsca na zdjęcia działają lokalnie na urządzeniu; wysyłka i podgląd u właściciela to osobny etap.
 - **Google Maps: Places Autocomplete** (podpowiadanie adresów) i **Route Optimization** (optymalizacja wielu dostaw) — §37.
 - **Faktury (InFakt)** — §43.
 - **Push / SMS / e-mail** — dostawcy — §8.

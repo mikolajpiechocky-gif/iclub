@@ -51,7 +51,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
-      <Link href={`/jobs/${id}`} className="no-print mb-3 inline-flex items-center gap-1 text-[12.5px] font-semibold text-ink-2">‹ Zlecenie</Link>
+      <Link href={r?.id ? `/reservations/${r.id}` : "/reservations"} className="no-print mb-3 inline-flex items-center gap-1 text-[12.5px] font-semibold text-ink-2">‹ Rezerwacja</Link>
 
       {job.business_line !== "ICLUB" && (
         <div className="no-print mb-4"><Alert tone="info" title="Umowa dotyczy zleceń iClub">Dla wypożyczalni umowa jest opcjonalna.</Alert></div>

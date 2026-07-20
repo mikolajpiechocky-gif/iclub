@@ -35,7 +35,7 @@ export default async function ReservationsPage() {
         <EmptyState
           icon="bookmark"
           title="Brak rezerwacji"
-          desc="Utwórz pierwszą rezerwację iClub — powstanie z niej zlecenie i etapy."
+          desc="Utwórz pierwszą rezerwację iClub — od razu staje się realizacją z etapami."
           action={<Link href="/reservations/new"><PrimaryButton icon="plus">Nowa rezerwacja</PrimaryButton></Link>}
         />
       ) : (
@@ -55,14 +55,14 @@ export default async function ReservationsPage() {
                   const m = RESERVATION_STATUS_META[r.status];
                   return (
                     <tr key={r.id} className="border-b border-border-soft last:border-0 hover:bg-surface-2">
-                      <td className="px-4 py-3"><Link href={`/reservations/${r.id}/edit`} className="text-[13.5px] font-bold text-ink">{r.customer?.name ?? "— bez klienta —"}</Link></td>
+                      <td className="px-4 py-3"><Link href={`/reservations/${r.id}`} className="text-[13.5px] font-bold text-ink">{r.customer?.name ?? "— bez klienta —"}</Link></td>
                       <td className="px-4 py-3 text-[13px] text-ink-2">{r.event_type || "—"}</td>
                       <td className="px-4 py-3 text-[13px] text-ink">{fmtDate(r.event_date)}</td>
                       <td className="px-4 py-3 text-[13px] text-ink-2">{r.tent?.name ?? "—"}</td>
                       <td className="px-4 py-3 text-[13px] text-ink-2">{r.package?.name ?? "—"}</td>
                       <td className="px-4 py-3 text-[13px] text-ink">{fmtPLN(r.deposit)}</td>
                       <td className="px-4 py-3"><Pill label={m.label} fg={m.fg} bg={m.bg} /></td>
-                      <td className="px-4 py-3 text-right"><Link href={`/reservations/${r.id}/edit`} className="text-[12.5px] font-semibold">Edytuj →</Link></td>
+                      <td className="px-4 py-3 text-right"><Link href={`/reservations/${r.id}`} className="text-[12.5px] font-semibold">Otwórz →</Link></td>
                     </tr>
                   );
                 })}
@@ -75,7 +75,7 @@ export default async function ReservationsPage() {
             {reservations.map((r) => {
               const m = RESERVATION_STATUS_META[r.status];
               return (
-                <Link key={r.id} href={`/reservations/${r.id}/edit`} className="rounded-card border border-border bg-surface p-4">
+                <Link key={r.id} href={`/reservations/${r.id}`} className="rounded-card border border-border bg-surface p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="text-[14.5px] font-bold text-ink">{r.customer?.name ?? "— bez klienta —"}</div>
                     <Pill label={m.label} fg={m.fg} bg={m.bg} />
