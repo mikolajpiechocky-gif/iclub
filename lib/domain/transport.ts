@@ -8,3 +8,9 @@ export function fuelCost(km: number, consumption: number, price: number): number
   if (!km || !consumption || !price) return 0;
   return Math.round((km / 100) * consumption * price * 100) / 100;
 }
+
+// Amortyzacja auta (bez paliwa): km × stawka (§34, koszt wewnętrzny).
+export function amortizationCost(km: number, ratePerKm: number): number {
+  if (!km || !ratePerKm) return 0;
+  return Math.round(km * ratePerKm * 100) / 100;
+}

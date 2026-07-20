@@ -8,16 +8,18 @@ export interface AppSettings {
   fuel_price_petrol: number;
   fuel_price_diesel: number;
   fuel_price_lpg: number;
+  amortization_per_km: number;
   iclub_hours: number;
   vat_rate: number;
 }
 
-// Wartości startowe (seed migracji 0017). Jedyne miejsce z domyślnymi liczbami.
+// Wartości startowe (seed migracji 0017/0019). Jedyne miejsce z domyślnymi liczbami.
 export const DEFAULT_SETTINGS: AppSettings = {
   base_address: "Południowa 9, Dopiewo",
   fuel_price_petrol: 6.5,
   fuel_price_diesel: 6.5,
   fuel_price_lpg: 3.2,
+  amortization_per_km: 0.05,
   iclub_hours: 8,
   vat_rate: 23,
 };
@@ -32,7 +34,7 @@ export async function getSettings(): Promise<AppSettings> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("app_settings")
-    .select("base_address, fuel_price_petrol, fuel_price_diesel, fuel_price_lpg, iclub_hours, vat_rate")
+    .select("base_address, fuel_price_petrol, fuel_price_diesel, fuel_price_lpg, amortization_per_km, iclub_hours, vat_rate")
     .eq("id", true)
     .maybeSingle();
   if (error || !data) return DEFAULT_SETTINGS;
@@ -41,6 +43,7 @@ export async function getSettings(): Promise<AppSettings> {
     fuel_price_petrol: num(data.fuel_price_petrol, DEFAULT_SETTINGS.fuel_price_petrol),
     fuel_price_diesel: num(data.fuel_price_diesel, DEFAULT_SETTINGS.fuel_price_diesel),
     fuel_price_lpg: num(data.fuel_price_lpg, DEFAULT_SETTINGS.fuel_price_lpg),
+    amortization_per_km: num(data.amortization_per_km, DEFAULT_SETTINGS.amortization_per_km),
     iclub_hours: num(data.iclub_hours, DEFAULT_SETTINGS.iclub_hours),
     vat_rate: num(data.vat_rate, DEFAULT_SETTINGS.vat_rate),
   };

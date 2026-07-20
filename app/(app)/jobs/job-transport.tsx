@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
-import { fuelCost } from "@/lib/domain/transport";
+import { fuelCost, amortizationCost } from "@/lib/domain/transport";
 import type { TransportCalcRecord } from "@/lib/data/transport";
 import { createTransportAction, removeTransportAction, computeDistanceAction, type TransportFormValues } from "./transport-actions";
 
@@ -25,13 +25,14 @@ function priceForFuelType(fuelType: string | null, prices: FuelPrices): number {
 }
 
 export function JobTransport({
-  jobId, isOwner, calcs, vehicles, fuelPrices,
+  jobId, isOwner, calcs, vehicles, fuelPrices, amortizationPerKm,
 }: {
   jobId: string;
   isOwner: boolean;
   calcs: TransportCalcRecord[];
   vehicles: { id: string; name: string; consumption: number | null; fuel_type: string | null }[];
   fuelPrices: FuelPrices;
+  amortizationPerKm: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -65,7 +66,10 @@ export function JobTransport({
     }));
   };
 
-  const preview = fuelCost(Number(v.distance_km.replace(",", ".")) || 0, Number(v.consumption.replace(",", ".")) || 0, Number(v.fuel_price.replace(",", ".")) || 0);
+  const previewKm = Number(v.distance_km.replace(",", ".")) || 0;
+  const preview = fuelCost(previewKm, Number(v.consumption.replace(",", ".")) || 0, Number(v.fuel_price.replace(",", ".")) || 0);
+  const previewAmort = amortizationCost(previewKm, amortizationPerKm);
+  const previewInternal = Math.round((preview + previewAmort) * 100) / 100;
 
   const add = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +90,8 @@ export function JobTransport({
   };
 
   const totalFuel = calcs.reduce((s, c) => s + Number(c.fuel_cost || 0), 0);
+  const totalAmort = calcs.reduce((s, c) => s + Number(c.amortization || 0), 0);
+  const totalInternal = totalFuel + totalAmort;
   const totalClient = calcs.reduce((s, c) => s + Number(c.client_price || 0), 0);
 
   return (
@@ -99,13 +105,15 @@ export function JobTransport({
               <div key={c.id} className="flex flex-wrap items-center gap-3 rounded-[13px] border border-border bg-surface-2 px-3.5 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-bold text-ink">{c.kind === "ACTUAL" ? "Wykonanie" : "Plan"}{c.vehicle?.name ? ` · ${c.vehicle.name}` : ""} · {c.distance_km ?? 0} km</div>
-                  <div className="text-[12px] text-ink-2">Paliwo: {fmtPLN(c.fuel_cost)}{c.client_price != null ? ` · dla klienta: ${fmtPLN(c.client_price)}` : ""}{c.note ? ` · ${c.note}` : ""}</div>
+                  <div className="text-[12px] text-ink-2">Paliwo: {fmtPLN(c.fuel_cost)} · ekspl.: {fmtPLN(c.amortization)} · wewn.: {fmtPLN(Number(c.fuel_cost || 0) + Number(c.amortization || 0))}{c.client_price != null ? ` · dla klienta: ${fmtPLN(c.client_price)}` : ""}{c.note ? ` · ${c.note}` : ""}</div>
                 </div>
                 {isOwner && <button onClick={() => remove(c.id)} disabled={pending} className="rounded-[9px] border border-[#3a1c1f] bg-[#251215] px-2.5 py-1.5 text-[11.5px] font-semibold text-bad">Usuń</button>}
               </div>
             ))}
-            <div className="flex justify-end gap-4 text-[12.5px] font-semibold text-ink-2">
-              <span>Koszt paliwa: <span className="text-warn">{fmtPLN(totalFuel)}</span></span>
+            <div className="flex flex-wrap justify-end gap-x-4 gap-y-1 text-[12.5px] font-semibold text-ink-2">
+              <span>Paliwo: <span className="text-warn">{fmtPLN(totalFuel)}</span></span>
+              <span>Eksploatacja: <span className="text-warn">{fmtPLN(totalAmort)}</span></span>
+              <span>Koszt wewnętrzny: <span className="text-warn">{fmtPLN(totalInternal)}</span></span>
               {totalClient > 0 && <span>Dla klienta: <span className="text-ok">{fmtPLN(totalClient)}</span></span>}
             </div>
           </div>
@@ -129,8 +137,10 @@ export function JobTransport({
               <SecondaryButton type="button" onClick={calcFromMap} disabled={pending}>Oblicz z mapy</SecondaryButton>
               {mapMsg && <span className="text-[11.5px] text-ink-2">{mapMsg}</span>}
             </div>
-            <div className="col-span-2 flex items-center justify-between">
-              <span className="text-[12.5px] font-semibold text-ink-2">Szac. koszt paliwa: <span className="text-warn">{fmtPLN(preview)}</span></span>
+            <div className="col-span-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[12.5px] font-semibold text-ink-2">
+                Paliwo <span className="text-warn">{fmtPLN(preview)}</span> + eksploatacja <span className="text-warn">{fmtPLN(previewAmort)}</span> = <span className="text-warn">{fmtPLN(previewInternal)}</span>
+              </span>
               <PrimaryButton type="submit" icon="plus" disabled={pending}>{pending ? "Zapisywanie…" : "Dodaj kalkulację"}</PrimaryButton>
             </div>
           </form>

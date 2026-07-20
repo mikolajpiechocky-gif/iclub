@@ -1000,3 +1000,7 @@ create policy "realizations insert" on storage.objects for insert to authenticat
 drop policy if exists "realizations delete" on storage.objects;
 create policy "realizations delete" on storage.objects for delete to authenticated using (bucket_id = 'realizations');
 
+-- ================= 0019: eksploatacja auta w koszcie transportu =================
+alter table public.app_settings add column if not exists amortization_per_km numeric(6,2) not null default 0.05;
+alter table public.transport_calculations add column if not exists amortization numeric(10,2);
+

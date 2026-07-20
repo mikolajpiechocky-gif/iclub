@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createTransportCalc, removeTransportCalc } from "@/lib/data/transport";
-import { fuelCost } from "@/lib/domain/transport";
+import { fuelCost, amortizationCost } from "@/lib/domain/transport";
+import { getSettings } from "@/lib/data/settings";
 import { getJob } from "@/lib/data/jobs";
 import { computeRoundTrip } from "@/lib/integrations/google-maps";
 import { isGoogleMapsConfigured } from "@/lib/integrations/google-maps/config";
-import { getSettings } from "@/lib/data/settings";
 
 export interface TransportFormValues {
   vehicle_id: string;
@@ -40,6 +40,8 @@ export async function createTransportAction(jobId: string, v: TransportFormValue
   const cons = toNum(v.consumption);
   const price = toNum(v.fuel_price);
   const cost = fuelCost(km, cons ?? 0, price ?? 0);
+  const settings = await getSettings();
+  const amort = amortizationCost(km, settings.amortization_per_km);
   try {
     await createTransportCalc({
       job_id: jobId,
@@ -49,6 +51,7 @@ export async function createTransportAction(jobId: string, v: TransportFormValue
       consumption: cons,
       fuel_price: price,
       fuel_cost: cost,
+      amortization: amort,
       client_price: toNum(v.client_price),
       note: v.note.trim() || null,
     });

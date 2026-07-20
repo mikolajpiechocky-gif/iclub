@@ -173,7 +173,7 @@ async function ReservationOps({
 
       <JobVehicles jobId={job.id} isOwner={isOwner} assigned={assignedVehicles} available={availableVehicles} conflicts={vehicleConflicts} />
 
-      <JobTransport jobId={job.id} isOwner={isOwner} calcs={transportCalcs} vehicles={vehiclesForTransport} fuelPrices={fuelPrices} />
+      <JobTransport jobId={job.id} isOwner={isOwner} calcs={transportCalcs} vehicles={vehiclesForTransport} fuelPrices={fuelPrices} amortizationPerKm={settings.amortization_per_km} />
 
       <SectionCard title="Zdjęcia z realizacji" className="mt-4 p-5">
         <div className="px-5 pb-5">

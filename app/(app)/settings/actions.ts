@@ -10,6 +10,7 @@ export interface SettingsFormValues {
   fuel_price_petrol: string;
   fuel_price_diesel: string;
   fuel_price_lpg: string;
+  amortization_per_km: string;
   iclub_hours: string;
   vat_rate: string;
 }
@@ -30,7 +31,7 @@ function num(s: string): number | null {
 }
 
 const NUMERIC_FIELDS: (keyof SettingsFormValues)[] = [
-  "fuel_price_petrol", "fuel_price_diesel", "fuel_price_lpg", "iclub_hours", "vat_rate",
+  "fuel_price_petrol", "fuel_price_diesel", "fuel_price_lpg", "amortization_per_km", "iclub_hours", "vat_rate",
 ];
 
 export async function updateSettingsAction(v: SettingsFormValues): Promise<ActionResult> {
@@ -56,6 +57,7 @@ export async function updateSettingsAction(v: SettingsFormValues): Promise<Actio
     fuel_price_petrol: parsed.fuel_price_petrol,
     fuel_price_diesel: parsed.fuel_price_diesel,
     fuel_price_lpg: parsed.fuel_price_lpg,
+    amortization_per_km: parsed.amortization_per_km,
     iclub_hours: parsed.iclub_hours,
     vat_rate: parsed.vat_rate,
   };

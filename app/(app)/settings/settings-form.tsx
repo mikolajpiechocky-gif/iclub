@@ -18,6 +18,7 @@ export function SettingsForm({ initial, disabled }: { initial: AppSettings; disa
     fuel_price_petrol: str(initial.fuel_price_petrol),
     fuel_price_diesel: str(initial.fuel_price_diesel),
     fuel_price_lpg: str(initial.fuel_price_lpg),
+    amortization_per_km: str(initial.amortization_per_km),
     iclub_hours: str(initial.iclub_hours),
     vat_rate: str(initial.vat_rate),
   });
@@ -59,6 +60,13 @@ export function SettingsForm({ initial, disabled }: { initial: AppSettings; disa
           <TextField label="Diesel" inputMode="decimal" value={v.fuel_price_diesel} onChange={(e) => set("fuel_price_diesel", e.target.value)} error={errors.fuel_price_diesel} />
           <TextField label="LPG" inputMode="decimal" value={v.fuel_price_lpg} onChange={(e) => set("fuel_price_lpg", e.target.value)} error={errors.fuel_price_lpg} />
         </div>
+      </SectionCard>
+
+      <SectionCard title="Transport" className="mt-4 p-5">
+        <div className="grid grid-cols-1 gap-4 px-5 pb-2 sm:grid-cols-2">
+          <TextField label="Eksploatacja auta (zł/km)" inputMode="decimal" value={v.amortization_per_km} onChange={(e) => set("amortization_per_km", e.target.value)} error={errors.amortization_per_km} />
+        </div>
+        <p className="px-5 pb-5 text-[12px] text-ink-2">Koszt bieżący auta bez paliwa (opony, serwis, płyny). Koszt wewnętrzny transportu = paliwo + eksploatacja × km.</p>
       </SectionCard>
 
       <SectionCard title="Rozliczenia" className="mt-4 p-5">

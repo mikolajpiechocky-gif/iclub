@@ -11,6 +11,7 @@ export interface TransportCalcRecord {
   consumption: number | null;
   fuel_price: number | null;
   fuel_cost: number | null;
+  amortization: number | null;
   client_price: number | null;
   note: string | null;
   vehicle: { id: string; name: string } | null;
@@ -24,6 +25,7 @@ export interface TransportInput {
   consumption: number | null;
   fuel_price: number | null;
   fuel_cost: number | null;
+  amortization: number | null;
   client_price: number | null;
   note: string | null;
 }
