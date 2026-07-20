@@ -42,7 +42,7 @@ export async function listJobs(): Promise<JobWithReservation[]> {
   const { data, error } = await supabase
     .from("jobs")
     .select(RESV_SELECT)
-    .order("event_date", { ascending: true });
+    .order("event_date", { ascending: false, nullsFirst: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as JobWithReservation[];
 }

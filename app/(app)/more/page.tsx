@@ -2,6 +2,7 @@
 // app/(app)/more/page.tsx — Mobilne menu „Więcej” (pozycje spoza dolnej nawigacji).
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/icons";
+import { LogoutButton } from "@/components/auth/logout-button";
 
 const LINKS: { href: string; label: string; icon: IconName }[] = [
   { href: "/notifications", label: "Powiadomienia", icon: "inbox" },
@@ -34,6 +35,7 @@ export default function MorePage() {
           </Link>
         ))}
       </div>
+      <LogoutButton className="mt-4 flex w-full items-center justify-center rounded-card border border-border bg-surface px-4 py-3.5 text-[14px] font-bold text-bad disabled:opacity-50" />
     </div>
   );
 }

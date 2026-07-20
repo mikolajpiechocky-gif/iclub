@@ -109,11 +109,13 @@ export function AppSidebar({ profile, unread = 0 }: { profile: ProfileRecord | n
 }
 
 /* ---------------------- MobileBottomNavigation ------------------------ */
-export function MobileBottomNavigation() {
+export function MobileBottomNavigation({ isOwner = false }: { isOwner?: boolean }) {
   const pathname = usePathname();
+  // „Start" prowadzi do właściwego ekranu domowego: pulpit (właściciel) / ekran pracownika.
+  const items = BOTTOM_NAV.map((it) => (it.href === "/me" ? { ...it, href: isOwner ? "/dashboard" : "/me" } : it));
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-[#17181f] bg-panel px-2 pt-2 pb-3.5 md:hidden" aria-label="Nawigacja główna">
-      {BOTTOM_NAV.map((it) => {
+      {items.map((it) => {
         const active = isActive(pathname, it.href);
         return (
           <Link key={it.href} href={it.href} className="flex flex-1 flex-col items-center gap-1 py-1.5">
@@ -134,7 +136,7 @@ export function AppShell({ children, profile, unread = 0 }: { children: ReactNod
     <div className="flex min-h-screen bg-workspace">
       <AppSidebar profile={profile} unread={unread} />
       <main className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
-      <MobileBottomNavigation />
+      <MobileBottomNavigation isOwner={profile?.role === "OWNER"} />
     </div>
   );
 }
