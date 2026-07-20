@@ -51,3 +51,15 @@ export async function setPaymentStatus(id: string, status: PaymentStatus): Promi
   const { error } = await supabase.from("payments").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+// Rozliczenie salda przy zakończeniu realizacji: zaplanowane/zgłoszone → zapłacone.
+export async function markJobPlannedPaid(jobId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from("payments")
+    .update({ status: "PAID", verified_by: user?.id ?? null })
+    .eq("job_id", jobId)
+    .in("status", ["PLANNED", "REPORTED", "OVERDUE"]);
+  if (error) throw new Error(error.message);
+}

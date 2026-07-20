@@ -21,6 +21,7 @@ import { listTransportCalcs } from "@/lib/data/transport";
 import { getSettings } from "@/lib/data/settings";
 import { ClientConfirmToggle } from "../confirm-toggle";
 import { InvoiceStatus } from "../invoice-status";
+import { RealizationDoneButton } from "../realization-done";
 import { JobTeam, type AssignmentView } from "../../jobs/job-team";
 import { JobVehicles, type JobVehicleView } from "../../jobs/job-vehicles";
 import { JobTransport } from "../../jobs/job-transport";
@@ -80,6 +81,7 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-card-lg border border-border bg-surface p-5">
         <Pill label={rm.label} fg={rm.fg} bg={rm.bg} />
         {reservation.location && <span className="text-[13px] font-semibold text-ink-2">📍 {reservation.location}</span>}
+        {job && isOwner && <span className="ml-auto"><RealizationDoneButton reservationId={reservation.id} done={job.status === "DONE"} /></span>}
       </div>
 
       <ClientConfirmToggle id={reservation.id} confirmed={reservation.client_confirmed} confirmedAt={reservation.client_confirmed_at} />

@@ -93,3 +93,9 @@ export async function setStageStatus(stageId: string, status: StageStatus): Prom
   const { error } = await supabase.from("job_stages").update({ status }).eq("id", stageId);
   if (error) throw new Error(error.message);
 }
+
+export async function setJobStatus(jobId: string, status: JobStatus): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("jobs").update({ status }).eq("id", jobId);
+  if (error) throw new Error(error.message);
+}

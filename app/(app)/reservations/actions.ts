@@ -4,6 +4,9 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createReservation, updateReservation, setReservationConfirmed, setInvoiceIssued, findTentConflicts, type ReservationInput } from "@/lib/data/reservations";
+import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
+import { markJobPlannedPaid } from "@/lib/data/payments";
+import { getCurrentProfile } from "@/lib/data/profiles";
 import { syncReservationToCalendar } from "@/lib/data/calendar-sync";
 import type { ReservationStatus, BusinessLine } from "@/lib/data/types";
 
@@ -157,6 +160,27 @@ export async function markReservationConfirmedAction(id: string, confirmed: bool
     return { ok: true, id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać potwierdzenia." };
+  }
+}
+
+// Zakończenie realizacji: zlecenie → DONE i rozliczenie salda „Do zapłaty"
+// (zaplanowane/zgłoszone → zapłacone). Raporty przeliczają się na żywo. Tylko OWNER.
+export async function markRealizationDoneAction(reservationId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko właściciel oznacza realizację jako zakończoną." };
+  try {
+    const job = await getJobByReservation(reservationId);
+    if (!job) return { ok: false, error: "Brak powiązanego zlecenia." };
+    await setJobStatus(job.id, "DONE");
+    await markJobPlannedPaid(job.id);
+    revalidatePath(`/reservations/${reservationId}`);
+    revalidatePath("/reports");
+    revalidatePath("/payments");
+    revalidatePath("/dashboard");
+    return { ok: true, id: reservationId };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zakończyć realizacji." };
   }
 }
 
