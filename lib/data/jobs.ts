@@ -60,6 +60,34 @@ export async function listAssignedJobs(profileId: string): Promise<JobWithReserv
   return rows.map((r) => r.job).filter((j): j is JobWithReservation => Boolean(j));
 }
 
+// Realizacje iClub „do zgarnięcia": nie zrealizowane (PLANNED/IN_PROGRESS), dziś i
+// w przyszłość, BEZ zaakceptowanego zespołu i których dany pracownik jeszcze nie tknął.
+export async function listClaimableJobs(profileId: string): Promise<JobWithReservation[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("jobs")
+    .select(RESV_SELECT)
+    .eq("business_line", "ICLUB")
+    .in("status", ["PLANNED", "IN_PROGRESS"])
+    .gte("event_date", today)
+    .order("event_date", { ascending: true });
+  if (error) return [];
+  const jobs = (data ?? []) as unknown as JobWithReservation[];
+  if (!jobs.length) return [];
+
+  const ids = jobs.map((j) => j.id);
+  const { data: aData } = await supabase.from("job_assignments").select("job_id, profile_id, status").in("job_id", ids);
+  const assigns = (aData ?? []) as { job_id: string; profile_id: string; status: string }[];
+  const taken = new Set(assigns.filter((a) => a.status === "APPROVED").map((a) => a.job_id));
+  const mine = new Set(assigns.filter((a) => a.profile_id === profileId).map((a) => a.job_id));
+  return jobs.filter((j) => {
+    const st = j.reservation?.status;
+    return !taken.has(j.id) && !mine.has(j.id) && st !== "CANCELLED" && st !== "EXPIRED";
+  });
+}
+
 export async function getJob(id: string): Promise<JobWithReservation | null> {
   if (!isSupabaseConfigured()) return DEMO_JOBS.find((j) => j.id === id) ?? null;
   const supabase = await createClient();

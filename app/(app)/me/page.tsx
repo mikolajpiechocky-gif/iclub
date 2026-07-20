@@ -2,14 +2,20 @@
 import Link from "next/link";
 import { EmptyState, Pill } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { listAssignedJobs } from "@/lib/data/jobs";
+import { listAssignedJobs, listClaimableJobs } from "@/lib/data/jobs";
+import { getSettings } from "@/lib/data/settings";
+import { getEmployee } from "@/lib/data/employees";
+import { predictedEarnings } from "@/lib/domain/earnings";
+import { geocode, routeLeg } from "@/lib/integrations/google-maps";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { JOB_STATUS_META } from "@/lib/data/types";
+import { JOB_STATUS_META, type JobWithReservation } from "@/lib/data/types";
 
 export const dynamic = "force-dynamic";
 
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "long" }) : "—";
+const fmtPLN = (v: number) =>
+  new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
 
 function initials(name: string) {
   const p = name.trim().split(/\s+/).filter(Boolean);
@@ -18,7 +24,9 @@ function initials(name: string) {
 
 export default async function EmployeeDashboardPage() {
   const profile = await getCurrentProfile();
-  const jobs = profile ? await listAssignedJobs(profile.id) : [];
+  const [jobs, claimable] = profile
+    ? await Promise.all([listAssignedJobs(profile.id), listClaimableJobs(profile.id)])
+    : [[], []];
   const demo = !isSupabaseConfigured();
 
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -27,6 +35,29 @@ export default async function EmployeeDashboardPage() {
     .sort((a, b) => (a.event_date! < b.event_date! ? -1 : 1));
   const next = upcoming[0] ?? jobs[0];
   const name = profile?.full_name?.trim() || "Pracowniku";
+
+  // Kafelki „do zgarnięcia": co / kiedy / gdzie / km od bazy / ile może zgarnąć.
+  // Km i stawki liczymy tylko gdy jest co pokazać; geokodujemy bazę i unikalne
+  // lokalizacje raz (dedup), potem trasa base→cel.
+  let claimableCards: { j: JobWithReservation; km: number | null; earn: number | null }[] = [];
+  if (claimable.length && profile) {
+    const settings = await getSettings();
+    const myRate = (await getEmployee(profile.id))?.rate ?? null;
+    const baseGeo = await geocode(settings.base_address);
+    const uniqLocs = [...new Set(claimable.map((j) => j.reservation?.location).filter((l): l is string => Boolean(l)))];
+    const kmByLoc = new Map<string, number | null>();
+    await Promise.all(
+      uniqLocs.map(async (loc) => {
+        const dest = await geocode(loc);
+        kmByLoc.set(loc, baseGeo && dest ? (await routeLeg(baseGeo, dest))?.km ?? null : null);
+      }),
+    );
+    claimableCards = claimable.map((j) => ({
+      j,
+      km: j.reservation?.location ? kmByLoc.get(j.reservation.location) ?? null : null,
+      earn: myRate ? predictedEarnings(myRate, "ICLUB", j.owner_bonus ?? 0, settings.iclub_hours).total : null,
+    }));
+  }
 
   return (
     <div className="mx-auto max-w-md px-4 py-4">
@@ -64,6 +95,36 @@ export default async function EmployeeDashboardPage() {
         </div>
       ) : (
         <div className="mb-4"><EmptyState icon="truck" title="Brak przypisanych realizacji" desc="Gdy właściciel przypisze Cię do zlecenia (lub podejmiesz wolne), pojawi się tutaj." /></div>
+      )}
+
+      {/* 2. kafelek: nieprzypisane realizacje iClub do zgarnięcia */}
+      {claimable.length > 0 && (
+        <div className="mb-4 rounded-card border border-[#2b3320] bg-[#141b12] p-1.5">
+          <div className="flex items-center gap-2 px-3 pt-2 pb-0.5">
+            <span className="font-display text-[13.5px] font-bold text-ok">Rezerwacje do zgarnięcia</span>
+            <span className="ml-auto rounded-full bg-[#16301f] px-2 py-0.5 text-[11px] font-bold text-ok">{claimable.length}</span>
+          </div>
+          <div className="px-3 pb-1.5 text-[11.5px] text-ink-2">Nieprzypisane realizacje iClub — poproś, właściciel zatwierdzi.</div>
+          {claimableCards.map(({ j, km, earn }) => (
+            <Link key={j.id} href={`/reservations/${j.reservation_id}`} className="block rounded-[12px] px-3 py-2.5 transition hover:bg-surface-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13.5px] font-bold text-ink">{j.reservation?.package?.name ?? j.reservation?.event_type ?? j.reservation?.customer?.name ?? "Realizacja iClub"}</div>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-ink-2">
+                    <span>📅 {fmtDate(j.event_date)}</span>
+                    {j.reservation?.location && <span className="max-w-[150px] truncate">📍 {j.reservation.location}</span>}
+                    <span>🚗 {km != null ? `${km} km` : "— km"} od bazy</span>
+                    {j.reservation?.tent?.name && <span>⛺ {j.reservation.tent.name}</span>}
+                  </div>
+                </div>
+                <div className="flex-none text-right">
+                  {earn != null && <div className="font-display text-[15px] font-bold text-ok">{fmtPLN(earn)}</div>}
+                  <div className="mt-0.5 text-[11px] font-bold text-ok">Zgarnij →</div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
       )}
 
       {upcoming.length > 1 && (
