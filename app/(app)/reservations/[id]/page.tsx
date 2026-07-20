@@ -14,6 +14,7 @@ import { predictedEarnings } from "@/lib/domain/earnings";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
 import { listJobPhotos } from "@/lib/data/photos";
+import { getEventWeather } from "@/lib/integrations/weather";
 import { RESERVATION_STATUS_META, STAGE_STATUS_META } from "@/lib/data/types";
 import { listTransportCalcs } from "@/lib/data/transport";
 import { getSettings } from "@/lib/data/settings";
@@ -41,6 +42,10 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
   const r = job?.reservation ?? reservation;
   const rm = RESERVATION_STATUS_META[reservation.status];
   const isOwner = profile?.role === "OWNER";
+
+  const weather = reservation.event_date && reservation.location
+    ? await getEventWeather(reservation.location, reservation.event_date)
+    : null;
 
   const cards: { h: string; rows: [string, string][] }[] = [
     { h: "Klient", rows: [["Klient", (r as { customer?: { name?: string } }).customer?.name ?? "—"], ["Źródło", reservation.source ?? "—"]] },
@@ -71,6 +76,25 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
       </div>
 
       <ClientConfirmToggle id={reservation.id} confirmed={reservation.client_confirmed} confirmedAt={reservation.client_confirmed_at} />
+
+      {weather && (
+        <div className={`mb-4 rounded-card-lg border p-4 ${weather.warnings.length ? "border-[#3d3216] bg-[#241e10]" : "border-border bg-surface"}`}>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px]">
+            <span className="font-bold text-ink">Pogoda · {fmtDate(weather.date)}</span>
+            <span className="font-semibold text-ink-2">{weather.label}</span>
+            {weather.tempMax != null && <span className="text-ink-2">{Math.round(weather.tempMin ?? weather.tempMax)}–{Math.round(weather.tempMax)}°C</span>}
+            {weather.windMax != null && <span className="text-ink-2">wiatr {Math.round(weather.windMax)} km/h</span>}
+            {weather.precip != null && <span className="text-ink-2">opady {weather.precip} mm</span>}
+          </div>
+          {weather.warnings.length > 0 && (
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {weather.warnings.map((w) => (
+                <span key={w} className="rounded-[8px] bg-[#332814] px-2.5 py-1 text-[11.5px] font-bold text-warn">⚠ {w}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (

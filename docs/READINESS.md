@@ -25,6 +25,7 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Raporty / rentowność** (przychód − koszty, per zlecenie i per linia)
 - **Powiadomienia in-app** (+ badge, powiadomienie przy przypisaniu)
 - **Potwierdzenie klienta przed realizacją** — pulpit pokazuje realizacje ≤7 dni czekające na potwierdzenie; oznaczanie „potwierdzone" w rezerwacji (wysyłkę SMS/e-mail dołożymy przy dostawcach)
+- **Pogoda w rezerwacji** — prognoza (Open-Meteo, darmowe) + ostrzeżenia (wiatr >20 km/h, opady, temp >25°C) dla dat w zasięgu ~14 dni. Współrzędne z geokodowania Google (klucz Map).
 - **Ustawienia** (tylko właściciel) — adres bazy, ceny paliwa (benzyna/diesel/LPG), godziny realizacji iClub, VAT. Wartości nie są zaszyte w kodzie — transport, prefill paliwa i wyliczenia zarobku czytają z ustawień.
 - **Cennik** (tylko właściciel) — ceny pakietów (Standard/Premium/VIP) i dodatków; rezerwacja podpowiada wartość z cennika (pakiet + dodatki).
 - **Pulpit** i **ekran pracownika** na prawdziwych danych
@@ -40,7 +41,7 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Push / SMS / e-mail** — dostawcy (w tym wysyłka próśb o potwierdzenie do klienta) — §8, §42.
 - **Google Calendar** — synchronizacja — §53.
 - **PWA offline** — kolejka synchronizacji, praca bez zasięgu — §14.
-- **Pogoda** (§41) i **rankingi/oceny** (§24).
+- **Rankingi/oceny** (§24).
 
 ## Wymagane do pełnych testów (kolejność)
 1. **Uruchom komplet SQL** w Supabase: otwórz `supabase/setup_all.sql` (migracje 0001–0016, 24 tabele), skopiuj całość, wklej w SQL Editor, Run. Idempotentne. **To odblokowuje Magazyn, Pracowników, Flotę, Płatności, Koszty, Serwis itd.**
