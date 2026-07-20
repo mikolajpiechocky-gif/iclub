@@ -10,7 +10,7 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Kalendarz** (na prawdziwych rezerwacjach, nawigacja miesięcy)
 - **Magazyn** (namioty + sprzęt)
 - **Pracownicy** (stawki, premie — tylko OWNER)
-- **Użytkownicy** (tylko OWNER) — lista, zmiana ról (Właściciel/Pracownik) i imion, ochrona „musi zostać właściciel". Dodawanie/zapraszanie nowych kont z panelu — po podaniu klucza `service_role` (patrz 🔑).
+- **Użytkownicy** (tylko OWNER) — lista, zmiana ról (Właściciel/Pracownik) i imion, ochrona „musi zostać właściciel", **dodawanie nowych kont** (nowe konto = Pracownik, panel pokazuje hasło tymczasowe do przekazania). Wymaga `SUPABASE_SERVICE_ROLE_KEY` na serwerze (ustawione na Vercel).
 - **Dostępność** pracowników (+ ostrzeżenie przy przypisaniu)
 - **Flota** (pojazdy, przypisanie do zleceń, konflikt pojazdu)
 - **Transport + koszt paliwa** (wzór; ręczny dystans lub „Oblicz z mapy")
@@ -37,7 +37,7 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Google Maps — auto-dystans** — działa lokalnie; na produkcji potrzebna zmienna `GOOGLE_MAPS_API_KEY` na Vercelu.
 - **Podpowiadanie adresów (Places Autocomplete)** — gotowe w kodzie; wymaga włączenia **„Places API (New)"** na kluczu Google + `GOOGLE_MAPS_API_KEY` na Vercelu. Bez tego pole adresu działa jak zwykły input (bez podpowiedzi).
 - **Planer tras / optymalizacja (Route Optimization)** — wybór dnia + pojazdu → optymalna kolejność realizacji + dystans/czas/koszt wewnętrzny. Używa Routes API (klucz masz ustawiony). Bez klucza pokazuje komunikat, nie liczy.
-- **Zapraszanie/dodawanie użytkowników z panelu** — gotowe do wpięcia; wymaga klucza `service_role` z Supabase (Settings → API). Zmiana ról i imion działa już bez niego.
+- **Dodawanie użytkowników z panelu** — gotowe; wymaga `SUPABASE_SERVICE_ROLE_KEY` na hostingu (ustawione na Vercel). Lokalnie bez tej zmiennej panel pokazuje komunikat zamiast formularza.
 - **Google Calendar (synchronizacja)** — apka = źródło prawdy; zapis/edycja rezerwacji tworzy/aktualizuje wydarzenie (anulowana/wygasła znika). Konto usługi zweryfikowane lokalnie. **Na produkcji wymaga 3 zmiennych na Vercel:** `GOOGLE_SA_CLIENT_EMAIL`, `GOOGLE_SA_PRIVATE_KEY`, `GOOGLE_CALENDAR_ID`. Bez nich sync jest po prostu pomijany.
 
 ## ⬜ Jeszcze nie napisane (kolejne etapy)

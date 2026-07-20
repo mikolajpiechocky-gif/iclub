@@ -4,7 +4,9 @@ import { Alert } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { listUsers } from "@/lib/data/users";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isServiceRoleConfigured } from "@/lib/supabase/admin";
 import { UsersManager } from "./users-manager";
+import { InviteUser } from "./invite-user";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +35,7 @@ export default async function UsersPage() {
       <UsersManager users={users} currentUserId={profile?.id ?? null} disabled={demo} />
 
       <div className="mt-4">
-        <Alert tone="info" title="Dodawanie nowych użytkowników">
-          Zmiana ról i imion istniejących kont działa tutaj. Zapraszanie nowych osób z panelu (mejlem) wymaga jeszcze klucza <code>service_role</code> z Supabase (Settings → API) — podaj go, a włączę dodawanie. Do tego czasu nowe konta zakładasz w Supabase → Authentication → Users.
-        </Alert>
+        <InviteUser canInvite={!demo && isServiceRoleConfigured()} />
       </div>
     </div>
   );
