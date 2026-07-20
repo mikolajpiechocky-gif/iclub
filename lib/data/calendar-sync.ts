@@ -41,10 +41,6 @@ function cityFrom(location: string | null, customerCity: string | null): string 
   return (location?.split(",")[0]?.trim() || customerCity || location || "").trim();
 }
 
-function rangeLabel(start: string, endInclusive: string): string {
-  return start === endInclusive ? start : `${start} – ${endInclusive}`;
-}
-
 interface ResRow {
   business_line: string;
   event_date: string | null;
@@ -132,13 +128,11 @@ export async function syncReservationToCalendar(reservationId: string): Promise<
     end = { date: addDay(endInclusive) };
   }
 
-  // ---- Opis ----
+  // ---- Opis ---- (bez adresu, terminu i liczby gości — są w innych miejscach)
   const balance = r.price != null ? r.price - (r.deposit ?? 0) : null;
   const lines: string[] = [];
-  if (r.location) lines.push(`Adres: ${r.location}`);
   if (r.customer?.name) lines.push(`Klient: ${r.customer.name}`);
   if (r.customer?.phone) lines.push(`Tel: ${r.customer.phone}`);
-  lines.push(`Termin: ${rangeLabel(startDate, endInclusive)}${r.delivery_time ? ` · dostawa ${r.delivery_time}` : ""}`);
   if (isIclub) {
     const names = tentList.map((t) => t.name).filter(Boolean).join(" + ");
     if (names) lines.push(`Namiot: ${names}`);
@@ -152,7 +146,6 @@ export async function syncReservationToCalendar(reservationId: string): Promise<
     if (r.rental_items) lines.push(`Sprzęt: ${r.rental_items}`);
     lines.push(`Płatność: ${r.payment_upfront ? "opłacone z góry" : "przy odbiorze"}`);
   }
-  if (r.guests != null) lines.push(`Goście: ${r.guests}`);
   if (r.price != null) lines.push(`Wartość: ${r.price} zł`);
   if (r.deposit) lines.push(`Zaliczka: ${r.deposit} zł`);
   if (balance != null) lines.push(`Do zapłaty: ${balance} zł`);
