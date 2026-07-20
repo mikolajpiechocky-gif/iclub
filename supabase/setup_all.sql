@@ -1016,3 +1016,6 @@ alter table public.reservations add column if not exists invoice_issued boolean 
 alter table public.reservations add column if not exists invoice_issued_at timestamptz;
 alter table public.reservations add column if not exists invoice_number text;
 
+-- ================= 0023: powiązanie z Google Calendar =================
+alter table public.reservations add column if not exists gcal_event_id text;
+

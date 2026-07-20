@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createReservation, updateReservation, setReservationConfirmed, setInvoiceIssued, findTentConflicts, type ReservationInput } from "@/lib/data/reservations";
+import { syncReservationToCalendar } from "@/lib/data/calendar-sync";
 import type { ReservationStatus, BusinessLine } from "@/lib/data/types";
 
 export interface ReservationFormValues {
@@ -127,6 +128,7 @@ export async function createReservationAction(values: ReservationFormValues): Pr
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
   try {
     const { id } = await createReservation(toInput(values));
+    try { await syncReservationToCalendar(id); } catch {}
     revalidatePath("/reservations");
     return { ok: true, id };
   } catch (e) {
@@ -164,6 +166,7 @@ export async function updateReservationAction(id: string, values: ReservationFor
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
   try {
     await updateReservation(id, toInput(values));
+    try { await syncReservationToCalendar(id); } catch {}
     revalidatePath("/reservations");
     revalidatePath(`/reservations/${id}/edit`);
     return { ok: true, id };

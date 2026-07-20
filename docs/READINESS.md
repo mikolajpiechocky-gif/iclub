@@ -36,11 +36,11 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 - **Google Maps — auto-dystans** — działa lokalnie; na produkcji potrzebna zmienna `GOOGLE_MAPS_API_KEY` na Vercelu.
 - **Podpowiadanie adresów (Places Autocomplete)** — gotowe w kodzie; wymaga włączenia **„Places API (New)"** na kluczu Google + `GOOGLE_MAPS_API_KEY` na Vercelu. Bez tego pole adresu działa jak zwykły input (bez podpowiedzi).
 - **Planer tras / optymalizacja (Route Optimization)** — wybór dnia + pojazdu → optymalna kolejność realizacji + dystans/czas/koszt wewnętrzny. Używa Routes API (klucz masz ustawiony). Bez klucza pokazuje komunikat, nie liczy.
+- **Google Calendar (synchronizacja)** — apka = źródło prawdy; zapis/edycja rezerwacji tworzy/aktualizuje wydarzenie (anulowana/wygasła znika). Konto usługi zweryfikowane lokalnie. **Na produkcji wymaga 3 zmiennych na Vercel:** `GOOGLE_SA_CLIENT_EMAIL`, `GOOGLE_SA_PRIVATE_KEY`, `GOOGLE_CALENDAR_ID`. Bez nich sync jest po prostu pomijany.
 
 ## ⬜ Jeszcze nie napisane (kolejne etapy)
 - **Faktury — pełna integracja InFakt** (automatyczne wystawianie/wysyłka; szkielet już gotowy — patrz ✅) — wymaga konta i klucza API InFakt — §43.
 - **Push / SMS / e-mail** — dostawcy (w tym wysyłka próśb o potwierdzenie do klienta) — §8, §42.
-- **Google Calendar** — synchronizacja — §53.
 - **PWA offline** — kolejka synchronizacji, praca bez zasięgu — §14.
 - **Rankingi/oceny** (§24).
 
