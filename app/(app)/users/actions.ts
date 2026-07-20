@@ -82,6 +82,51 @@ export async function inviteUserAction(email: string, fullName: string): Promise
   }
 }
 
+export interface ResetPasswordResult {
+  ok: boolean;
+  error?: string;
+  tempPassword?: string;
+}
+
+// Reset hasła użytkownika — ustawia nowe hasło tymczasowe (do przekazania).
+export async function resetUserPasswordAction(id: string): Promise<ResetPasswordResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
+  const me = await requireOwner();
+  if (!me) return { ok: false, error: "Tylko właściciel może resetować hasła." };
+  if (!isServiceRoleConfigured()) return { ok: false, error: "Brak klucza service_role na serwerze." };
+  const tempPassword = crypto.randomBytes(9).toString("base64url");
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.auth.admin.updateUserById(id, { password: tempPassword });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, tempPassword };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zresetować hasła." };
+  }
+}
+
+// Zmiana adresu e-mail użytkownika (potwierdzona od razu).
+export async function changeUserEmailAction(id: string, email: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
+  const me = await requireOwner();
+  if (!me) return { ok: false, error: "Tylko właściciel może zmieniać e-mail." };
+  if (!isServiceRoleConfigured()) return { ok: false, error: "Brak klucza service_role na serwerze." };
+  const clean = email.trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(clean)) return { ok: false, error: "Podaj poprawny adres e-mail." };
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.auth.admin.updateUserById(id, { email: clean, email_confirm: true });
+    if (error) {
+      const dup = /already|exist|registered/i.test(error.message);
+      return { ok: false, error: dup ? "Ten e-mail jest już zajęty." : error.message };
+    }
+    revalidatePath("/users");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zmienić e-maila." };
+  }
+}
+
 export async function updateUserNameAction(id: string, fullName: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const me = await requireOwner();
