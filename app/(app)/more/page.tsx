@@ -9,7 +9,6 @@ const LINKS: { href: string; label: string; icon: IconName }[] = [
   { href: "/inquiries", label: "Zapytania", icon: "inbox" },
   { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },
   { href: "/planner", label: "Planer tras", icon: "navigation" },
-  { href: "/availability", label: "Dostępność", icon: "calendar" },
   { href: "/employees", label: "Pracownicy", icon: "users" },
   { href: "/vehicles", label: "Flota", icon: "truck" },
   { href: "/pricing", label: "Cennik", icon: "doc" },

@@ -32,14 +32,12 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
     { href: "/customers", label: "Klienci", icon: "users" },
     { href: "/inventory", label: "Magazyn", icon: "box" },
     { href: "/employees", label: "Pracownicy", icon: "users" },
-    { href: "/availability", label: "Dostępność", icon: "calendar" },
     { href: "/vehicles", label: "Flota", icon: "truck" },
   ]},
   { group: "Finanse", tint: "#22c55e", ownerOnly: true, items: [
     { href: "/pricing", label: "Cennik", icon: "doc" },
     { href: "/costs", label: "Koszty", icon: "coins" },
     { href: "/payments", label: "Płatności", icon: "card" },
-    { href: "/investments", label: "Inwestycje", icon: "cube" },
     { href: "/reports", label: "Raporty", icon: "chart" },
   ]},
   { group: "System", tint: "#64748b", items: [
