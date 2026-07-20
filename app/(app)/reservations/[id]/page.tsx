@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout";
 import { SectionCard, Pill } from "@/components/ui";
+import { Icon } from "@/components/icons";
 import { getReservation } from "@/lib/data/reservations";
 import { getCustomer } from "@/lib/data/customers";
 import { getJobByReservation, getJobStages } from "@/lib/data/jobs";
@@ -110,7 +111,10 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
           {weather.warnings.length > 0 && (
             <div className="mt-2.5 flex flex-wrap gap-2">
               {weather.warnings.map((w) => (
-                <span key={w} className="rounded-[8px] bg-[#332814] px-2.5 py-1 text-[11.5px] font-bold text-warn">⚠ {w}</span>
+                <span key={w.kind} className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#332814] px-2.5 py-1 text-[11.5px] font-bold text-warn">
+                  <Icon name={w.kind === "wind" ? "wind" : w.kind === "heat" ? "sun" : "droplet"} className="h-3.5 w-3.5" />
+                  {w.text}
+                </span>
               ))}
             </div>
           )}

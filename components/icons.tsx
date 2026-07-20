@@ -11,7 +11,8 @@ export type IconName =
   | "users" | "box" | "cube" | "coins" | "card" | "chart" | "doc" | "gear"
   | "check" | "chevron-right" | "chevron-left" | "phone" | "navigation"
   | "camera" | "warning" | "plus" | "x" | "menu" | "signature" | "more"
-  | "wifi" | "wifi-off" | "refresh" | "pen";
+  | "wifi" | "wifi-off" | "refresh" | "pen"
+  | "wind" | "sun" | "droplet";
 
 // d-ścieżki dla viewBox 0 0 24 24, stroke.
 const PATHS: Record<IconName, string> = {
@@ -45,6 +46,9 @@ const PATHS: Record<IconName, string> = {
   "wifi-off": "M2 8.5a15 15 0 0 1 6-3.8M22 8.5a15 15 0 0 0-6-3.8M5 12a10 10 0 0 1 3-2M8.5 15.5a5 5 0 0 1 7 0M12 19h.01M3 3l18 18",
   refresh: "M20 11a8 8 0 1 0-.5 4M20 5v6h-6",
   pen: "M4 20h4L20 8l-4-4L4 16zM14 6l4 4",
+  wind: "M4 8h10a2.5 2.5 0 1 0-2.5-2.5M4 16h13a2.5 2.5 0 1 1-2.5 2.5M4 12h8",
+  sun: "M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19",
+  droplet: "M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11z",
 };
 
 interface IconProps extends SVGProps<SVGSVGElement> {

@@ -3,6 +3,14 @@
 // prognozy zwraca null — karta pogody się po prostu nie pokazuje.
 import { geocode } from "@/lib/integrations/google-maps";
 
+// Rodzaj ostrzeżenia → mapowany na ikonę w UI (wind/sun/droplet).
+export type WeatherWarningKind = "wind" | "heat" | "rain";
+
+export interface WeatherWarning {
+  kind: WeatherWarningKind;
+  text: string;
+}
+
 export interface EventWeather {
   date: string;
   label: string;
@@ -10,7 +18,7 @@ export interface EventWeather {
   tempMin: number | null;
   windMax: number | null;
   precip: number | null;
-  warnings: string[];
+  warnings: WeatherWarning[];
 }
 
 // Kod pogody WMO → krótka etykieta PL.
@@ -53,10 +61,16 @@ export async function getEventWeather(location: string, date: string): Promise<E
     const precip = d.precipitation_sum?.[0] ?? null;
     const code = d.weathercode?.[0] ?? null;
 
-    const warnings: string[] = [];
-    if (windMax != null && windMax > 20) warnings.push(`Silny wiatr: ${Math.round(windMax)} km/h`);
-    if (precip != null && precip >= 1) warnings.push(`Opady: ${precip} mm`);
-    if (tempMax != null && tempMax > 25) warnings.push(`Wysoka temperatura: ${Math.round(tempMax)}°C`);
+    // Progi i zalecenia terenowe (ustalone z właścicielem):
+    //  wiatr > 25 km/h → dodatkowe mocowania; temp > 23°C → wentylator; deszcz → osłona dmuchawy.
+    const rainy =
+      (precip != null && precip >= 0.5) ||
+      (code != null && ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95));
+
+    const warnings: WeatherWarning[] = [];
+    if (windMax != null && windMax > 25) warnings.push({ kind: "wind", text: `Dodatkowe mocowania (wiatr ${Math.round(windMax)} km/h)` });
+    if (tempMax != null && tempMax > 23) warnings.push({ kind: "heat", text: `Weź wentylator (${Math.round(tempMax)}°C)` });
+    if (rainy) warnings.push({ kind: "rain", text: "Weź osłonę na dmuchawę" });
 
     return { date, label: weatherLabel(code), tempMax, tempMin, windMax, precip, warnings };
   } catch {
