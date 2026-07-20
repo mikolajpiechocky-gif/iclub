@@ -129,7 +129,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       {/* Per linia biznesowa */}
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {[
-          { name: "iClub (namioty)", d: iclub, c: "#e11d74" },
+          { name: "iClub", d: iclub, c: "#e11d74" },
           { name: "Wypożyczalnia", d: rental, c: "#14b8c4" },
         ].map((l) => (
           <div key={l.name} className="rounded-card-lg border border-border bg-surface p-5">
