@@ -2,10 +2,15 @@
 // Pokazuje rezerwacje na siatce miesiąca; nawigacja prev/next przez ?month=YYYY-MM.
 import Link from "next/link";
 import { PageHeader } from "@/components/layout";
+import { Icon, type IconName } from "@/components/icons";
 import { listReservations } from "@/lib/data/reservations";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { reservationCalendarTitle } from "@/lib/domain/calendar";
+import { getEventWeather, type EventWeather, type WeatherWarningKind } from "@/lib/integrations/weather";
 import { RESERVATION_STATUS_META, type ReservationStatus } from "@/lib/data/types";
+
+const WARN_ICON: Record<WeatherWarningKind, IconName> = { wind: "wind", heat: "sun", rain: "droplet" };
+const WEATHER_OK_MSG = "Cycuś pizdeczka, pogoda będzie lux 😎";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +55,14 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     list.push({ id: r.id, label, status: r.status });
     byDay.set(day, list);
   }
+
+  // Pogoda dla rezerwacji w tym miesiącu. getEventWeather zwraca null poza oknem
+  // prognozy (~16 dni) BEZ odpytywania API, więc dla dalszych miesięcy brak kosztu.
+  const monthResvs = reservations.filter((r) => r.event_date && r.event_date.startsWith(monthPrefix));
+  const weatherEntries = await Promise.all(
+    monthResvs.map(async (r) => [r.id, r.location && r.event_date ? await getEventWeather(r.location, r.event_date) : null] as const),
+  );
+  const weatherById = new Map<string, EventWeather | null>(weatherEntries);
 
   // Siatka miesiąca
   const firstWeekday = (new Date(year, month0, 1).getDay() + 6) % 7; // Pon=0
@@ -111,9 +124,24 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                   <div className="mb-1.5 text-[12px] font-bold" style={{ color: c.today ? "#f26fa6" : c.day ? "#b4b9c6" : "#3a3d4a" }}>{c.day ?? ""}</div>
                   {events.map((e) => {
                     const m = RESERVATION_STATUS_META[e.status];
+                    const w = weatherById.get(e.id) ?? null;
+                    const bad = w && w.warnings.length > 0;
+                    const title = w ? (bad ? w.warnings.map((x) => x.text).join(" · ") : WEATHER_OK_MSG) : undefined;
                     return (
-                      <Link key={e.id} href={`/reservations/${e.id}/edit`} className="mb-1 block truncate rounded border-l-[3px] px-1.5 py-1 text-[10.5px] font-semibold" style={{ background: m.bg, color: m.fg, borderColor: m.fg }}>
-                        {e.label}
+                      <Link key={e.id} href={`/reservations/${e.id}/edit`} title={title} className="mb-1 block rounded border-l-[3px] px-1.5 py-1 text-[10.5px] font-semibold" style={{ background: m.bg, color: m.fg, borderColor: m.fg }}>
+                        <span className="block truncate">{e.label}</span>
+                        {w && (
+                          <span className="mt-0.5 flex items-center gap-1" style={{ color: bad ? "#f4b23c" : "#5fd68b" }}>
+                            {bad ? (
+                              w.warnings.map((x) => <Icon key={x.kind} name={WARN_ICON[x.kind]} className="h-3 w-3" />)
+                            ) : (
+                              <>
+                                <Icon name="check" className="h-3 w-3" />
+                                <span className="truncate text-[9px] font-bold">pogoda lux</span>
+                              </>
+                            )}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}
