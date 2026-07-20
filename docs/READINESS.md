@@ -31,9 +31,10 @@ Stan na teraz. Legenda: ✅ gotowe i działa · 🔑 gotowe w kodzie, wymaga klu
 
 ## 🔑 Gotowe w kodzie — wymagają Twojego klucza/decyzji
 - **Google Maps — auto-dystans** — działa lokalnie; na produkcji potrzebna zmienna `GOOGLE_MAPS_API_KEY` na Vercelu.
+- **Podpowiadanie adresów (Places Autocomplete)** — gotowe w kodzie; wymaga włączenia **„Places API (New)"** na kluczu Google + `GOOGLE_MAPS_API_KEY` na Vercelu. Bez tego pole adresu działa jak zwykły input (bez podpowiedzi).
 
 ## ⬜ Jeszcze nie napisane (kolejne etapy)
-- **Google Maps: Places Autocomplete** (podpowiadanie adresów) i **Route Optimization** (optymalizacja wielu dostaw) — §37.
+- **Google Maps: Route Optimization** (optymalizacja kolejności wielu dostaw/odbiorów) — §37. (Podpowiadanie adresów już gotowe — patrz sekcja 🔑.)
 - **Faktury (InFakt)** — §43.
 - **Push / SMS / e-mail** — dostawcy — §8.
 - **Google Calendar** — synchronizacja — §53.

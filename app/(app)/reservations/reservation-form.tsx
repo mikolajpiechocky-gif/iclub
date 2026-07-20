@@ -8,6 +8,7 @@ import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Al
 import type { ReservationRecord, TentRecord, PackageRecord, AddonRecord, ReservationStatus, BusinessLine } from "@/lib/data/types";
 import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
 import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, type ReservationFormValues, type TentConflict } from "./actions";
+import { AddressAutocomplete } from "./address-autocomplete";
 
 type CustomerOption = { id: string; name: string };
 
@@ -136,7 +137,7 @@ export function ReservationForm({
             <TextField label="Rodzaj imprezy" placeholder="Osiemnastka" value={v.event_type} onChange={(e) => set("event_type", e.target.value)} />
             <TextField label="Liczba osób" inputMode="numeric" placeholder="45" value={v.guests} onChange={(e) => set("guests", e.target.value)} error={errors.guests} />
             <TextField label="Data imprezy" type="date" value={v.event_date} onChange={(e) => set("event_date", e.target.value)} />
-            <TextField label="Lokalizacja" placeholder="Tarnowo Podgórne" value={v.location} onChange={(e) => set("location", e.target.value)} />
+            <AddressAutocomplete label="Lokalizacja" placeholder="Tarnowo Podgórne, ul. …" value={v.location} onChange={(val) => set("location", val)} />
             <TextField label="Data montażu" type="date" value={v.setup_date} onChange={(e) => set("setup_date", e.target.value)} />
             <TextField label="Data demontażu" type="date" value={v.teardown_date} onChange={(e) => set("teardown_date", e.target.value)} />
           </div>

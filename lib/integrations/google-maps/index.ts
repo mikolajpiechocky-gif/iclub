@@ -32,6 +32,41 @@ export async function geocode(address: string): Promise<GeoPoint | null> {
   }
 }
 
+// Podpowiadanie adresów (§37) — Places API (New) Autocomplete. Bez klucza lub
+// przy błędzie zwraca pustą listę (formularz działa jak zwykłe pole tekstowe).
+export interface AddressSuggestion {
+  description: string;
+  placeId: string | null;
+}
+
+export async function autocompleteAddress(input: string): Promise<AddressSuggestion[]> {
+  if (!isGoogleMapsConfigured() || input.trim().length < 3) return [];
+  try {
+    const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
+      },
+      body: JSON.stringify({ input, languageCode: "pl", regionCode: "PL" }),
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const suggestions = (json?.suggestions ?? []) as {
+      placePrediction?: { placeId?: string; text?: { text?: string } };
+    }[];
+    return suggestions
+      .map((s): AddressSuggestion | null => {
+        const p = s.placePrediction;
+        return p?.text?.text ? { description: p.text.text, placeId: p.placeId ?? null } : null;
+      })
+      .filter((x): x is AddressSuggestion => Boolean(x))
+      .slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+
 // Trasa między dwoma punktami → dystans (km) i czas (min). Routes API.
 export async function routeLeg(origin: GeoPoint, dest: GeoPoint): Promise<{ km: number; minutes: number } | null> {
   if (!isGoogleMapsConfigured()) return null;
