@@ -3,11 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { EmployeeRate } from "./types";
 
+export type AssignmentStatus = "REQUESTED" | "APPROVED";
+
 export interface JobAssignment {
   id: string;
   job_id: string;
   profile_id: string;
   is_lead: boolean;
+  status: AssignmentStatus;
   note: string | null;
   employee: { id: string; full_name: string; role: string } | null;
   rate: EmployeeRate | null;
@@ -18,8 +21,8 @@ const DEMO_RATE_KUBA: EmployeeRate = { profile_id: "demo-emp2", rate_model: "HOU
 
 const DEMO_ASSIGNMENTS: Record<string, JobAssignment[]> = {
   "demo-job-1": [
-    { id: "demo-as1", job_id: "demo-job-1", profile_id: "demo-emp1", is_lead: true, note: null, employee: { id: "demo-emp1", full_name: "Marek W.", role: "EMPLOYEE" }, rate: DEMO_RATE_MAREK },
-    { id: "demo-as2", job_id: "demo-job-1", profile_id: "demo-emp2", is_lead: false, note: null, employee: { id: "demo-emp2", full_name: "Kuba L.", role: "EMPLOYEE" }, rate: DEMO_RATE_KUBA },
+    { id: "demo-as1", job_id: "demo-job-1", profile_id: "demo-emp1", is_lead: true, status: "APPROVED", note: null, employee: { id: "demo-emp1", full_name: "Marek W.", role: "EMPLOYEE" }, rate: DEMO_RATE_MAREK },
+    { id: "demo-as2", job_id: "demo-job-1", profile_id: "demo-emp2", is_lead: false, status: "APPROVED", note: null, employee: { id: "demo-emp2", full_name: "Kuba L.", role: "EMPLOYEE" }, rate: DEMO_RATE_KUBA },
   ],
 };
 
@@ -47,12 +50,19 @@ export async function listJobAssignments(jobId: string): Promise<JobAssignment[]
   return list;
 }
 
-export async function assignEmployee(jobId: string, profileId: string, isLead = false): Promise<void> {
+export async function assignEmployee(jobId: string, profileId: string, isLead = false, status: AssignmentStatus = "APPROVED"): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { error } = await supabase
     .from("job_assignments")
-    .insert({ job_id: jobId, profile_id: profileId, is_lead: isLead, assigned_by: user?.id ?? null });
+    .insert({ job_id: jobId, profile_id: profileId, is_lead: isLead, status, assigned_by: user?.id ?? null });
+  if (error) throw new Error(error.message);
+}
+
+// Właściciel akceptuje prośbę pracownika o przypisanie.
+export async function approveAssignment(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("job_assignments").update({ status: "APPROVED" }).eq("id", id);
   if (error) throw new Error(error.message);
 }
 

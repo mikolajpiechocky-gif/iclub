@@ -1168,3 +1168,21 @@ insert into public.investments (name, amount, category, note) values
   ('Nagrzewnica', 1600.00, 'Sprzęt', 'seed-2025'),
   ('Webasto', 500.00, 'Pojazd', 'seed-2025');
 
+-- ================= 0027: akcept właściciela dla samo-przypisań =================
+-- Pracownik może POPROSIĆ o przypisanie (status REQUESTED); właściciel akceptuje
+-- (APPROVED) lub odrzuca (usuwa). Przypisania właściciela są od razu APPROVED.
+alter table public.job_assignments add column if not exists status text not null default 'APPROVED';
+do $$ begin
+  alter table public.job_assignments add constraint job_assignments_status_chk check (status in ('REQUESTED','APPROVED'));
+exception when duplicate_object then null; end $$;
+
+-- Insert: właściciel dowolne; pracownik tylko samego siebie i tylko jako REQUESTED.
+drop policy if exists job_assignments_insert on public.job_assignments;
+create policy job_assignments_insert on public.job_assignments for insert to authenticated
+  with check (public.is_owner() or (profile_id = auth.uid() and status = 'REQUESTED'));
+
+-- Delete: właściciel dowolne; pracownik może wycofać WŁASNĄ prośbę (tylko REQUESTED).
+drop policy if exists job_assignments_delete on public.job_assignments;
+create policy job_assignments_delete on public.job_assignments for delete to authenticated
+  using (public.is_owner() or (profile_id = auth.uid() and status = 'REQUESTED'));
+

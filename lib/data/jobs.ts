@@ -53,7 +53,8 @@ export async function listAssignedJobs(profileId: string): Promise<JobWithReserv
   const { data, error } = await supabase
     .from("job_assignments")
     .select(`job:jobs(${RESV_SELECT})`)
-    .eq("profile_id", profileId);
+    .eq("profile_id", profileId)
+    .eq("status", "APPROVED");
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as unknown as { job: JobWithReservation | null }[];
   return rows.map((r) => r.job).filter((j): j is JobWithReservation => Boolean(j));

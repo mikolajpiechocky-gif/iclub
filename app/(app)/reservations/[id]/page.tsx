@@ -167,13 +167,15 @@ async function ReservationOps({
     profile_id: a.profile_id,
     full_name: a.employee?.full_name ?? "—",
     is_lead: a.is_lead,
+    status: a.status,
     earnings: a.rate ? predictedEarnings(a.rate, job.business_line, ownerBonus, settings.iclub_hours) : null,
   }));
   const assignedIds = new Set(assignments.map((a) => a.profile_id));
   const availableEmployees = employees.filter((e) => !assignedIds.has(e.id)).map((e) => ({ id: e.id, full_name: e.full_name || "—" }));
   const myRate = employees.find((e) => e.id === profile?.id)?.rate ?? null;
   const myEarnings = myRate ? predictedEarnings(myRate, job.business_line, ownerBonus, settings.iclub_hours) : null;
-  const amIAssigned = profile ? assignedIds.has(profile.id) : false;
+  const amIAssigned = profile ? assignments.some((a) => a.profile_id === profile.id && a.status === "APPROVED") : false;
+  const amIRequested = profile ? assignments.some((a) => a.profile_id === profile.id && a.status === "REQUESTED") : false;
   const unavailableIds = await getUnavailableProfileIds(job.event_date);
 
   const [vehicles, jobVehicles] = await Promise.all([listVehicles(), listJobVehicles(job.id)]);
@@ -221,6 +223,7 @@ async function ReservationOps({
         unavailableIds={unavailableIds}
         myEarnings={myEarnings}
         amIAssigned={amIAssigned}
+        amIRequested={amIRequested}
       />
 
       <JobVehicles jobId={job.id} isOwner={isOwner} assigned={assignedVehicles} available={availableVehicles} conflicts={vehicleConflicts} />

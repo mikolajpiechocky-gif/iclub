@@ -31,3 +31,11 @@ export async function getCurrentProfile(): Promise<ProfileRecord | null> {
   }
   return data as ProfileRecord;
 }
+
+// Id właścicieli — do powiadamiania o prośbach pracowników (np. o przypisanie).
+export async function listOwnerIds(): Promise<string[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+  const { data } = await supabase.from("profiles").select("id").eq("role", "OWNER");
+  return ((data ?? []) as { id: string }[]).map((r) => r.id);
+}

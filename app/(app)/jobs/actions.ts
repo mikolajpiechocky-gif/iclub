@@ -3,9 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { assignEmployee, removeAssignment, setAssignmentLead, setJobOwnerBonus } from "@/lib/data/assignments";
+import { assignEmployee, approveAssignment, removeAssignment, setAssignmentLead, setJobOwnerBonus } from "@/lib/data/assignments";
 import { getJob } from "@/lib/data/jobs";
+import { listOwnerIds } from "@/lib/data/profiles";
 import { createNotification } from "@/lib/data/notifications";
+
+function jobLabel(job: Awaited<ReturnType<typeof getJob>>): string {
+  return job?.reservation?.customer?.name ?? job?.title ?? "zlecenie";
+}
 
 export interface ActionResult {
   ok: boolean;
@@ -62,16 +67,71 @@ export async function toggleLeadAction(id: string, jobId: string, isLead: boolea
   }
 }
 
+// Pracownik PROSI o przypisanie (status REQUESTED). Właściciel musi zaakceptować.
 export async function selfClaimAction(jobId: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const p = await getCurrentProfile();
   if (!p) return { ok: false, error: "Zaloguj się." };
   try {
-    await assignEmployee(jobId, p.id);
+    await assignEmployee(jobId, p.id, false, "REQUESTED");
+    const job = await getJob(jobId);
+    const owners = await listOwnerIds();
+    const who = p.full_name?.trim() || "Pracownik";
+    await Promise.all(
+      owners.map((oid) =>
+        createNotification(oid, "Prośba o przypisanie", `${who} prosi o przypisanie: ${jobLabel(job)}${job?.event_date ? " · " + job.event_date : ""}`, "ASSIGNMENT_REQUEST", jobId),
+      ),
+    );
     revalidatePath(`/jobs/${jobId}`);
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się podjąć zlecenia." };
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się wysłać prośby." };
+  }
+}
+
+// Właściciel akceptuje prośbę pracownika o przypisanie.
+export async function approveAssignmentAction(id: string, jobId: string, profileId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
+  const err = await ownerError();
+  if (err) return { ok: false, error: err };
+  try {
+    await approveAssignment(id);
+    const job = await getJob(jobId);
+    await createNotification(profileId, "Przypisanie zaakceptowane", `Właściciel zaakceptował Twoje przypisanie: ${jobLabel(job)}${job?.event_date ? " · " + job.event_date : ""}`, "ASSIGNMENT", jobId);
+    revalidatePath(`/jobs/${jobId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zaakceptować." };
+  }
+}
+
+// Właściciel odrzuca prośbę (usuwa ją) i powiadamia pracownika.
+export async function rejectAssignmentAction(id: string, jobId: string, profileId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
+  const err = await ownerError();
+  if (err) return { ok: false, error: err };
+  try {
+    await removeAssignment(id);
+    const job = await getJob(jobId);
+    await createNotification(profileId, "Prośba o przypisanie odrzucona", `Zlecenie: ${jobLabel(job)}`, "ASSIGNMENT", jobId);
+    revalidatePath(`/jobs/${jobId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się odrzucić." };
+  }
+}
+
+// Pracownik wycofuje własną, nieakceptowaną jeszcze prośbę (RLS: tylko REQUESTED, own).
+export async function withdrawRequestAction(id: string, jobId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
+  const p = await getCurrentProfile();
+  if (!p) return { ok: false, error: "Zaloguj się." };
+  try {
+    await removeAssignment(id);
+    revalidatePath(`/jobs/${jobId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się wycofać prośby." };
   }
 }
 
