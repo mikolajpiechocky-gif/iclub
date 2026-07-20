@@ -39,6 +39,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
     { href: "/pricing", label: "Cennik", icon: "doc" },
     { href: "/costs", label: "Koszty", icon: "coins" },
     { href: "/payments", label: "Płatności", icon: "card" },
+    { href: "/investments", label: "Inwestycje", icon: "cube" },
     { href: "/reports", label: "Raporty", icon: "chart" },
   ]},
   { group: "System", tint: "#64748b", items: [

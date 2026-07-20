@@ -422,6 +422,17 @@ export interface CostWithJob extends CostRecord {
   job: { id: string; title: string | null } | null;
 }
 
+// Inwestycja: majątek włożony w iClub. NIE jest kosztem realizacji — służy tylko
+// do oceny zwrotu (suma włożona vs zysk narastająco).
+export interface InvestmentRecord {
+  id: string;
+  name: string;
+  amount: number;
+  category: string;
+  note: string | null;
+  created_at: string;
+}
+
 export type EquipmentStatus = "AVAILABLE" | "SERVICE" | "DAMAGED";
 
 export interface EquipmentRecord {
