@@ -1,5 +1,6 @@
 // app/(app)/reports/page.tsx — Raporty i rentowność (RSC, tylko OWNER).
 // Przychód (płatności zapłacone) − koszty = zysk; per zlecenie i per linia (§16, §45).
+// Filtr roku: „Wszystko" (total) oraz per rok wg daty realizacji.
 import { PageHeader } from "@/components/layout";
 import { MetricCard, Alert, Pill } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
@@ -7,7 +8,7 @@ import { listJobs } from "@/lib/data/jobs";
 import { listPayments } from "@/lib/data/payments";
 import { listCosts } from "@/lib/data/costs";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { JOB_STATUS_META } from "@/lib/data/types";
+import { JOB_STATUS_META, type JobWithReservation } from "@/lib/data/types";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,11 @@ const fmtPLN = (v: number) =>
   new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
 const pct = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : "—");
 
-export default async function ReportsPage() {
+// Rok realizacji zlecenia: z daty zlecenia, w razie braku z rezerwacji.
+const jobYear = (j: JobWithReservation): string =>
+  (j.event_date ?? j.reservation?.event_date ?? "").slice(0, 4);
+
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
   const profile = await getCurrentProfile();
   if (profile && profile.role !== "OWNER") {
     return (
@@ -29,6 +34,11 @@ export default async function ReportsPage() {
   const [jobs, payments, costs] = await Promise.all([listJobs(), listPayments(), listCosts()]);
   const demo = !isSupabaseConfigured();
 
+  // Dostępne lata (malejąco) + wybór z URL; domyślnie „Wszystko".
+  const years = Array.from(new Set(jobs.map(jobYear).filter(Boolean))).sort().reverse();
+  const { year: yearParam } = await searchParams;
+  const selectedYear = yearParam && years.includes(yearParam) ? yearParam : "all";
+
   const paidByJob = new Map<string, number>();
   for (const p of payments) {
     if (p.status !== "PAID" || !p.job_id) continue;
@@ -40,11 +50,13 @@ export default async function ReportsPage() {
     costByJob.set(c.job_id, (costByJob.get(c.job_id) ?? 0) + Number(c.amount || 0));
   }
 
-  const rows = jobs.map((j) => {
-    const rev = paidByJob.get(j.id) ?? 0;
-    const cost = costByJob.get(j.id) ?? 0;
-    return { job: j, rev, cost, profit: rev - cost };
-  });
+  const rows = jobs
+    .filter((j) => selectedYear === "all" || jobYear(j) === selectedYear)
+    .map((j) => {
+      const rev = paidByJob.get(j.id) ?? 0;
+      const cost = costByJob.get(j.id) ?? 0;
+      return { job: j, rev, cost, profit: rev - cost };
+    });
 
   const totalRev = rows.reduce((s, r) => s + r.rev, 0);
   const totalCost = rows.reduce((s, r) => s + r.cost, 0);
@@ -59,9 +71,12 @@ export default async function ReportsPage() {
   const iclub = byLine("ICLUB");
   const rental = byLine("EQUIPMENT_RENTAL");
 
+  const scopeLabel = selectedYear === "all" ? "od początku" : `rok ${selectedYear}`;
+  const tabs = [{ k: "all", label: "Wszystko" }, ...years.map((y) => ({ k: y, label: y }))];
+
   return (
     <div className="mx-auto max-w-[1200px] px-5 py-6 md:px-8">
-      <PageHeader title="Raporty i rentowność" subtitle="Przychód (zapłacone) − koszty = zysk" />
+      <PageHeader title="Raporty i rentowność" subtitle={`Przychód (zapłacone) − koszty = zysk · ${scopeLabel}`} />
 
       {demo && (
         <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
@@ -69,11 +84,30 @@ export default async function ReportsPage() {
         </div>
       )}
 
+      {/* Filtr roku */}
+      <div className="mb-5 flex flex-wrap gap-2">
+        {tabs.map((t) => {
+          const active = selectedYear === t.k;
+          const href = t.k === "all" ? "/reports" : `/reports?year=${t.k}`;
+          return (
+            <a
+              key={t.k}
+              href={href}
+              className={`rounded-full px-4 py-1.5 text-[13px] font-bold transition-colors ${
+                active ? "bg-white text-[#0b0c11]" : "border border-border bg-surface text-ink-2 hover:text-white"
+              }`}
+            >
+              {t.label}
+            </a>
+          );
+        })}
+      </div>
+
       <div className="mb-5 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
         <MetricCard label="Przychód" value={fmtPLN(totalRev)} tone="ok" />
         <MetricCard label="Koszty" value={fmtPLN(totalCost)} tone="warn" />
         <MetricCard label="Zysk" value={fmtPLN(totalProfit)} sub={`marża ${pct(totalProfit, totalRev)}`} tone={totalProfit >= 0 ? "ok" : "bad"} />
-        <MetricCard label="Zlecenia" value={String(jobs.length)} />
+        <MetricCard label="Zlecenia" value={String(rows.length)} />
       </div>
 
       {/* Per linia biznesowa */}
@@ -99,12 +133,15 @@ export default async function ReportsPage() {
 
       {/* Per zlecenie */}
       <h2 className="mb-3 font-display text-[15px] font-bold text-white">Rentowność zleceń</h2>
-      <div className="overflow-hidden rounded-card border border-border bg-surface">
+      <div className="overflow-x-auto rounded-card border border-border bg-surface">
         <table className="w-full text-left">
           <thead className="border-b border-border bg-[#12131a] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">
             <tr>{["Zlecenie", "Status", "Przychód", "Koszty", "Zysk", "Marża"].map((h) => <th key={h} className="px-4 py-3 font-bold">{h}</th>)}</tr>
           </thead>
           <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-[13px] text-ink-2">Brak zleceń w wybranym okresie.</td></tr>
+            )}
             {rows.map((r) => {
               const m = JOB_STATUS_META[r.job.status];
               return (
