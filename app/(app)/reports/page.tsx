@@ -147,34 +147,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         ))}
       </div>
 
-      {/* Per zlecenie */}
-      <h2 className="mb-3 font-display text-[15px] font-bold text-white">Rentowność zleceń</h2>
-      <div className="overflow-x-auto rounded-card border border-border bg-surface">
-        <table className="w-full text-left">
-          <thead className="border-b border-border bg-[#12131a] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">
-            <tr>{["Zlecenie", "Status", "Przychód", "Koszty", "Zysk", "Marża"].map((h) => <th key={h} className="px-4 py-3 font-bold">{h}</th>)}</tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-[13px] text-ink-2">Brak zleceń w wybranym okresie.</td></tr>
-            )}
-            {rows.map((r) => {
-              const m = JOB_STATUS_META[r.job.status];
-              return (
-                <tr key={r.job.id} className="border-b border-border-soft last:border-0">
-                  <td className="px-4 py-3 text-[13px] font-bold text-ink">{r.job.reservation?.customer?.name ?? r.job.title ?? "Zlecenie"}</td>
-                  <td className="px-4 py-3"><Pill label={m.label} fg={m.fg} bg={m.bg} /></td>
-                  <td className="px-4 py-3 text-[13px] text-ok">{fmtPLN(r.rev)}</td>
-                  <td className="px-4 py-3 text-[13px] text-warn">{fmtPLN(r.cost)}</td>
-                  <td className="px-4 py-3 text-[13px] font-bold" style={{ color: r.profit >= 0 ? "#5fd68b" : "#f58585" }}>{fmtPLN(r.profit)}</td>
-                  <td className="px-4 py-3 text-[13px] text-ink-2">{pct(r.profit, r.rev)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
       {/* Inwestycje — zwrot majątku (narastająco, poza rentownością zleceń) */}
       {investments.length > 0 && (
         <div className="mt-8">
@@ -240,6 +212,34 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </details>
         </div>
       )}
+
+      {/* Per zlecenie */}
+      <h2 className="mb-3 mt-8 font-display text-[15px] font-bold text-white">Rentowność zleceń</h2>
+      <div className="overflow-x-auto rounded-card border border-border bg-surface">
+        <table className="w-full text-left">
+          <thead className="border-b border-border bg-[#12131a] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">
+            <tr>{["Zlecenie", "Status", "Przychód", "Koszty", "Zysk", "Marża"].map((h) => <th key={h} className="px-4 py-3 font-bold">{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-[13px] text-ink-2">Brak zleceń w wybranym okresie.</td></tr>
+            )}
+            {rows.map((r) => {
+              const m = JOB_STATUS_META[r.job.status];
+              return (
+                <tr key={r.job.id} className="border-b border-border-soft last:border-0">
+                  <td className="px-4 py-3 text-[13px] font-bold text-ink">{r.job.reservation?.customer?.name ?? r.job.title ?? "Zlecenie"}</td>
+                  <td className="px-4 py-3"><Pill label={m.label} fg={m.fg} bg={m.bg} /></td>
+                  <td className="px-4 py-3 text-[13px] text-ok">{fmtPLN(r.rev)}</td>
+                  <td className="px-4 py-3 text-[13px] text-warn">{fmtPLN(r.cost)}</td>
+                  <td className="px-4 py-3 text-[13px] font-bold" style={{ color: r.profit >= 0 ? "#5fd68b" : "#f58585" }}>{fmtPLN(r.profit)}</td>
+                  <td className="px-4 py-3 text-[13px] text-ink-2">{pct(r.profit, r.rev)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
