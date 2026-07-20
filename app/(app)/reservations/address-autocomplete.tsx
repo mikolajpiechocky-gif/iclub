@@ -28,19 +28,29 @@ export function AddressAutocomplete({
       return;
     }
     const q = value.trim();
-    // Cała aktualizacja stanu w callbacku timera (asynchronicznie) — bez
-    // synchronicznego setState w ciele efektu.
+    // `active` odrzuca spóźnione/nieaktualne odpowiedzi (wyścig, wybór pozycji,
+    // wyczyszczenie pola). Cała aktualizacja stanu asynchronicznie w callbacku
+    // timera — bez synchronicznego setState w ciele efektu.
+    let active = true;
     const t = setTimeout(async () => {
       if (q.length < 3) {
-        setSuggestions([]);
-        setOpen(false);
+        if (active) { setSuggestions([]); setOpen(false); }
         return;
       }
-      const res = await suggestAddressesAction(q);
-      setSuggestions(res);
-      setOpen(res.length > 0);
+      try {
+        const res = await suggestAddressesAction(q);
+        if (!active) return;
+        setSuggestions(res);
+        setOpen(res.length > 0);
+      } catch {
+        // Błąd RPC/sieci — degradacja do braku podpowiedzi (pole nadal działa).
+        if (active) { setSuggestions([]); setOpen(false); }
+      }
     }, q.length < 3 ? 0 : 350);
-    return () => clearTimeout(t);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
   }, [value]);
 
   useEffect(() => {
