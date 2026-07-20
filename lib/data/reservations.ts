@@ -38,7 +38,7 @@ export async function listReservations(): Promise<ReservationWithRefs[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("reservations")
-    .select("*, customer:customers(id,name), tent:tents(id,name), package:packages(id,name)")
+    .select("*, customer:customers(id,name), tent:tents!tent_id(id,name), package:packages(id,name)")
     .order("event_date", { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []) as ReservationWithRefs[];
@@ -153,7 +153,7 @@ export async function findTentConflicts(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("reservations")
-      .select("*, customer:customers(id,name), tent:tents(id,name), package:packages(id,name)")
+      .select("*, customer:customers(id,name), tent:tents!tent_id(id,name), package:packages(id,name)")
       .or(`tent_id.eq.${tentId},tent_id_2.eq.${tentId}`)
       .in("status", ["TEMPORARY", "CONFIRMED"]);
     if (error) throw new Error(error.message);

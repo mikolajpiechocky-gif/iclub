@@ -7,7 +7,7 @@ import { DEMO_RESERVATIONS } from "./demo-resources";
 import { ICLUB_STAGES } from "@/lib/domain/stages";
 
 const RESV_SELECT =
-  "*, reservation:reservations(*, customer:customers(id,name), tent:tents(id,name), package:packages(id,name))";
+  "*, reservation:reservations(*, customer:customers(id,name), tent:tents!tent_id(id,name), package:packages(id,name))";
 
 const now = "2026-07-14T10:00:00.000Z";
 
