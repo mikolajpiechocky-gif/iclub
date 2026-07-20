@@ -28,3 +28,16 @@ export async function listAddons(): Promise<AddonRecord[]> {
   if (error) throw new Error(error.message);
   return (data ?? []) as AddonRecord[];
 }
+
+// --- Cennik (§51): edycja cen pakietów i dodatków. Zapis tylko OWNER (RLS). ---
+export async function updatePackagePrice(id: string, base_price: number): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("packages").update({ base_price }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function updateAddonPrice(id: string, price: number): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("addons").update({ price }).eq("id", id);
+  if (error) throw new Error(error.message);
+}

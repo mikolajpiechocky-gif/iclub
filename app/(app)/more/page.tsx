@@ -11,6 +11,7 @@ const LINKS: { href: string; label: string; icon: IconName }[] = [
   { href: "/availability", label: "Dostępność", icon: "calendar" },
   { href: "/employees", label: "Pracownicy", icon: "users" },
   { href: "/vehicles", label: "Flota", icon: "truck" },
+  { href: "/pricing", label: "Cennik", icon: "doc" },
   { href: "/costs", label: "Koszty", icon: "coins" },
   { href: "/payments", label: "Płatności", icon: "card" },
   { href: "/reports", label: "Raporty", icon: "chart" },

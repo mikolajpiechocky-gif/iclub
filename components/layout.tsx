@@ -35,6 +35,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
     { href: "/vehicles", label: "Flota", icon: "truck" },
   ]},
   { group: "Finanse", tint: "#22c55e", ownerOnly: true, items: [
+    { href: "/pricing", label: "Cennik", icon: "doc" },
     { href: "/costs", label: "Koszty", icon: "coins" },
     { href: "/payments", label: "Płatności", icon: "card" },
     { href: "/reports", label: "Raporty", icon: "chart" },

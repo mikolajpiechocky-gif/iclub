@@ -85,6 +85,10 @@ export function ReservationForm({
     .filter((a) => v.addon_ids.includes(a.id))
     .reduce((sum, a) => sum + Number(a.price || 0), 0);
 
+  // Podpowiedź ceny z cennika: pakiet + wybrane dodatki (§51).
+  const packagePrice = Number(packages.find((p) => p.id === v.package_id)?.base_price ?? 0);
+  const suggestedPrice = packagePrice + addonsTotal;
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
@@ -184,7 +188,14 @@ export function ReservationForm({
 
         <SectionCard title="Rozliczenie" className="p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-3">
-            <TextField label="Wartość (zł)" inputMode="numeric" placeholder="6800" value={v.price} onChange={(e) => set("price", e.target.value)} error={errors.price} />
+            <div>
+              <TextField label="Wartość (zł)" inputMode="numeric" placeholder="6800" value={v.price} onChange={(e) => set("price", e.target.value)} error={errors.price} />
+              {suggestedPrice > 0 && (
+                <button type="button" onClick={() => set("price", String(suggestedPrice))} className="mt-1.5 text-[12px] font-semibold text-accent-soft">
+                  Z cennika: {fmtPLN(suggestedPrice)} →
+                </button>
+              )}
+            </div>
             <TextField label="Rabat (zł)" inputMode="numeric" placeholder="0" value={v.discount} onChange={(e) => set("discount", e.target.value)} error={errors.discount} />
             <TextField label="Zaliczka (zł)" inputMode="numeric" placeholder="2000" value={v.deposit} onChange={(e) => set("deposit", e.target.value)} error={errors.deposit} />
             <SelectField label="Źródło" value={v.source} onChange={(e) => set("source", e.target.value)}>
