@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout";
 import { listReservations } from "@/lib/data/reservations";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { reservationCalendarTitle } from "@/lib/domain/calendar";
 import { RESERVATION_STATUS_META, type ReservationStatus } from "@/lib/data/types";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,16 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     if (!r.event_date || !r.event_date.startsWith(monthPrefix)) continue;
     const day = Number(r.event_date.slice(8, 10));
     const list = byDay.get(day) ?? [];
-    list.push({ id: r.id, label: r.customer?.name ?? r.event_type ?? "Rezerwacja", status: r.status });
+    const label = reservationCalendarTitle({
+      businessLine: r.business_line,
+      tentSizes: [r.tent?.size ?? null, r.tent2?.size ?? null],
+      packageName: r.package?.name ?? null,
+      location: r.location,
+      customerCity: r.customer?.city ?? null,
+      customerName: r.customer?.name ?? null,
+      rentalItems: r.rental_items,
+    });
+    list.push({ id: r.id, label, status: r.status });
     byDay.set(day, list);
   }
 

@@ -164,8 +164,9 @@ export interface ReservationRecord {
 }
 
 export interface ReservationWithRefs extends ReservationRecord {
-  customer: { id: string; name: string } | null;
-  tent: { id: string; name: string } | null;
+  customer: { id: string; name: string; city?: string | null } | null;
+  tent: { id: string; name: string; size?: string | null } | null;
+  tent2?: { id: string; name: string; size: string | null } | null;
   package: { id: string; name: string } | null;
 }
 

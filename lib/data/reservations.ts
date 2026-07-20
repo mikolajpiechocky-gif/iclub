@@ -38,7 +38,7 @@ export async function listReservations(): Promise<ReservationWithRefs[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("reservations")
-    .select("*, customer:customers(id,name), tent:tents!tent_id(id,name), package:packages(id,name)")
+    .select("*, customer:customers(id,name,city), tent:tents!tent_id(id,name,size), tent2:tents!tent_id_2(id,name,size), package:packages(id,name)")
     .order("event_date", { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []) as ReservationWithRefs[];
