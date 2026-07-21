@@ -63,7 +63,9 @@ export function PullToRefresh() {
     };
   }, [router]);
 
-  const dragging = s.current.active;
+  // Podczas ciągnięcia (pull > 0) wyłącz przejście, aby kółko podążało za palcem;
+  // po puszczeniu pull wraca do 0 i włącza się płynny powrót. Bez czytania refa w renderze.
+  const dragging = pull > 0;
   const visible = pull > 0 || pending;
   const progress = Math.min(1, pull / THRESHOLD);
   const ready = progress >= 1;

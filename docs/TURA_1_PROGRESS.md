@@ -11,10 +11,10 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 4. ⬜ Mobilny kalendarz pokazuje cały tydzień (§5.2).
 5. ⬜ Priorytetowy widok weekendu (§5.2).
 6. ✅ Powiadomienia pod ikoną dzwonka w nagłówku (§5.5) — licznik, panel, przejście do rekordu, oznaczanie, „Zobacz wszystkie"; usunięto zakładkę.
-7. ⬜ Uproszczony formularz rezerwacji (§7).
-8. ⬜ Liczba osób nie jest wymagana (§7.1).
-9. ⬜ Daty montażu/demontażu domyślnie ukryte (§8).
-10. ⬜ Domyślnie montaż w dniu imprezy, demontaż następnego dnia (§8).
+7. ✅ Uproszczony formularz rezerwacji — sekcje Klient i lokalizacja → Namiot i pakiet → Dodatki → Informacje dodatkowe → Rozliczenie; status ukryty przy tworzeniu (nadawany automatycznie), widoczny tylko w edycji (§7).
+8. ✅ Liczba osób opcjonalna — przeniesiona na dół, nie blokuje zapisu (§7.1).
+9. ✅ Daty montażu/demontażu domyślnie ukryte — rozwijana sekcja „Montaż lub demontaż w innym terminie" (§8).
+10. ✅ Domyślnie montaż w dniu imprezy, demontaż następnego dnia — logika po stronie serwera (`nextDayIso`), okno overbookingu spójne (§8).
 11. ✅ Duże namioty jako pula dwóch egzemplarzy (§10).
 12. ✅ Duży z tylnymi drzwiami jako konkretny zasób z tej samej puli (§10).
 13. ✅ Dodatkowy namiot jako osobna sekcja (+ gastronomiczny) (§10.2).

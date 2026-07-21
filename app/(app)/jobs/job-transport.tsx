@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
-import { fuelCost, amortizationCost, fuelPriceForType, plannedKm, tripMultiplier, tripClass, clientTransportPrice, type FuelPrices } from "@/lib/domain/transport";
+import { fuelCost, amortizationCost, fuelPriceForType, plannedKm, tripClass, clientTransportPrice, type FuelPrices } from "@/lib/domain/transport";
 import type { TransportCalcRecord } from "@/lib/data/transport";
 import { createTransportAction, removeTransportAction, computeDistanceAction, type TransportFormValues } from "./transport-actions";
 

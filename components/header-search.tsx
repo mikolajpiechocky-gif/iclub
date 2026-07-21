@@ -14,13 +14,11 @@ export function HeaderSearch() {
   const [pending, start] = useTransition();
   const boxRef = useRef<HTMLDivElement>(null);
 
-  // Debounce zapytania → Server Action.
+  // Debounce zapytania → Server Action. Dla < 2 znaków nie szukamy; stare
+  // podpowiedzi i tak nie są renderowane (bramka `showQuery` niżej).
   useEffect(() => {
     const query = q.trim();
-    if (query.length < 2) {
-      setItems([]);
-      return;
-    }
+    if (query.length < 2) return;
     const t = setTimeout(() => {
       start(async () => {
         const res = await searchAction(query);
@@ -75,7 +73,7 @@ export function HeaderSearch() {
         {pending && <span className="text-[11px] font-semibold text-ink-2">…</span>}
       </form>
 
-      {open && items.length > 0 && (
+      {open && showQuery && items.length > 0 && (
         <div className="absolute inset-x-0 top-[calc(100%+6px)] z-50 max-h-[70vh] overflow-y-auto rounded-card border border-border bg-panel p-1.5 shadow-2xl">
           {items.map((it, i) => (
             <button

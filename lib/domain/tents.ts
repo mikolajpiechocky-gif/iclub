@@ -48,7 +48,7 @@ export function addSlots(a: TentSlots, b: TentSlots): TentSlots {
   return { large: a.large + b.large, small: a.small + b.small, backdoor: a.backdoor + b.backdoor, gastro: a.gastro + b.gastro };
 }
 
-export interface TentCapacities extends TentSlots {}
+export type TentCapacities = TentSlots;
 export const DEFAULT_TENT_CAPACITIES: TentCapacities = { large: 2, small: 1, backdoor: 1, gastro: 1 };
 
 // Zwraca nazwy przekroczonych pul (pusta lista = brak overbookingu).

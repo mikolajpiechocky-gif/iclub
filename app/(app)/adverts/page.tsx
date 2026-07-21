@@ -12,8 +12,6 @@ import { AdvertsSyncButton } from "./sync-button";
 export const dynamic = "force-dynamic";
 
 const pct = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(1)}%`);
-const fmtDate = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : "—";
 const delta = (d: number | null) => (d == null || d === 0 ? "" : d > 0 ? ` (+${d})` : ` (${d})`);
 
 function expiryPill(days: number | null, expired: boolean) {

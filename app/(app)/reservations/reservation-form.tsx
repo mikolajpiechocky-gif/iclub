@@ -16,6 +16,15 @@ type CustomerOption = { id: string; name: string };
 const fmtPLN = (v: number) =>
   new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
 
+// §8 następny dzień po dacie "YYYY-MM-DD" (bez wpływu strefy czasowej) — dla podpowiedzi demontażu.
+const nextDay = (iso: string): string => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+};
+
 export function ReservationForm({
   initial,
   customers,
@@ -69,6 +78,16 @@ export function ReservationForm({
   const [conflicts, setConflicts] = useState<TentConflict[]>([]);
   const [exceeded, setExceeded] = useState<string[]>([]);
 
+  // §8 Rozwijana sekcja niestandardowych dat. Domyślnie zwinięta; rozwinięta,
+  // gdy istniejąca rezerwacja ma daty inne niż domyślne (montaż = impreza, demontaż = +1 dzień).
+  const evD = initial?.event_date ?? "";
+  const hadCustomDates = Boolean(
+    isEdit &&
+      ((initial?.setup_date && initial.setup_date !== evD) ||
+        (initial?.teardown_date && initial.teardown_date !== nextDay(evD))),
+  );
+  const [showCustomDates, setShowCustomDates] = useState(hadCustomDates);
+
   // §10.3 Kontrola pojemności namiotów per typ (overbooking = twardy blok przy zapisie).
   useEffect(() => {
     let active = true;
@@ -107,10 +126,12 @@ export function ReservationForm({
     e.preventDefault();
     setErrors({});
     setFormError(null);
+    // §8: przy zwiniętej sekcji dat wyślij puste montaż/demontaż — serwer nada domyślne.
+    const payload: ReservationFormValues = showCustomDates ? v : { ...v, setup_date: "", teardown_date: "" };
     startTransition(async () => {
       const res = isEdit
-        ? await updateReservationAction(initial!.id, v)
-        : await createReservationAction(v);
+        ? await updateReservationAction(initial!.id, payload)
+        : await createReservationAction(payload);
       if (res.ok) {
         router.push("/reservations");
         router.refresh();
@@ -134,26 +155,44 @@ export function ReservationForm({
       )}
 
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <SectionCard title="Klient i wydarzenie" className="p-5">
-          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
+        <SectionCard title="Klient i lokalizacja" className="p-5">
+          <div className="grid grid-cols-1 gap-4 px-5 pb-4 sm:grid-cols-2">
             <SelectField label="Linia biznesowa" value={v.business_line} onChange={(e) => set("business_line", e.target.value as BusinessLine)}>
-              <option value="ICLUB">iClub (namioty)</option>
+              <option value="ICLUB">iClub</option>
               <option value="EQUIPMENT_RENTAL">Wypożyczalnia sprzętu</option>
             </SelectField>
             <SelectField label="Klient" value={v.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
               <option value="">— bez klienta —</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </SelectField>
-            <SelectField label="Status" value={v.status} onChange={(e) => set("status", e.target.value as ReservationStatus)}>
-              {RESERVATION_STATUS_ORDER.map((s) => <option key={s} value={s}>{RESERVATION_STATUS_LABELS[s]}</option>)}
-            </SelectField>
-            <TextField label="Rodzaj imprezy" placeholder="Osiemnastka" value={v.event_type} onChange={(e) => set("event_type", e.target.value)} />
-            <TextField label="Liczba osób" inputMode="numeric" placeholder="45" value={v.guests} onChange={(e) => set("guests", e.target.value)} error={errors.guests} />
+            {isEdit && (
+              <SelectField label="Status" value={v.status} onChange={(e) => set("status", e.target.value as ReservationStatus)}>
+                {RESERVATION_STATUS_ORDER.map((s) => <option key={s} value={s}>{RESERVATION_STATUS_LABELS[s]}</option>)}
+              </SelectField>
+            )}
             <TextField label="Data imprezy" type="date" value={v.event_date} onChange={(e) => set("event_date", e.target.value)} />
             <AddressAutocomplete label="Lokalizacja" placeholder="Tarnowo Podgórne, ul. …" value={v.location} onChange={(val) => set("location", val)} />
-            <TextField label="Data montażu" type="date" value={v.setup_date} onChange={(e) => set("setup_date", e.target.value)} />
-            <TextField label="Data demontażu" type="date" value={v.teardown_date} onChange={(e) => set("teardown_date", e.target.value)} />
             <TextField label="Godzina dostawy (opcjonalnie)" type="time" value={v.delivery_time} onChange={(e) => set("delivery_time", e.target.value)} hint="Puste = wydarzenie całodniowe" />
+          </div>
+          {/* §8 Daty montażu/demontażu domyślnie ukryte; rozwijane w razie nietypowego terminu. */}
+          <div className="px-5 pb-5">
+            <label className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-ink">
+              <input type="checkbox" checked={showCustomDates} onChange={(e) => setShowCustomDates(e.target.checked)} className="h-4 w-4 accent-accent" />
+              Montaż lub demontaż w innym terminie
+            </label>
+            {!showCustomDates && (
+              <p className="mt-1.5 text-[11.5px] text-ink-2">
+                {v.event_date
+                  ? `Domyślnie: montaż ${v.event_date}, demontaż ${nextDay(v.event_date)}.`
+                  : "Domyślnie montaż w dniu imprezy, demontaż następnego dnia."}
+              </p>
+            )}
+            {showCustomDates && (
+              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <TextField label="Data montażu" type="date" value={v.setup_date} onChange={(e) => set("setup_date", e.target.value)} hint={v.event_date ? `puste = ${v.event_date}` : "puste = dzień imprezy"} />
+                <TextField label="Data demontażu" type="date" value={v.teardown_date} onChange={(e) => set("teardown_date", e.target.value)} hint={v.event_date ? `puste = ${nextDay(v.event_date)}` : "puste = następny dzień"} />
+              </div>
+            )}
           </div>
         </SectionCard>
 
@@ -229,6 +268,13 @@ export function ReservationForm({
             </div>
           </SectionCard>
         )}
+
+        <SectionCard title="Informacje dodatkowe" className="p-5">
+          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
+            <TextField label="Rodzaj imprezy" placeholder="Osiemnastka" value={v.event_type} onChange={(e) => set("event_type", e.target.value)} />
+            <TextField label="Liczba osób (opcjonalnie)" inputMode="numeric" placeholder="45" value={v.guests} onChange={(e) => set("guests", e.target.value)} error={errors.guests} hint="Nie blokuje zapisu rezerwacji" />
+          </div>
+        </SectionCard>
 
         <SectionCard title="Rozliczenie" className="p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-3">

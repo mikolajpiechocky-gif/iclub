@@ -18,7 +18,12 @@ export function HeaderBell({ unread = 0 }: { unread?: number }) {
   const [pending, start] = useTransition();
   const boxRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setCount(unread), [unread]);
+  // Synchronizacja licznika z propem serwera bez efektu (wzorzec „state pochodny od propa").
+  const [prevUnread, setPrevUnread] = useState(unread);
+  if (unread !== prevUnread) {
+    setPrevUnread(unread);
+    setCount(unread);
+  }
 
   const load = () => start(async () => {
     const list = await getMyNotificationsAction();

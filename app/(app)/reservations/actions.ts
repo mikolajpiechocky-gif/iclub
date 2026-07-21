@@ -71,6 +71,14 @@ function toNumber(s: string): number | null {
   return isNaN(n) ? null : n;
 }
 
+// §8: następny dzień po dacie "YYYY-MM-DD" (bez wpływu strefy czasowej).
+function nextDayIso(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
 function toInput(v: ReservationFormValues): ReservationInput {
   const clean = (s: string) => {
     const t = s.trim();
@@ -80,13 +88,18 @@ function toInput(v: ReservationFormValues): ReservationInput {
     v.status === "TEMPORARY"
       ? new Date(Date.now() + DEFAULT_HOLD_HOURS * 3600 * 1000).toISOString()
       : null;
+  // §8 Domyślna logika dat: montaż = dzień imprezy, demontaż = następny dzień.
+  // Pola pozostają rozdzielne w bazie; użytkownik może je nadpisać rozwijaną sekcją.
+  const eventDate = clean(v.event_date);
+  const setupDate = clean(v.setup_date) ?? eventDate;
+  const teardownDate = clean(v.teardown_date) ?? (eventDate ? nextDayIso(eventDate) : null);
   return {
     business_line: v.business_line === "EQUIPMENT_RENTAL" ? "EQUIPMENT_RENTAL" : "ICLUB",
     customer_id: v.customer_id.trim() ? v.customer_id.trim() : null,
     event_type: clean(v.event_type),
-    event_date: clean(v.event_date),
-    setup_date: clean(v.setup_date),
-    teardown_date: clean(v.teardown_date),
+    event_date: eventDate,
+    setup_date: setupDate,
+    teardown_date: teardownDate,
     location: clean(v.location),
     guests: toNumber(v.guests) ?? null,
     tent_id: null, // ustalane w warstwie danych z wybranego typu
@@ -152,7 +165,8 @@ async function overbookingBlock(values: ReservationFormValues, excludeId?: strin
   if (values.business_line !== "ICLUB") return null;
   const start = values.setup_date || values.event_date;
   if (!start) return null;
-  const end = values.teardown_date || values.event_date || start;
+  // Okno zajętości = montaż → demontaż z tą samą domyślną logiką co zapis (§8).
+  const end = values.teardown_date || (values.event_date ? nextDayIso(values.event_date) : start);
   const mine = sumSlots([values.tent_main as TentChoice, values.tent_extra as TentChoice]);
   const { exceeded } = await checkTentOverbooking(mine, start, end, excludeId);
   if (!exceeded.length) return null;
