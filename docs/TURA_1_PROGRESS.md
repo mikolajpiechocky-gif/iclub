@@ -28,7 +28,7 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 21. ✅ D×2 / D×4 wpływają tylko na koszt wewnętrzny (paliwo + eksploatacja liczone od planowanych km); cena klienta niezależna od mnożnika (§16).
 22. ✅ Dokładnie 100 km = wyjazd bliski (`tripClass`: daleki dopiero >100) (§16.3).
 23. ✅ Daleki wyjazd > 100 km w jedną stronę — powrót do bazy zablokowany, wymuszony D×2 (§16.3).
-24. 🟡 Flota jednym źródłem danych o pojazdach (istnieje; scalenie transport/paliwo do potwierdzenia, §14).
+24. ✅ Flota jednym źródłem danych o pojazdach — `vehicles` to jedyna definicja pojazdu; `job_vehicles.vehicle_id` i `transport_calculations.vehicle_id` to FK do floty (brak zdublowanych tabel), `job-transport` czyta spalanie/typ paliwa z floty, ceny paliwa scentralizowane w `app_settings`. Braki §14.1 (osobne pola awarii/dostępności, marka/model, koszt-km per pojazd) to rozszerzenia, nie dublowanie (§14).
 25. ⬜ Magazyn w pełni edytowalny (§17).
 26. ⬜ Audyt każdej zmiany magazynowej (§17.3).
 27. ✅ Pierwsze 4 realizacje w miesiącu → czas wolny — `settlementForRealization`: forma „free_time", 8 h × 32,40 zł = 259,20 zł wartości rozliczeniowej, reguły konfigurowalne w Ustawieniach (§19.1).
