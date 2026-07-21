@@ -13,6 +13,9 @@ export interface SettingsFormValues {
   amortization_per_km: string;
   iclub_hours: string;
   vat_rate: string;
+  iclub_hourly_rate: string;
+  iclub_month_threshold: string;
+  iclub_flat_rate: string;
 }
 
 export interface ActionResult {
@@ -32,6 +35,7 @@ function num(s: string): number | null {
 
 const NUMERIC_FIELDS: (keyof SettingsFormValues)[] = [
   "fuel_price_petrol", "fuel_price_diesel", "fuel_price_lpg", "amortization_per_km", "iclub_hours", "vat_rate",
+  "iclub_hourly_rate", "iclub_month_threshold", "iclub_flat_rate",
 ];
 
 export async function updateSettingsAction(v: SettingsFormValues): Promise<ActionResult> {
@@ -60,6 +64,9 @@ export async function updateSettingsAction(v: SettingsFormValues): Promise<Actio
     amortization_per_km: parsed.amortization_per_km,
     iclub_hours: parsed.iclub_hours,
     vat_rate: parsed.vat_rate,
+    iclub_hourly_rate: parsed.iclub_hourly_rate,
+    iclub_month_threshold: parsed.iclub_month_threshold,
+    iclub_flat_rate: parsed.iclub_flat_rate,
   };
   // Odśwież znacznik przypomnienia tylko, gdy realnie zmieniono ceny paliwa.
   const current = await getSettings();

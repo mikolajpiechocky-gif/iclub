@@ -31,8 +31,8 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 24. 🟡 Flota jednym źródłem danych o pojazdach (istnieje; scalenie transport/paliwo do potwierdzenia, §14).
 25. ⬜ Magazyn w pełni edytowalny (§17).
 26. ⬜ Audyt każdej zmiany magazynowej (§17.3).
-27. ⬜ Pierwsze 4 realizacje Bartka → czas wolny (§19.1).
-28. ⬜ Piąta+ → konfigurowalne 500 zł + dodatki (§19.2).
+27. ✅ Pierwsze 4 realizacje w miesiącu → czas wolny — `settlementForRealization`: forma „free_time", 8 h × 32,40 zł = 259,20 zł wartości rozliczeniowej, reguły konfigurowalne w Ustawieniach (§19.1).
+28. ✅ Piąta i kolejna → konfigurowalny ryczałt + premie — forma „flat" (domyślnie 500 zł, zmienialne bez kodu) + premie gwarantowane (daleki wyjazd, gastro) i możliwe (opinia, rolka); zliczanie `countDoneIclubRealizations` (DONE + iClub + przypisany, 1 zlecenie = 1 realizacja); widok „do zgarnięcia" w /me pokazuje formę, wartość i premie. Wymaga migracji 0033 (§19.2).
 29. ✅ Koszty i płatności — widoki miesięczne + filtry — domyślnie bieżący miesiąc, nawigacja ‹ ›/Ten miesiąc/Rok/Wszystko (`PeriodBar`), filtry (koszty: kategoria+status; płatności: metoda+status) przez `FilterSelect`, podsumowanie przefiltrowanego widoku (suma kosztów / do weryfikacji; wpłynęło / do zapłaty / zaległe). Filtry po polach spoza modelu (dostawca, pojazd, pracownik, klient, termin) — do dodania po rozszerzeniu schematu (§20).
 30. ✅ Nowa impreza istniejącego klienta → nowy lead (§6.3) — każde zapytanie to osobny rekord powiązany z klientem; nowy wątek OLX = nowy lead.
 31. ✅ Powrót do starego zapytania reaktywuje lead (§6.3) — nowa wiadomość OLX do przegranego = „Odgrzany" (auto), plus ręczny przycisk „Odgrzej leada"; zachowana historia (poprzedni status, licznik i data reaktywacji).

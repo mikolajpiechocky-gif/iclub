@@ -21,6 +21,9 @@ export function SettingsForm({ initial, disabled }: { initial: AppSettings; disa
     amortization_per_km: str(initial.amortization_per_km),
     iclub_hours: str(initial.iclub_hours),
     vat_rate: str(initial.vat_rate),
+    iclub_hourly_rate: str(initial.iclub_hourly_rate),
+    iclub_month_threshold: str(initial.iclub_month_threshold),
+    iclub_flat_rate: str(initial.iclub_flat_rate),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -75,6 +78,17 @@ export function SettingsForm({ initial, disabled }: { initial: AppSettings; disa
           <TextField label="Stawka VAT (%)" inputMode="decimal" value={v.vat_rate} onChange={(e) => set("vat_rate", e.target.value)} error={errors.vat_rate} />
         </div>
         <p className="px-5 pb-5 text-[12px] text-ink-2">Godziny służą do wyliczeń stawki godzinowej. VAT wykorzysta moduł faktur.</p>
+      </SectionCard>
+
+      <SectionCard title="Rozliczenia iClub (realizacje w miesiącu)" className="mt-4 p-5">
+        <div className="grid grid-cols-1 gap-4 px-5 pb-2 sm:grid-cols-3">
+          <TextField label="Pierwszych realizacji = czas wolny" inputMode="numeric" value={v.iclub_month_threshold} onChange={(e) => set("iclub_month_threshold", e.target.value)} error={errors.iclub_month_threshold} hint="np. 4" />
+          <TextField label="Stawka czasu wolnego (zł/h)" inputMode="decimal" value={v.iclub_hourly_rate} onChange={(e) => set("iclub_hourly_rate", e.target.value)} error={errors.iclub_hourly_rate} hint="np. 32,40" />
+          <TextField label="Ryczałt od kolejnej (zł)" inputMode="decimal" value={v.iclub_flat_rate} onChange={(e) => set("iclub_flat_rate", e.target.value)} error={errors.iclub_flat_rate} hint="np. 500" />
+        </div>
+        <p className="px-5 pb-5 text-[12px] text-ink-2">
+          Każda z pierwszych realizacji w miesiącu = {v.iclub_hours || "8"} h czasu wolnego (wartość {v.iclub_hours || "8"} h × {v.iclub_hourly_rate || "32,40"} zł). Piąta i kolejne = ryczałt {v.iclub_flat_rate || "500"} zł + premie. Premie (daleki wyjazd, gastro, opinia, rolka) ustawiasz per pracownik w „Pracownicy”.
+        </p>
       </SectionCard>
 
       <div className="mt-4 flex justify-end">

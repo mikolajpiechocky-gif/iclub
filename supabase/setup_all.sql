@@ -1253,3 +1253,8 @@ alter table public.reservations add column if not exists overbooking_reason text
 alter table public.transport_calculations add column if not exists one_way_km numeric(7,1);
 alter table public.transport_calculations add column if not exists returns_to_base boolean not null default false;
 
+-- ================= 0033: konfigurowalne reguły rozliczenia iClub (§19) =================
+alter table public.app_settings add column if not exists iclub_hourly_rate numeric(8,2) not null default 32.40;
+alter table public.app_settings add column if not exists iclub_month_threshold integer not null default 4;
+alter table public.app_settings add column if not exists iclub_flat_rate numeric(10,2) not null default 500;
+

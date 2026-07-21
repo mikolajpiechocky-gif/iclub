@@ -88,6 +88,29 @@ export async function listClaimableJobs(profileId: string): Promise<JobWithReser
   });
 }
 
+// §19.4 Liczba zaliczonych realizacji iClub pracownika w danym miesiącu (YYYY-MM).
+// Realizacja liczy się, gdy: zakończona (DONE), iClub, przypisany pracownik (APPROVED).
+// Jedno zlecenie = jedna realizacja (nawet gdy montaż/demontaż w różnych dniach).
+export async function countDoneIclubRealizations(profileId: string, monthPrefix: string): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("job_assignments")
+    .select("job:jobs(id, status, business_line, event_date)")
+    .eq("profile_id", profileId)
+    .eq("status", "APPROVED");
+  if (error) return 0;
+  const rows = (data ?? []) as unknown as { job: { id: string; status: string; business_line: string; event_date: string | null } | null }[];
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const j = r.job;
+    if (!j || j.status !== "DONE" || j.business_line !== "ICLUB") continue;
+    if (!j.event_date || !j.event_date.startsWith(monthPrefix)) continue;
+    seen.add(j.id);
+  }
+  return seen.size;
+}
+
 export async function getJob(id: string): Promise<JobWithReservation | null> {
   if (!isSupabaseConfigured()) return DEMO_JOBS.find((j) => j.id === id) ?? null;
   const supabase = await createClient();

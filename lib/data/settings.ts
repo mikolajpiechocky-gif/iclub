@@ -11,9 +11,13 @@ export interface AppSettings {
   amortization_per_km: number;
   iclub_hours: number;
   vat_rate: number;
+  // §19 Reguły rozliczenia realizacji iClub (konfigurowalne — bez kodowania na stałe).
+  iclub_hourly_rate: number;    // stawka „czasu wolnego" (zł/h), np. 32,40
+  iclub_month_threshold: number; // liczba pierwszych realizacji w miesiącu = czas wolny
+  iclub_flat_rate: number;      // ryczałt za realizację powyżej progu (zł), np. 500
 }
 
-// Wartości startowe (seed migracji 0017/0019). Jedyne miejsce z domyślnymi liczbami.
+// Wartości startowe (seed migracji 0017/0019/0033). Jedyne miejsce z domyślnymi liczbami.
 export const DEFAULT_SETTINGS: AppSettings = {
   base_address: "Południowa 9, Dopiewo",
   fuel_price_petrol: 6.5,
@@ -22,6 +26,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   amortization_per_km: 0.05,
   iclub_hours: 8,
   vat_rate: 23,
+  iclub_hourly_rate: 32.4,
+  iclub_month_threshold: 4,
+  iclub_flat_rate: 500,
 };
 
 const num = (v: unknown, fallback: number) => {
@@ -34,7 +41,7 @@ export async function getSettings(): Promise<AppSettings> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("app_settings")
-    .select("base_address, fuel_price_petrol, fuel_price_diesel, fuel_price_lpg, amortization_per_km, iclub_hours, vat_rate")
+    .select("base_address, fuel_price_petrol, fuel_price_diesel, fuel_price_lpg, amortization_per_km, iclub_hours, vat_rate, iclub_hourly_rate, iclub_month_threshold, iclub_flat_rate")
     .eq("id", true)
     .maybeSingle();
   if (error || !data) return DEFAULT_SETTINGS;
@@ -46,6 +53,9 @@ export async function getSettings(): Promise<AppSettings> {
     amortization_per_km: num(data.amortization_per_km, DEFAULT_SETTINGS.amortization_per_km),
     iclub_hours: num(data.iclub_hours, DEFAULT_SETTINGS.iclub_hours),
     vat_rate: num(data.vat_rate, DEFAULT_SETTINGS.vat_rate),
+    iclub_hourly_rate: num(data.iclub_hourly_rate, DEFAULT_SETTINGS.iclub_hourly_rate),
+    iclub_month_threshold: num(data.iclub_month_threshold, DEFAULT_SETTINGS.iclub_month_threshold),
+    iclub_flat_rate: num(data.iclub_flat_rate, DEFAULT_SETTINGS.iclub_flat_rate),
   };
 }
 
