@@ -19,6 +19,7 @@ import type { ProfileRecord } from "@/lib/data/types";
 /* Konfiguracja nawigacji — pełna dla sidebar desktop, pogrupowana. */
 const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { href: string; label: string; icon: IconName; badge?: string; ownerOnly?: boolean }[] }[] = [
   { group: "Główne", tint: "#14b8c4", items: [
+    { href: "/search", label: "Szukaj", icon: "search" },
     { href: "/dashboard", label: "Pulpit", icon: "home", ownerOnly: true },
     { href: "/calendar", label: "Kalendarz", icon: "calendar" },
     { href: "/planner", label: "Planer tras", icon: "navigation", ownerOnly: true },
