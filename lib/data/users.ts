@@ -13,9 +13,16 @@ const DEMO_USERS: ProfileRecord[] = [
 export async function listUsers(): Promise<ProfileRecord[]> {
   if (!isSupabaseConfigured()) return DEMO_USERS;
   const supabase = await createClient();
-  const { data, error } = await supabase.from("profiles").select("id, full_name, role").order("role").order("full_name");
+  const { data, error } = await supabase.from("profiles").select("id, full_name, role, avatar_url").order("role").order("full_name");
   if (error) throw new Error(error.message);
   return (data ?? []) as ProfileRecord[];
+}
+
+// Avatar zespołu — miniatura (data URL) zapisywana w profilu.
+export async function setUserAvatar(id: string, avatarUrl: string | null): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export async function setUserRole(id: string, role: UserRole): Promise<void> {

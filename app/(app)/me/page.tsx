@@ -1,6 +1,7 @@
 // app/(app)/me/page.tsx — Ekran pracownika (MOBILE, dane z Supabase lub demo).
 import Link from "next/link";
 import { EmptyState, Pill } from "@/components/ui";
+import { Avatar } from "@/components/avatar";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { listAssignedJobs, listClaimableJobs } from "@/lib/data/jobs";
 import { getSettings } from "@/lib/data/settings";
@@ -20,11 +21,6 @@ const fmtPLN = (v: number) =>
 // Wariant z groszami (wartość rozliczeniowa np. 259,20 zł) — bez zbędnych zer dla kwot całkowitych.
 const fmtPLN2 = (v: number) =>
   new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(v);
-
-function initials(name: string) {
-  const p = name.trim().split(/\s+/).filter(Boolean);
-  return ((p[0]?.[0] ?? "U") + (p[1]?.[0] ?? "")).toUpperCase();
-}
 
 export default async function EmployeeDashboardPage() {
   const profile = await getCurrentProfile();
@@ -76,7 +72,7 @@ export default async function EmployeeDashboardPage() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo-iclub.png" alt="iClub" className="mb-4 h-7 w-auto" />
       <div className="mb-4 flex items-center gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-[13px] text-[16px] font-bold text-white" style={{ background: "linear-gradient(135deg,#7c3aed,#e11d74)" }}>{initials(name)}</span>
+        <Avatar name={name} url={profile?.avatar_url} size={44} />
         <div>
           <div className="font-display text-[18px] font-bold text-white">Cześć, {name}</div>
           <div className="text-[12.5px] font-medium text-ink-2">{jobs.length} {jobs.length === 1 ? "realizacja" : "realizacji"} przypisanych</div>

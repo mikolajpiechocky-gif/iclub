@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isServiceRoleConfigured, createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { setUserRole, setUserName } from "@/lib/data/users";
+import { setUserRole, setUserName, setUserAvatar } from "@/lib/data/users";
 import type { UserRole, ProfileRecord } from "@/lib/data/types";
 
 export interface ActionResult {
@@ -124,6 +124,24 @@ export async function changeUserEmailAction(id: string, email: string): Promise<
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zmienić e-maila." };
+  }
+}
+
+// Avatar zespołu: miniatura (data URL) przygotowana po stronie klienta. null = usuń.
+export async function updateUserAvatarAction(id: string, avatarUrl: string | null): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
+  const me = await requireOwner();
+  if (!me) return { ok: false, error: "Tylko szef zarządza użytkownikami." };
+  if (avatarUrl != null) {
+    if (!/^data:image\/(png|jpe?g|webp);base64,/.test(avatarUrl)) return { ok: false, error: "Nieprawidłowy plik obrazu." };
+    if (avatarUrl.length > 200_000) return { ok: false, error: "Obraz za duży — wybierz mniejsze zdjęcie." };
+  }
+  try {
+    await setUserAvatar(id, avatarUrl);
+    revalidatePath("/users");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać avatara." };
   }
 }
 

@@ -1310,3 +1310,6 @@ alter table public.reservations add column if not exists discount_type text not 
 alter table public.reservations add column if not exists discount_value numeric(10,2);
 alter table public.reservations add column if not exists transport_price numeric(10,2);
 
+-- ================= 0036: avatary zespołu =================
+alter table public.profiles add column if not exists avatar_url text;
+

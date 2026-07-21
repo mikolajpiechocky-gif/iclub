@@ -12,6 +12,7 @@ export interface ProfileRecord {
   id: string;
   full_name: string;
   role: UserRole;
+  avatar_url?: string | null; // avatar (data URL — miniatura zapisana w profilu)
 }
 
 export interface CustomerRecord {

@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SectionCard, Alert, Pill } from "@/components/ui";
+import { Avatar } from "@/components/avatar";
 import type { ProfileRecord, UserRole } from "@/lib/data/types";
-import { updateUserRoleAction, updateUserNameAction, changeUserEmailAction, resetUserPasswordAction } from "./actions";
+import { updateUserRoleAction, updateUserNameAction, changeUserEmailAction, resetUserPasswordAction, updateUserAvatarAction } from "./actions";
 
 type UserWithEmail = ProfileRecord & { email: string };
 
@@ -13,9 +14,37 @@ interface Row {
   full_name: string;
   email: string;
   role: UserRole;
+  avatar_url: string | null;
   savedName: string;
   savedEmail: string;
   savedRole: UserRole;
+}
+
+// Zmniejsza wybrane zdjęcie do kwadratu 128px (cover) i zwraca miniaturę jako data URL.
+async function fileToAvatar(file: File): Promise<string> {
+  const dataUrl = await new Promise<string>((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result as string);
+    fr.onerror = () => rej(new Error("Nie udało się odczytać pliku."));
+    fr.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error("Nieprawidłowy obraz."));
+    i.src = dataUrl;
+  });
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  const scale = Math.max(size / img.width, size / img.height);
+  const w = img.width * scale;
+  const h = img.height * scale;
+  ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+  return canvas.toDataURL("image/jpeg", 0.82);
 }
 
 export function UsersManager({
@@ -35,8 +64,35 @@ export function UsersManager({
   const [savedId, setSavedId] = useState<string | null>(null);
   const [pwById, setPwById] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<Row[]>(
-    users.map((u) => ({ id: u.id, full_name: u.full_name, email: u.email, role: u.role, savedName: u.full_name, savedEmail: u.email, savedRole: u.role })),
+    users.map((u) => ({ id: u.id, full_name: u.full_name, email: u.email, role: u.role, avatar_url: u.avatar_url ?? null, savedName: u.full_name, savedEmail: u.email, savedRole: u.role })),
   );
+
+  // Wybór/zmiana avatara: zmniejszenie po stronie klienta → zapis miniatury.
+  const pickAvatar = (row: Row, file: File | null) => {
+    if (!file) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        const dataUrl = await fileToAvatar(file);
+        const res = await updateUserAvatarAction(row.id, dataUrl);
+        if (!res.ok) { setError(res.error ?? "Błąd"); return; }
+        setRows((rs) => rs.map((rr) => (rr.id === row.id ? { ...rr, avatar_url: dataUrl } : rr)));
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Nie udało się wczytać zdjęcia.");
+      }
+    });
+  };
+
+  const removeAvatar = (row: Row) => {
+    setError(null);
+    startTransition(async () => {
+      const res = await updateUserAvatarAction(row.id, null);
+      if (!res.ok) { setError(res.error ?? "Błąd"); return; }
+      setRows((rs) => rs.map((rr) => (rr.id === row.id ? { ...rr, avatar_url: null } : rr)));
+      router.refresh();
+    });
+  };
 
   const patch = (id: string, p: Partial<Row>) => {
     setSavedId(null);
@@ -86,6 +142,19 @@ export function UsersManager({
             const dirty = r.full_name !== r.savedName || (canAdmin && r.email !== r.savedEmail) || r.role !== r.savedRole;
             return (
               <div key={r.id} className="rounded-[12px] border border-border bg-surface p-3.5">
+                {/* Avatar zespołu — zdjęcie zmniejszane po stronie klienta do miniatury. */}
+                <div className="mb-3 flex items-center gap-3">
+                  <Avatar name={r.full_name || r.email} url={r.avatar_url} size={48} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className={`rounded-[10px] border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-2 ${disabled || pending ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                      {r.avatar_url ? "Zmień zdjęcie" : "Dodaj zdjęcie"}
+                      <input type="file" accept="image/*" className="hidden" disabled={disabled || pending} onChange={(e) => { pickAvatar(r, e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                    </label>
+                    {r.avatar_url && (
+                      <button type="button" onClick={() => removeAvatar(r)} disabled={pending} className="rounded-[10px] border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-2">Usuń</button>
+                    )}
+                  </div>
+                </div>
                 <div className="grid gap-2.5 sm:grid-cols-2">
                   <input
                     value={r.full_name}
