@@ -7,7 +7,8 @@ import { PageHeader } from "@/components/layout";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
 import type { ReservationRecord, TentRecord, PackageRecord, ReservationAddon, ReservationStatus, BusinessLine, PricingSnapshot } from "@/lib/data/types";
 import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
-import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
+import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, checkAddonAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
+import type { AddonShortage } from "@/lib/data/reservations";
 import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
 import { computeOrderPrice, suggestedDeposit } from "@/lib/domain/order-pricing";
 import { computeSetupTimes, fmtDuration, type AssemblyConfig } from "@/lib/domain/assembly";
@@ -91,6 +92,7 @@ export function ReservationForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<TentConflict[]>([]);
   const [exceeded, setExceeded] = useState<string[]>([]);
+  const [addonShortages, setAddonShortages] = useState<AddonShortage[]>([]);
   // §13.6 Zadatek: śledzimy, czy Szef zmienił go ręcznie (wtedy nie nadpisujemy sugestią).
   const [depositTouched, setDepositTouched] = useState(isEdit);
   const [transportMsg, setTransportMsg] = useState<string | null>(null);
@@ -121,6 +123,19 @@ export function ReservationForm({
       active = false;
     };
   }, [v.tent_main, v.tent_extra, v.setup_date, v.teardown_date, v.event_date, initial?.id]);
+
+  // §12.3 Live-kontrola dostępności dodatków magazynowych w tym terminie.
+  useEffect(() => {
+    let active = true;
+    const start = v.setup_date || v.event_date || "";
+    const end = v.teardown_date || v.event_date || start;
+    checkAddonAvailabilityAction(v.addon_ids, v.addon_qty, start, end, initial?.id).then((s) => {
+      if (active) setAddonShortages(s);
+    });
+    return () => {
+      active = false;
+    };
+  }, [v.addon_ids, v.addon_qty, v.setup_date, v.teardown_date, v.event_date, initial?.id]);
 
   const set = <K extends keyof ReservationFormValues>(k: K, val: ReservationFormValues[K]) =>
     setV((s) => ({ ...s, [k]: val }));
@@ -285,10 +300,17 @@ export function ReservationForm({
                 {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </SelectField>
             </div>
-            {exceeded.length > 0 && (
+            {(exceeded.length > 0 || addonShortages.length > 0) && (
               <div className="px-5 pb-4">
-                <Alert tone="bad" title="Overbooking — brak wolnych zasobów">
-                  Na ten termin brakuje: <b>{exceeded.join(", ")}</b>.
+                <Alert tone="bad" title="Brak dostępności na ten termin">
+                  {exceeded.length > 0 && <div>Namioty: <b>{exceeded.join(", ")}</b>.</div>}
+                  {addonShortages.length > 0 && (
+                    <div className="mt-1">Dodatki ze stanu magazynu:
+                      <ul className="mt-1 list-disc pl-4">
+                        {addonShortages.map((s) => <li key={s.id}>{s.name}: potrzeba {s.requested}, wolne {Math.max(0, s.stock - s.used)} z {s.stock}</li>)}
+                      </ul>
+                    </div>
+                  )}
                   {conflicts.length > 0 && (
                     <ul className="mt-1.5 list-disc pl-4">
                       {conflicts.map((c) => <li key={c.id}>{c.label}</li>)}

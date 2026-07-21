@@ -3,7 +3,7 @@
 // rezerwacji automatycznie generuje zlecenie i etapy (warstwa danych).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setInvoiceIssued, checkTentOverbooking, type ReservationInput } from "@/lib/data/reservations";
+import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, type ReservationInput, type AddonShortage } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
 import { markJobPlannedPaid } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
@@ -201,12 +201,32 @@ async function overbookingBlock(values: ReservationFormValues, excludeId?: strin
   const end = values.teardown_date || (values.event_date ? nextDayIso(values.event_date) : start);
   const mine = sumSlots([values.tent_main as TentChoice, values.tent_extra as TentChoice]);
   const { exceeded } = await checkTentOverbooking(mine, start, end, excludeId);
-  if (!exceeded.length) return null;
+  // §12.3 Dostępność dodatków magazynowych w tym terminie.
+  const { shortages } = await checkAddonOverbooking(values.addon_ids, values.addon_qty, start, end, excludeId);
+  const problems = [...exceeded, ...shortages.map((s) => `${s.name} (potrzeba ${s.requested}, wolne ${Math.max(0, s.stock - s.used)} z ${s.stock})`)];
+  if (!problems.length) return null;
   if (!values.overbooking_override) {
-    return `Overbooking: brak wolnych zasobów (${exceeded.join(", ")}) na ten termin. Zaznacz „wyjątek szefa" i podaj powód, aby zapisać mimo to.`;
+    return `Brak dostępności na ten termin: ${problems.join("; ")}. Zaznacz „wyjątek szefa" i podaj powód, aby zapisać mimo to.`;
   }
-  if (!values.overbooking_reason.trim()) return "Podaj powód wyjątku overbookingu (decyzja szefa).";
+  if (!values.overbooking_reason.trim()) return "Podaj powód wyjątku (decyzja szefa).";
   return null;
+}
+
+// §12.3 Live-sprawdzenie dostępności dodatków (dla formularza).
+export async function checkAddonAvailabilityAction(
+  addonIds: string[],
+  addonQty: Record<string, number>,
+  startDate: string,
+  endDate: string,
+  excludeId?: string,
+): Promise<AddonShortage[]> {
+  if (!startDate || !addonIds.length) return [];
+  try {
+    const { shortages } = await checkAddonOverbooking(addonIds, addonQty, startDate, endDate || startDate, excludeId);
+    return shortages;
+  } catch {
+    return [];
+  }
 }
 
 export interface ReservationTransportResult {
