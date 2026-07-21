@@ -153,6 +153,8 @@ export async function createReservationAction(values: ReservationFormValues): Pr
 
 export async function markReservationConfirmedAction(id: string, confirmed: boolean): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko właściciel zmienia potwierdzenie klienta." };
   try {
     await setReservationConfirmed(id, confirmed);
     revalidatePath(`/reservations/${id}`);
@@ -186,6 +188,8 @@ export async function markRealizationDoneAction(reservationId: string): Promise<
 
 export async function markInvoiceIssuedAction(id: string, issued: boolean, invoiceNumber: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko właściciel zmienia status faktury." };
   try {
     await setInvoiceIssued(id, issued, invoiceNumber.trim() || null);
     revalidatePath(`/reservations/${id}`);

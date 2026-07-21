@@ -61,8 +61,11 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
     { h: "Wydarzenie", rows: [["Typ", reservation.event_type ?? "—"], ["Goście", reservation.guests != null ? `${reservation.guests} osób` : "—"], ["Data", fmtDate(reservation.event_date)]] },
     { h: "Terminy", rows: [["Montaż", fmtDate(reservation.setup_date)], ["Demontaż", fmtDate(reservation.teardown_date)], ["Lokalizacja", reservation.location ?? "—"]] },
     { h: "Namiot i pakiet", rows: [["Namiot", (r as { tent?: { name?: string } }).tent?.name ?? "—"], ["Pakiet", (r as { package?: { name?: string } }).package?.name ?? "—"]] },
-    { h: "Rozliczenie", rows: [["Wartość", fmtPLN(reservation.price)], ["Rabat", fmtPLN(reservation.discount ?? 0)], ["Zaliczka", fmtPLN(reservation.deposit ?? 0)]] },
   ];
+  // Rozliczenie (Wartość/Rabat/Zaliczka) — tylko właściciel; pracownika to nie dotyczy.
+  if (isOwner) {
+    cards.push({ h: "Rozliczenie", rows: [["Wartość", fmtPLN(reservation.price)], ["Rabat", fmtPLN(reservation.discount ?? 0)], ["Zaliczka", fmtPLN(reservation.deposit ?? 0)]] });
+  }
 
   return (
     <div className="mx-auto max-w-[1180px] px-5 py-6 md:px-8">
@@ -85,9 +88,9 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
         {job && isOwner && <span className="ml-auto"><RealizationDoneButton reservationId={reservation.id} done={job.status === "DONE"} /></span>}
       </div>
 
-      <ClientConfirmToggle id={reservation.id} confirmed={reservation.client_confirmed} confirmedAt={reservation.client_confirmed_at} />
+      {isOwner && <ClientConfirmToggle id={reservation.id} confirmed={reservation.client_confirmed} confirmedAt={reservation.client_confirmed_at} />}
 
-      {reservation.is_invoice && (
+      {isOwner && reservation.is_invoice && (
         <InvoiceStatus
           id={reservation.id}
           issued={reservation.invoice_issued}
@@ -155,11 +158,10 @@ async function SafeReservationOps(props: OpsProps) {
   try {
     return await ReservationOps(props);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
     console.error("ReservationOps failed:", e);
     return (
       <div className="mt-4 rounded-card border border-[#3a1c1f] bg-[#251215] p-4 text-[12.5px] text-bad">
-        Nie udało się załadować sekcji realizacji. Szczegóły: {msg}
+        Nie udało się załadować sekcji realizacji. Odśwież stronę — jeśli błąd wraca, zgłoś właścicielowi.
       </div>
     );
   }

@@ -39,7 +39,7 @@ export default async function EmployeeDashboardPage() {
   // Kafelki „do zgarnięcia": co / kiedy / gdzie / km od bazy / ile może zgarnąć.
   // Km i stawki liczymy tylko gdy jest co pokazać; geokodujemy bazę i unikalne
   // lokalizacje raz (dedup), potem trasa base→cel.
-  let claimableCards: { j: JobWithReservation; km: number | null; earn: number | null }[] = [];
+  let claimableCards: { j: JobWithReservation; km: number | null; earn: number }[] = [];
   if (claimable.length && profile) {
     const settings = await getSettings();
     const myRate = (await getEmployee(profile.id))?.rate ?? null;
@@ -55,7 +55,7 @@ export default async function EmployeeDashboardPage() {
     claimableCards = claimable.map((j) => ({
       j,
       km: j.reservation?.location ? kmByLoc.get(j.reservation.location) ?? null : null,
-      earn: myRate ? predictedEarnings(myRate, "ICLUB", j.owner_bonus ?? 0, settings.iclub_hours).total : null,
+      earn: predictedEarnings(myRate, "ICLUB", j.owner_bonus ?? 0, settings.iclub_hours).total,
     }));
   }
 
@@ -118,8 +118,9 @@ export default async function EmployeeDashboardPage() {
                   </div>
                 </div>
                 <div className="flex-none text-right">
-                  {earn != null && <div className="font-display text-[15px] font-bold text-ok">{fmtPLN(earn)}</div>}
-                  <div className="mt-0.5 text-[11px] font-bold text-ok">Zgarnij →</div>
+                  <div className="font-display text-[15px] font-bold text-ok">{fmtPLN(earn)}</div>
+                  <div className="text-[9px] font-semibold text-ink-2">do zgarnięcia</div>
+                  <div className="mt-1 text-[11px] font-bold text-ok">Zgarnij →</div>
                 </div>
               </div>
             </Link>

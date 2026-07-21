@@ -12,7 +12,7 @@ export async function listAllAvailability(): Promise<AvailabilityWithProfile[]> 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("employee_availability")
-    .select("*, profile:profiles(id, full_name)")
+    .select("*, profile:profiles!profile_id(id, full_name)")
     .order("start_date");
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as AvailabilityWithProfile[];

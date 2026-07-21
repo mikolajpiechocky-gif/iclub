@@ -32,7 +32,7 @@ export async function listJobAssignments(jobId: string): Promise<JobAssignment[]
   const supabase = await createClient();
   const { data: rows, error } = await supabase
     .from("job_assignments")
-    .select("*, employee:profiles(id, full_name, role)")
+    .select("*, employee:profiles!profile_id(id, full_name, role)")
     .eq("job_id", jobId)
     .order("is_lead", { ascending: false });
   if (error) throw new Error(error.message);
