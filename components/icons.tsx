@@ -12,7 +12,7 @@ export type IconName =
   | "check" | "chevron-right" | "chevron-left" | "phone" | "navigation"
   | "camera" | "warning" | "plus" | "x" | "menu" | "signature" | "more"
   | "wifi" | "wifi-off" | "refresh" | "pen"
-  | "wind" | "sun" | "droplet" | "search" | "tag";
+  | "wind" | "sun" | "droplet" | "search" | "tag" | "bell";
 
 // d-ścieżki dla viewBox 0 0 24 24, stroke.
 const PATHS: Record<IconName, string> = {
@@ -51,6 +51,7 @@ const PATHS: Record<IconName, string> = {
   droplet: "M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11z",
   search: "M10.5 3a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15M21 21l-5.4-5.4",
   tag: "M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8M7.5 7.5h.01",
+  bell: "M6 9a6 6 0 1 1 12 0c0 4.5 2 5.5 2 5.5H4S6 13.5 6 9M10 19a2 2 0 0 0 4 0",
 };
 
 interface IconProps extends SVGProps<SVGSVGElement> {

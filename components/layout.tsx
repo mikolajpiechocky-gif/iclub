@@ -14,6 +14,7 @@ import { StatusBadge } from "./ui";
 import { UserMenu } from "./auth/user-menu";
 import { PullToRefresh } from "./pull-to-refresh";
 import { HeaderSearch } from "./header-search";
+import { HeaderBell } from "./header-bell";
 import type { StatusKey } from "@/lib/types";
 import type { ProfileRecord } from "@/lib/data/types";
 
@@ -24,7 +25,6 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
     { href: "/dashboard", label: "Pulpit", icon: "home", ownerOnly: true },
     { href: "/calendar", label: "Kalendarz", icon: "calendar" },
     { href: "/planner", label: "Planer tras", icon: "navigation", ownerOnly: true },
-    { href: "/notifications", label: "Powiadomienia", icon: "inbox" },
   ]},
   { group: "Sprzedaż", tint: "#7c3aed", items: [
     { href: "/inquiries", label: "Zapytania", icon: "inbox", ownerOnly: true },
@@ -141,8 +141,9 @@ export function AppShell({ children, profile, unread = 0 }: { children: ReactNod
       <PullToRefresh />
       <AppSidebar profile={profile} unread={unread} />
       <main className="min-w-0 flex-1 pb-24 md:pb-0">
-        <div className="sticky top-0 z-30 border-b border-[#1b1d27] bg-panel px-4 py-2.5 md:px-8">
-          <HeaderSearch />
+        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-[#1b1d27] bg-panel px-4 py-2.5 md:px-8">
+          <div className="min-w-0 flex-1"><HeaderSearch /></div>
+          <HeaderBell unread={unread} />
         </div>
         {children}
       </main>

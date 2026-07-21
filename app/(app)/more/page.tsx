@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 
 const LINKS: { href: string; label: string; icon: IconName; ownerOnly?: boolean }[] = [
   { href: "/search", label: "Szukaj", icon: "search" },
-  { href: "/notifications", label: "Powiadomienia", icon: "inbox" },
   { href: "/customers", label: "Klienci", icon: "users" },
   { href: "/inquiries", label: "Zapytania", icon: "inbox", ownerOnly: true },
   { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },

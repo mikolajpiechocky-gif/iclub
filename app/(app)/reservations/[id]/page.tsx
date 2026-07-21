@@ -16,7 +16,7 @@ import { predictedEarnings } from "@/lib/domain/earnings";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
 import { listJobPhotos } from "@/lib/data/photos";
-import { getEventWeather } from "@/lib/integrations/weather";
+import { getEventWeather, WEATHER_KIND_STYLE } from "@/lib/integrations/weather";
 import { RESERVATION_STATUS_META, STAGE_STATUS_META } from "@/lib/data/types";
 import { listTransportCalcs } from "@/lib/data/transport";
 import { getSettings } from "@/lib/data/settings";
@@ -114,8 +114,8 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
           {weather.warnings.length > 0 && (
             <div className="mt-2.5 flex flex-wrap gap-2">
               {weather.warnings.map((w) => (
-                <span key={w.kind} className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#332814] px-2.5 py-1 text-[11.5px] font-bold text-warn">
-                  <Icon name={w.kind === "wind" ? "wind" : w.kind === "heat" ? "sun" : "droplet"} className="h-3.5 w-3.5" />
+                <span key={w.kind} className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#20242e] px-2.5 py-1 text-[11.5px] font-bold" style={{ color: WEATHER_KIND_STYLE[w.kind].color }}>
+                  <Icon name={WEATHER_KIND_STYLE[w.kind].icon} className="h-3.5 w-3.5" />
                   {w.text}
                 </span>
               ))}

@@ -10,7 +10,7 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 3. 🟡 Overbooking namiotów blokowany — jest ostrzeżenie per rozmiar; twardy blok serwer/baza do zrobienia (§10).
 4. ⬜ Mobilny kalendarz pokazuje cały tydzień (§5.2).
 5. ⬜ Priorytetowy widok weekendu (§5.2).
-6. ⬜ Powiadomienia pod ikoną dzwonka w nagłówku (§5.5).
+6. ✅ Powiadomienia pod ikoną dzwonka w nagłówku (§5.5) — licznik, panel, przejście do rekordu, oznaczanie, „Zobacz wszystkie"; usunięto zakładkę.
 7. ⬜ Uproszczony formularz rezerwacji (§7).
 8. ⬜ Liczba osób nie jest wymagana (§7.1).
 9. ⬜ Daty montażu/demontażu domyślnie ukryte (§8).
@@ -44,3 +44,5 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 - ✅ §3: usunięto notkę „Konta zakłada… Supabase" z ekranu logowania.
 - ✅ §4.1: kolejność pulpitu — Podsumowanie → Wymaga uwagi → Najnowsze zapytania → Najbliższe realizacje.
 - ✅ §4.3: usunięto kafelek „Konflikty namiotu" (walidacja ma blokować, nie informować).
+- ✅ §5.4: kolory ikon pogody — upał żółty, deszcz niebieski, wiatr pomarańczowy, OK zielony (kalendarz + rezerwacja).
+- ✅ §5.5: dzwonek powiadomień w nagłówku; zakładka „Powiadomienia" usunięta z menu.

@@ -1,10 +1,16 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { markRead, markAllRead } from "@/lib/data/notifications";
+import { markRead, markAllRead, listMyNotifications, type NotificationRecord } from "@/lib/data/notifications";
 
 export interface ActionResult {
   ok: boolean;
+}
+
+// Lista powiadomień do panelu pod dzwonkiem w nagłówku.
+export async function getMyNotificationsAction(): Promise<NotificationRecord[]> {
+  if (!isSupabaseConfigured()) return [];
+  return listMyNotifications();
 }
 
 export async function markReadAction(id: string): Promise<ActionResult> {

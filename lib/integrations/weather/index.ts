@@ -11,6 +11,15 @@ export interface WeatherWarning {
   text: string;
 }
 
+// Kolory ikon pogodowych (§5.4): upał — żółty, deszcz — niebieski, silny wiatr —
+// pomarańczowy; bezpieczne warunki — zielone. (Burza/mróz/IMGW — do dodania później.)
+export const WEATHER_KIND_STYLE: Record<WeatherWarningKind, { icon: "wind" | "sun" | "droplet"; color: string }> = {
+  wind: { icon: "wind", color: "#f97316" },
+  heat: { icon: "sun", color: "#fbbf24" },
+  rain: { icon: "droplet", color: "#38bdf8" },
+};
+export const WEATHER_OK_COLOR = "#5fd68b";
+
 export interface EventWeather {
   date: string;
   label: string;
