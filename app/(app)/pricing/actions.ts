@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { updatePackagePrice, updatePackageAssembly, updateAddonPrice } from "@/lib/data/resources";
+import { updatePackagePrice, updatePackageAssembly, updatePackageActive, updateAddonPrice } from "@/lib/data/resources";
 
 export interface PriceRow {
   id: string;
   price: string;
   assembly?: string; // §9.2 czas montażu (minuty) — tylko pakiety
+  active?: boolean;  // §11 aktywność — tylko pakiety
 }
 export interface PricingFormValues {
   packages: PriceRow[];
@@ -37,18 +38,18 @@ export async function updatePricingAction(v: PricingFormValues): Promise<ActionR
 
   // Walidacja wszystkich kwot przed jakimkolwiek zapisem.
   const fieldErrors: Record<string, string> = {};
-  const parsed: { id: string; price: number; assembly: number | null; kind: "pkg" | "add" }[] = [];
+  const parsed: { id: string; price: number; assembly: number | null; active: boolean | null; kind: "pkg" | "add" }[] = [];
   for (const row of v.packages) {
     const n = num(row.price);
     const a = row.assembly != null ? num(row.assembly) : null;
     if (n == null || n < 0) fieldErrors[row.id] = "Podaj kwotę ≥ 0.";
     else if (a != null && (a < 0 || !Number.isInteger(a))) fieldErrors[row.id] = "Czas montażu: liczba całkowita minut ≥ 0.";
-    else parsed.push({ id: row.id, price: n, assembly: a, kind: "pkg" });
+    else parsed.push({ id: row.id, price: n, assembly: a, active: row.active ?? null, kind: "pkg" });
   }
   for (const row of v.addons) {
     const n = num(row.price);
     if (n == null || n < 0) fieldErrors[row.id] = "Podaj kwotę ≥ 0.";
-    else parsed.push({ id: row.id, price: n, assembly: null, kind: "add" });
+    else parsed.push({ id: row.id, price: n, assembly: null, active: null, kind: "add" });
   }
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
 
@@ -57,6 +58,7 @@ export async function updatePricingAction(v: PricingFormValues): Promise<ActionR
       if (row.kind === "pkg") {
         await updatePackagePrice(row.id, row.price);
         if (row.assembly != null) await updatePackageAssembly(row.id, row.assembly);
+        if (row.active != null) await updatePackageActive(row.id, row.active);
       } else {
         await updateAddonPrice(row.id, row.price);
       }

@@ -6,7 +6,7 @@ import { SectionCard, PrimaryButton, Alert } from "@/components/ui";
 import type { PackageRecord, AddonRecord } from "@/lib/data/types";
 import { updatePricingAction } from "./actions";
 
-type Row = { id: string; name: string; description?: string | null; price: string; assembly?: string };
+type Row = { id: string; name: string; description?: string | null; price: string; assembly?: string; active?: boolean };
 
 export function PricingForm({
   packages,
@@ -24,7 +24,7 @@ export function PricingForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [pkg, setPkg] = useState<Row[]>(
-    packages.map((p) => ({ id: p.id, name: p.name, description: p.description, price: String(p.base_price ?? 0), assembly: String(p.assembly_minutes ?? 180) })),
+    packages.map((p) => ({ id: p.id, name: p.name, description: p.description, price: String(p.base_price ?? 0), assembly: String(p.assembly_minutes ?? 180), active: p.active })),
   );
   const [add, setAdd] = useState<Row[]>(
     addons.map((a) => ({ id: a.id, name: a.name, price: String(a.price ?? 0) })),
@@ -42,13 +42,18 @@ export function PricingForm({
     setPkg((rows) => rows.map((r) => (r.id === id ? { ...r, assembly } : r)));
   };
 
+  const setPkgActive = (id: string, active: boolean) => {
+    setSaved(false);
+    setPkg((rows) => rows.map((r) => (r.id === id ? { ...r, active } : r)));
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
     setFormError(null);
     startTransition(async () => {
       const res = await updatePricingAction({
-        packages: pkg.map(({ id, price, assembly }) => ({ id, price, assembly })),
+        packages: pkg.map(({ id, price, assembly, active }) => ({ id, price, assembly, active })),
         addons: add.map(({ id, price }) => ({ id, price })),
       });
       if (res.ok) { setSaved(true); router.refresh(); return; }
@@ -77,10 +82,17 @@ export function PricingForm({
       <SectionCard title="Pakiety" className="p-5">
         <div className="flex flex-col divide-y divide-border-soft px-5 pb-2">
           {pkg.map((r) => (
-            <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div key={r.id} className={`flex flex-wrap items-center justify-between gap-3 py-3 ${r.active === false ? "opacity-55" : ""}`}>
               <div className="min-w-0 flex-1">
-                <div className="text-[14px] font-bold text-ink">{r.name}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px] font-bold text-ink">{r.name}</span>
+                  {r.active === false && <span className="rounded-[6px] bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-ink-2">Nieaktywny</span>}
+                </div>
                 {r.description && <div className="truncate text-[12px] text-ink-2">{r.description}</div>}
+                <label className="mt-1 inline-flex cursor-pointer items-center gap-1.5 text-[11.5px] font-semibold text-ink-2">
+                  <input type="checkbox" checked={r.active ?? true} onChange={(e) => setPkgActive(r.id, e.target.checked)} className="h-3.5 w-3.5 accent-accent" />
+                  Aktywny (widoczny w nowych rezerwacjach)
+                </label>
                 {errors[r.id] && <div className="text-[11px] font-semibold text-bad">{errors[r.id]}</div>}
               </div>
               <div className="flex items-center gap-2">

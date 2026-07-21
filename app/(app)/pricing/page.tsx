@@ -2,7 +2,7 @@
 import { PageHeader } from "@/components/layout";
 import { Alert } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { listPackages, listAddons } from "@/lib/data/resources";
+import { listAllPackages, listAddons } from "@/lib/data/resources";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { PricingForm } from "./pricing-form";
 
@@ -19,7 +19,7 @@ export default async function PricingPage() {
     );
   }
 
-  const [packages, addons] = await Promise.all([listPackages(), listAddons()]);
+  const [packages, addons] = await Promise.all([listAllPackages(), listAddons()]);
   const demo = !isSupabaseConfigured();
 
   return (

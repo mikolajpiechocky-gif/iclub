@@ -22,6 +22,23 @@ export async function listPackages(): Promise<PackageRecord[]> {
   return (data ?? []) as PackageRecord[];
 }
 
+// Wszystkie pakiety (także nieaktywne) — do zarządzania w cenniku.
+export async function listAllPackages(): Promise<PackageRecord[]> {
+  if (!isSupabaseConfigured()) return DEMO_PACKAGE_RECORDS;
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("packages").select("*").order("sort");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as PackageRecord[];
+}
+
+export async function getPackage(id: string): Promise<PackageRecord | null> {
+  if (!isSupabaseConfigured()) return DEMO_PACKAGE_RECORDS.find((p) => p.id === id) ?? null;
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("packages").select("*").eq("id", id).maybeSingle();
+  if (error) return null;
+  return (data as PackageRecord) ?? null;
+}
+
 export async function listAddons(): Promise<AddonRecord[]> {
   if (!isSupabaseConfigured()) return DEMO_ADDON_RECORDS;
   const supabase = await createClient();
@@ -58,6 +75,13 @@ export async function updatePackagePrice(id: string, base_price: number): Promis
 export async function updatePackageAssembly(id: string, assembly_minutes: number): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("packages").update({ assembly_minutes }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// §11 Aktywność pakietu (aktywny/nieaktywny — nieaktywne znikają z nowych rezerwacji).
+export async function updatePackageActive(id: string, active: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("packages").update({ active }).eq("id", id);
   if (error) throw new Error(error.message);
 }
 
