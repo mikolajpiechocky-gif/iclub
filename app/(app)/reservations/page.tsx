@@ -17,7 +17,8 @@ const fmtPLN = (v: number | null) =>
 const FILTERS: Record<string, { label: string; test: (r: ReservationRecord, ctx: { todayStr: string; plus7Str: string }) => boolean }> = {
   "no-deposit": {
     label: "Bez zadatku",
-    test: (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && (!r.deposit || r.deposit === 0),
+    // numeric z Postgresa bywa stringiem ("0.00") — koercja przed porównaniem.
+    test: (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && !Number(r.deposit),
   },
   "upcoming7": {
     label: "Najbliższe (7 dni)",

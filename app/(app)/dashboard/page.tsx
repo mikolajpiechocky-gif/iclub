@@ -49,7 +49,8 @@ export default async function DashboardPage() {
   const toConfirm = upcoming.filter((r) => r.event_date! <= plus7Str && !r.client_confirmed);
   const newInquiries = inquiries.filter((q) => q.status === "NEW").length;
   const noDeposit = reservations.filter(
-    (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && (!r.deposit || r.deposit === 0)
+    // numeric z Postgresa bywa stringiem ("0.00") — koercja przed porównaniem.
+    (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && !Number(r.deposit)
   );
   const plannedJobs = jobs.filter((j) => j.status === "PLANNED").length;
 

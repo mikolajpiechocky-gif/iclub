@@ -68,7 +68,8 @@ export function ReservationForm({
     payment_upfront: initial?.payment_upfront ?? false,
     price: initial?.price != null ? String(initial.price) : "",
     discount_type: initial?.discount_type === "PERCENT" ? "PERCENT" : "AMOUNT",
-    discount_value: initial?.discount_value != null ? String(initial.discount_value) : "",
+    // Legacy (sprzed kolumny discount_value): pokaż zapisaną kwotę rabatu, by nie wyzerować jej przy edycji.
+    discount_value: initial?.discount_value != null ? String(initial.discount_value) : (initial?.discount ? String(initial.discount) : ""),
     discount_amount: initial?.discount != null ? String(initial.discount) : "",
     transport_price: initial?.transport_price != null ? String(initial.transport_price) : "",
     deposit: initial?.deposit != null ? String(initial.deposit) : "",
@@ -130,10 +131,14 @@ export function ReservationForm({
   const transportPrice = Number(v.transport_price.replace(",", ".")) || 0;
   const discountValueNum = Number(v.discount_value.replace(",", ".")) || 0;
   const order = computeOrderPrice({ packagePrice, addonsTotal, transportPrice, discountType: v.discount_type, discountValue: discountValueNum });
-  const suggestedDep = suggestedDeposit(transportPrice); // §13.6 300 zł + transport
+  // §21: ręcznie ustawiona wartość końcowa ma priorytet; inaczej używamy wyliczonej.
+  const finalPrice = Number(v.price.replace(",", ".")) || order.total;
+  const rawSuggestedDep = suggestedDeposit(transportPrice); // §13.6 300 zł + transport
+  const suggestedDep = finalPrice > 0 ? Math.min(rawSuggestedDep, finalPrice) : rawSuggestedDep; // nie ponad wartość
   const depositValue = depositTouched ? v.deposit : String(suggestedDep);
   const depositNum = Number(depositValue.replace(",", ".")) || 0;
-  const remaining = Math.max(0, Math.round((order.total - depositNum) * 100) / 100);
+  const remaining = Math.max(0, Math.round((finalPrice - depositNum) * 100) / 100);
+  const depositOverValue = finalPrice > 0 && depositNum > finalPrice; // §13.6 ostrzeżenie
 
   // §14.3 Transport rezerwacji z adresu (odległość w jedną stronę → widełki).
   const computeTransport = () => {
@@ -367,7 +372,7 @@ export function ReservationForm({
         <details open className="overflow-hidden rounded-card-lg border border-border bg-surface">
           <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3">
             <span className="font-display text-[15px] font-bold text-white">Podsumowanie</span>
-            <span className="font-display text-[16px] font-bold text-accent-soft">{fmtPLN(order.total)}</span>
+            <span className="font-display text-[16px] font-bold text-accent-soft">{fmtPLN(finalPrice)}</span>
           </summary>
           <div className="flex flex-col gap-2 border-t border-border px-4 py-3.5 text-[13px]">
             <div className="flex justify-between"><span className="text-ink-2">Pakiet</span><span className="font-semibold text-ink">{fmtPLN(packagePrice)}</span></div>
@@ -376,12 +381,18 @@ export function ReservationForm({
             {order.discountAmount > 0 && (
               <div className="flex justify-between"><span className="text-ink-2">Rabat{v.discount_type === "PERCENT" ? ` (${discountValueNum}%)` : ""}</span><span className="font-semibold text-ok">− {fmtPLN(order.discountAmount)}</span></div>
             )}
-            <div className="mt-1 flex justify-between border-t border-border-soft pt-2 text-[14px] font-bold text-white"><span>Razem</span><span>{fmtPLN(order.total)}</span></div>
+            <div className="mt-1 flex justify-between border-t border-border-soft pt-2 text-[14px] font-bold text-white"><span>Wartość końcowa</span><span>{fmtPLN(finalPrice)}</span></div>
+            {Math.round(finalPrice) !== Math.round(order.total) && (
+              <div className="flex justify-between text-[11px] text-ink-2"><span>Wyliczona (pakiet+dodatki+transport−rabat)</span><span>{fmtPLN(order.total)}</span></div>
+            )}
             <div className="flex justify-between"><span className="text-ink-2">Zadatek</span><span className="font-semibold text-ink">{fmtPLN(depositNum)}</span></div>
             <div className="flex justify-between"><span className="text-ink-2">Pozostało</span><span className="font-bold text-warn">{fmtPLN(remaining)}</span></div>
+            {depositOverValue && (
+              <div className="rounded-[9px] border border-[#3a1c1f] bg-[#251215] px-2.5 py-1.5 text-[11.5px] font-semibold text-bad">Zadatek przekracza wartość rezerwacji — zmniejsz go, aby zapisać.</div>
+            )}
             {order.total > 0 && Number(v.price.replace(",", ".")) !== order.total && (
               <button type="button" onClick={() => set("price", String(order.total))} className="mt-1.5 rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-[12.5px] font-semibold text-accent-soft">
-                Zastosuj cenę {fmtPLN(order.total)}
+                Zastosuj wyliczoną cenę {fmtPLN(order.total)}
               </button>
             )}
           </div>

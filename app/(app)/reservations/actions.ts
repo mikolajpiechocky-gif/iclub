@@ -68,8 +68,12 @@ function validate(v: ReservationFormValues): Record<string, string> {
   if (!STATUSES.includes(v.status)) e.status = "Wybierz status.";
   for (const [k, label] of [["guests", "Liczba osób"], ["price", "Cena"], ["discount_value", "Rabat"], ["transport_price", "Transport"], ["deposit", "Zadatek"]] as const) {
     const val = num(v[k]);
-    if (val && isNaN(Number(val.replace(",", ".")))) e[k === "discount_value" ? "discount_value" : k] = `${label} musi być liczbą.`;
+    if (val && isNaN(Number(val.replace(",", ".")))) e[k] = `${label} musi być liczbą.`;
   }
+  // §13.6 Zadatek nie może przekroczyć wartości końcowej rezerwacji.
+  const priceN = toNumber(v.price);
+  const depositN = toNumber(v.deposit);
+  if (priceN != null && depositN != null && depositN > priceN) e.deposit = "Zadatek nie może przekroczyć wartości rezerwacji.";
   return e;
 }
 

@@ -38,7 +38,8 @@ export interface ContractData {
 }
 
 export function buildContract(i: ContractInput): ContractData {
-  const remaining = i.price != null ? i.price - (i.deposit ?? 0) : null;
+  // Pozostało do zapłaty nigdy nie jest ujemne (zadatek nie może przekroczyć wartości).
+  const remaining = i.price != null ? Math.max(0, i.price - (i.deposit ?? 0)) : null;
   const addons = (i.addonNames ?? []).join(", ") || "brak";
   const lesseeLine = [
     i.customerName ?? "—",
