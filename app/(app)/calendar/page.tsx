@@ -8,6 +8,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { reservationCalendarTitle } from "@/lib/domain/calendar";
 import { getEventWeather, WEATHER_KIND_STYLE, WEATHER_OK_COLOR, type EventWeather } from "@/lib/integrations/weather";
 import { RESERVATION_STATUS_META, type ReservationStatus } from "@/lib/data/types";
+import { MobileCalendar, type CalEvent } from "./mobile-calendar";
 
 const WEATHER_OK_MSG = "Cycuś pizdeczka, pogoda będzie lux 😎";
 
@@ -36,13 +37,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const demo = !isSupabaseConfigured();
   const monthPrefix = `${year}-${pad2(month0 + 1)}`;
 
-  // Rezerwacje w tym miesiącu, pogrupowane po dniu (wg daty imprezy).
-  const byDay = new Map<number, { id: string; label: string; status: ReservationStatus }[]>();
-  for (const r of reservations) {
-    if (!r.event_date || !r.event_date.startsWith(monthPrefix)) continue;
-    const day = Number(r.event_date.slice(8, 10));
-    const list = byDay.get(day) ?? [];
-    const label = reservationCalendarTitle({
+  // Etykieta kalendarzowa rezerwacji (wspólna dla desktopu i mobile).
+  const labelFor = (r: (typeof reservations)[number]) =>
+    reservationCalendarTitle({
       businessLine: r.business_line,
       tentSizes: [r.tent?.size ?? null, r.tent2?.size ?? null],
       packageName: r.package?.name ?? null,
@@ -51,17 +48,49 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       customerName: r.customer?.name ?? null,
       rentalItems: r.rental_items,
     });
-    list.push({ id: r.id, label, status: r.status });
+
+  // „Dziś" i poniedziałek bieżącego tygodnia (lokalnie) dla widoku mobilnego.
+  const todayStr = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+  const dow = (now.getDay() + 6) % 7; // Pon=0
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - dow);
+  const weekStartStr = `${monday.getFullYear()}-${pad2(monday.getMonth() + 1)}-${pad2(monday.getDate())}`;
+
+  // Pogoda dla rezerwacji w wyświetlanym miesiącu ORAZ w oknie prognozy (~16 dni),
+  // aby mobilny widok tygodnia też miał ikony. getEventWeather zwraca null poza
+  // oknem prognozy BEZ odpytywania API (brak kosztu dla dalszych terminów).
+  const forecastEnd = (() => { const d = new Date(now); d.setDate(now.getDate() + 16); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; })();
+  const needWeather = reservations.filter(
+    (r) => r.event_date && r.location && (r.event_date.startsWith(monthPrefix) || (r.event_date >= todayStr && r.event_date <= forecastEnd)),
+  );
+  const weatherEntries = await Promise.all(
+    needWeather.map(async (r) => [r.id, await getEventWeather(r.location!, r.event_date!)] as const),
+  );
+  const weatherById = new Map<string, EventWeather | null>(weatherEntries);
+
+  // Rezerwacje w tym miesiącu, pogrupowane po dniu (siatka desktop).
+  const byDay = new Map<number, { id: string; label: string; status: ReservationStatus }[]>();
+  for (const r of reservations) {
+    if (!r.event_date || !r.event_date.startsWith(monthPrefix)) continue;
+    const day = Number(r.event_date.slice(8, 10));
+    const list = byDay.get(day) ?? [];
+    list.push({ id: r.id, label: labelFor(r), status: r.status });
     byDay.set(day, list);
   }
 
-  // Pogoda dla rezerwacji w tym miesiącu. getEventWeather zwraca null poza oknem
-  // prognozy (~16 dni) BEZ odpytywania API, więc dla dalszych miesięcy brak kosztu.
-  const monthResvs = reservations.filter((r) => r.event_date && r.event_date.startsWith(monthPrefix));
-  const weatherEntries = await Promise.all(
-    monthResvs.map(async (r) => [r.id, r.location && r.event_date ? await getEventWeather(r.location, r.event_date) : null] as const),
-  );
-  const weatherById = new Map<string, EventWeather | null>(weatherEntries);
+  // Wszystkie rezerwacje jako wydarzenia dla mobilnego kalendarza.
+  const calEvents: CalEvent[] = reservations
+    .filter((r) => r.event_date)
+    .map((r) => {
+      const w = weatherById.get(r.id) ?? null;
+      return {
+        id: r.id,
+        date: r.event_date!,
+        label: labelFor(r),
+        status: r.status,
+        weather: w ? { ok: w.warnings.length === 0, kinds: w.warnings.map((x) => x.kind) } : null,
+      };
+    });
 
   // Siatka miesiąca
   const firstWeekday = (new Date(year, month0, 1).getDay() + 6) % 7; // Pon=0
@@ -83,7 +112,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         title="Kalendarz"
         subtitle={monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 md:flex">
             <Link href={`/calendar?month=${prev}`} className="rounded-[10px] border border-border bg-surface px-3 py-2 text-[13px] font-bold text-ink-2">‹</Link>
             <Link href="/calendar" className="rounded-[10px] border border-border bg-surface px-3 py-2 text-[12.5px] font-semibold text-ink-2">Dziś</Link>
             <Link href={`/calendar?month=${next}`} className="rounded-[10px] border border-border bg-surface px-3 py-2 text-[13px] font-bold text-ink-2">›</Link>
@@ -97,7 +126,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      <div className="mb-3.5 flex flex-wrap gap-3.5">
+      {/* §5.2 Mobilny widok tygodnia + Weekend (cały tydzień na ekranie). */}
+      <MobileCalendar events={calEvents} weekStart={weekStartStr} today={todayStr} />
+
+      <div className="mb-3.5 hidden flex-wrap gap-3.5 md:flex">
         {LEGEND.map((l) => {
           const m = RESERVATION_STATUS_META[l.status];
           return (
@@ -108,7 +140,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         })}
       </div>
 
-      <div className="overflow-x-auto rounded-card border border-border bg-surface">
+      <div className="hidden overflow-x-auto rounded-card border border-border bg-surface md:block">
         <div className="min-w-[720px]">
           <div className="grid grid-cols-7 border-b border-border bg-[#12131a]">
             {WEEKDAYS.map((w) => (

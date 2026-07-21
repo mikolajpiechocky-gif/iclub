@@ -8,8 +8,8 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 1. ✅ Kafelki pulpitu prowadzą do przefiltrowanych list — MetricCard klikalny (`href`), filtry `?filter=` w rezerwacjach (bez zadatku / najbliższe 7 dni / do potwierdzenia / nadchodzące / faktura), `?status=` w zapytaniach, banner filtra z „Wyczyść" (§4.2).
 2. ✅ „Wymaga uwagi" — każda pozycja linkuje do miejsca rozwiązania (rekord rezerwacji, ustawienia cen paliwa, moduł ogłoszeń) (§4.4).
 3. ✅ Overbooking namiotów blokowany — twardy blok przy zapisie (serwer), z wyjątkiem Szefa (checkbox + powód) (§10/§3).
-4. ⬜ Mobilny kalendarz pokazuje cały tydzień (§5.2).
-5. ⬜ Priorytetowy widok weekendu (§5.2).
+4. ✅ Mobilny kalendarz pokazuje cały tydzień — komponent `MobileCalendar` (7 kolumn bez poziomego przewijania, krótkie nazwy dni, kompaktowe kropki/licznik, kliknięcie dnia → agenda); siatka miesiąca tylko na desktopie (§5.2).
+5. ✅ Priorytetowy widok weekendu — przełącznik „Weekend" (Pt–Nd) z agendą per dzień; weekend wyróżniony też w pasku tygodnia (§5.2).
 6. ✅ Powiadomienia pod ikoną dzwonka w nagłówku (§5.5) — licznik, panel, przejście do rekordu, oznaczanie, „Zobacz wszystkie"; usunięto zakładkę.
 7. ✅ Uproszczony formularz rezerwacji — sekcje Klient i lokalizacja → Namiot i pakiet → Dodatki → Informacje dodatkowe → Rozliczenie; status ukryty przy tworzeniu (nadawany automatycznie), widoczny tylko w edycji (§7).
 8. ✅ Liczba osób opcjonalna — przeniesiona na dół, nie blokuje zapisu (§7.1).
