@@ -55,10 +55,10 @@ Kierunek i propozycja MVP są opisane. Poniższe odpowiedzi są potrzebne przed 
 - **Dwa namioty a pakiet:** przy rezerwacji z dwoma namiotami przynajmniej jeden powinien mieć przypisany pakiet (np. VIP/Standard). Rozważyć osobny pakiet dla drugiego namiotu albo walidację, że jest choć jeden.
 - **Wypożyczalnia — ilość:** dodać ilości pozycji sprzętu (np. „Krzesła ×50"), do tytułu/opisu i do wyceny.
 
-## Pytania o interfejs — do późniejszego etapu
+## Pytania o interfejs — rozstrzygnięte (2026-07)
 
-- Jak powinien wyglądać główny ekran właściciela?
-- Jak powinien wyglądać główny ekran pracownika?
+- ~~Jak powinien wyglądać główny ekran właściciela?~~ → Pulpit (`/dashboard`) z metrykami, uwagami i skrótami; landing właściciela po zalogowaniu.
+- ~~Jak powinien wyglądać główny ekran pracownika?~~ → Ekran „Start" (`/me`): najbliższa realizacja + kafelek „Rezerwacje do zgarnięcia"; landing pracownika po zalogowaniu.
 
 ## Rozwój iteracyjny
 

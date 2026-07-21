@@ -195,6 +195,58 @@ Powód: Każdy etap to inne działanie, nie tylko zaznaczenie ptaszka; kroki maj
 Konsekwencje: Zmieniono szablon etapów iClub (`ICLUB_STAGES`). Wysyłka zdjęć do chmury (Storage) to osobny, późniejszy etap — na razie zdjęcia zostają na urządzeniu.  
 Status: zatwierdzona
 
+## Decyzje — sesja 2026‑07 (rozwój iteracyjny)
+
+Data: 2026-07-21
+
+### Google Calendar
+Decyzja: Integracja przez konto serwisowe (JWT RS256, bez biblioteki googleapis). Tytuł „{M/D/MD/DD} {Pakiet} - {Miejscowość}"; kolory wydarzeń: Flaming (jest duży namiot) / Winogrono (same małe) / Szałwia (wypożyczalnia). Synchronizujemy TYLKO nowe rezerwacje z apki — importów i starych nie ruszamy (flaga `allowCreate`).  
+Status: zatwierdzona
+
+### Import danych historycznych (2024–2026)
+Decyzja: Rezerwacje + przychody + koszty wprowadzane zbiorczo dla lat wcześniejszych; od 2026 wypożyczalnia per zlecenie. Zaliczka w formacie „0/kwota" → wartość po „0/". Niedostarczone traktowane jako zrealizowane (brak odklika), duplikaty pomijane.  
+Status: zatwierdzona
+
+### Inwestycje ≠ koszty
+Decyzja: Majątek (pojazdy, sprzęt, namioty, marketing) to osobny rejestr „Inwestycje" — NIE koszt realizacji. Służy do licznika zwrotu (zysk narastająco vs. zainwestowane). Prezentowany jako sekcja w Raportach (nad listą rentowności).  
+Status: zatwierdzona
+
+### Rozkład kosztów bieżących
+Decyzja: Koszty iClub rozłożone równo na zrealizowane rezerwacje danego roku; koszty „generalne" dzielone po równo iClub/wypożyczalnia; koszty wypożyczalni z buforem +10%; koszty 2026 szacowane wskaźnikiem koszt/przychód z 2025.  
+Status: zatwierdzona
+
+### Raporty
+Decyzja: Filtr roku (Wszystko / per rok) wg daty realizacji. Rentowność = przychód (płatności PAID) − koszty.  
+Status: zatwierdzona
+
+### Pogoda i ostrzeżenia
+Decyzja: Open‑Meteo (bez klucza) + geokodowanie Map. Progi terenowe: wiatr > 25 km/h → dodatkowe mocowania; temp > 23°C → wentylator; deszcz → osłona na dmuchawę. Ikony na rezerwacji i w kalendarzu; przy dobrych warunkach status OK.  
+Status: zatwierdzona
+
+### Przypisania pracowników do zleceń
+Decyzja: Właściciel przypisuje bezpośrednio (od razu zatwierdzone). Pracownik może POPROSIĆ o przypisanie (status REQUESTED) — wymaga akceptu właściciela (APPROVED). Egzekwowane przez RLS (`job_assignments.status`).  
+Status: zatwierdzona
+
+### Ekran „Start" pracownika + „do zgarnięcia"
+Decyzja: Po zalogowaniu pracownik ląduje na swoim „Start" (nie na pulpicie właściciela). Kafelek „Rezerwacje do zgarnięcia": nieprzypisane realizacje iClub (dziś i w przyszłość) z informacją co / kiedy / gdzie / km od bazy / ile może zgarnąć.  
+Status: zatwierdzona
+
+### Konflikt namiotów per rozmiar
+Decyzja: Konflikt liczony POJEMNOŚCIOWO per rozmiar (M = 5,4×5,4, D = 6×8) wg stanu magazynu — nie po konkretnym namiocie ani kolorze. Kolory namiotów zostają w bazie, ale nie tworzą konfliktów.  
+Status: zatwierdzona
+
+### Uprawnienia i menu pracownika
+Decyzja: Pracownik widzi tylko: Kalendarz, Powiadomienia, Rezerwacje, Realizacje, Klienci, Magazyn, Cennik, Zgłoszenia i szkody, Szukaj (+ jego Start). Nie widzi rozliczenia/zaliczki na rezerwacji, nie cofa potwierdzenia klienta ani statusu faktury (UI + akcje serwerowe).  
+Status: zatwierdzona
+
+### Wyszukiwarka
+Decyzja: Globalna wyszukiwarka w nagłówku (podpowiedzi na żywo) + strona /search. Dopasowanie rozmyte (normalizacja bez ogonków + Levenshtein na słowach). Obejmuje: rezerwacje, klientów, namioty, sprzęt. Przy skali → `pg_trgm`.  
+Status: zatwierdzona
+
+### Uproszczenia UI
+Decyzja: Mniej zakładek. „Dostępność" usunięta z menu (kod/tabela zostają). „Inwestycje" złożone do Raportów zamiast osobnej zakładki.  
+Status: zatwierdzona
+
 ## Rozwój iteracyjny
 
 Rejestr będzie aktualizowany po każdej ważnej decyzji produktowej lub technicznej.
