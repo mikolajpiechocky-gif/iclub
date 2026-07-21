@@ -1,10 +1,12 @@
-// app/(app)/inventory/page.tsx — Magazyn (RSC, dane z Supabase lub demo).
+// app/(app)/inventory/page.tsx — Magazyn (§17): pełna edycja pozycji + audyt zmian.
+import Link from "next/link";
 import { PageHeader } from "@/components/layout";
-import { Pill } from "@/components/ui";
+import { Pill, PrimaryButton } from "@/components/ui";
 import { listTents } from "@/lib/data/resources";
-import { listEquipment } from "@/lib/data/equipment";
+import { listInventory, listInventoryAudit } from "@/lib/data/inventory";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import type { TentStatus, EquipmentStatus } from "@/lib/data/types";
+import { EQUIPMENT_STATUS_META, type TentStatus } from "@/lib/data/types";
+import { InventoryAuditList } from "./audit-list";
 
 export const dynamic = "force-dynamic";
 
@@ -18,33 +20,36 @@ const TENT_STATUS_META: Record<TentStatus, { label: string; fg: string; bg: stri
   DAMAGED: { label: "Uszkodzony", fg: "#f58585", bg: "#341a1d" },
 };
 
-const EQUIP_STATUS_META: Record<EquipmentStatus, { label: string; fg: string; bg: string }> = {
-  AVAILABLE: { label: "Dostępny", fg: "#5fd68b", bg: "#16301f" },
-  SERVICE: { label: "W serwisie", fg: "#ebb05a", bg: "#332814" },
-  DAMAGED: { label: "Uszkodzony", fg: "#f58585", bg: "#341a1d" },
-};
+const fmtPLN = (v: number | null) =>
+  v == null ? null : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
 
 export default async function InventoryPage() {
-  const [tents, equipment] = await Promise.all([listTents(), listEquipment()]);
+  const [tents, items, audit] = await Promise.all([listTents(), listInventory(true), listInventoryAudit(undefined, 8)]);
   const demo = !isSupabaseConfigured();
 
+  const active = items.filter((i) => i.active);
+  const retired = items.filter((i) => !i.active);
   const tentsAvailable = tents.filter((t) => t.status === "AVAILABLE").length;
-  const equipUnits = equipment.reduce((sum, e) => sum + (e.quantity || 0), 0);
+  const equipUnits = active.reduce((sum, e) => sum + (e.quantity || 0), 0);
 
   const summary = [
     { label: "Namioty", value: tents.length, color: "#7fa8f5" },
     { label: "Namioty dostępne", value: tentsAvailable, color: "#5fd68b" },
-    { label: "Pozycje sprzętu", value: equipment.length, color: "#b98cf5" },
+    { label: "Pozycje sprzętu", value: active.length, color: "#b98cf5" },
     { label: "Sztuk sprzętu", value: equipUnits, color: "#ebb05a" },
   ];
 
   return (
     <div className="mx-auto max-w-[1280px] px-5 py-6 md:px-8">
-      <PageHeader title="Magazyn" subtitle="Stan zasobów · namioty i sprzęt" />
+      <PageHeader
+        title="Magazyn"
+        subtitle="Stan zasobów · namioty i sprzęt"
+        actions={<Link href="/inventory/new"><PrimaryButton icon="plus">Dodaj pozycję</PrimaryButton></Link>}
+      />
 
       {demo && (
         <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
-          Tryb demo — dane przykładowe. Po skonfigurowaniu Supabase magazyn pokaże prawdziwe zasoby.
+          Tryb demo — dane przykładowe. Po skonfigurowaniu Supabase magazyn pokaże i zapisze prawdziwe zasoby.
         </div>
       )}
 
@@ -82,25 +87,54 @@ export default async function InventoryPage() {
         })}
       </div>
 
-      {/* Sprzęt */}
-      <h2 id="gear" className="mb-3 font-display text-[15px] font-bold text-white">Sprzęt liczony ilościowo</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {equipment.map((e) => {
-          const m = EQUIP_STATUS_META[e.status];
-          return (
-            <div key={e.id} className="rounded-[14px] border border-border bg-surface p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="text-[13.5px] font-bold text-ink">{e.name}</div>
-                  {e.category && <div className="mt-0.5 text-[11.5px] font-medium text-ink-2">{e.category}</div>}
+      {/* Sprzęt — edytowalny */}
+      <h2 id="gear" className="mb-3 font-display text-[15px] font-bold text-white">Sprzęt i wyposażenie</h2>
+      {active.length === 0 ? (
+        <p className="mb-6 rounded-card border border-border bg-surface px-4 py-4 text-[13px] text-ink-2">Brak pozycji. Dodaj pierwszą przyciskiem „Dodaj pozycję”.</p>
+      ) : (
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {active.map((e) => {
+            const m = EQUIPMENT_STATUS_META[e.status];
+            return (
+              <Link key={e.id} href={`/inventory/${e.id}/edit`} className="rounded-[14px] border border-border bg-surface p-4 transition hover:border-accent">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-[13.5px] font-bold text-ink">{e.name}</div>
+                    <div className="mt-0.5 text-[11.5px] font-medium text-ink-2">
+                      {[e.category, e.location].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-display text-[18px] font-bold text-white">{e.quantity}{e.unit ? <span className="ml-0.5 text-[11px] text-ink-2">{e.unit}</span> : null}</div>
+                  </div>
                 </div>
-                <div className="font-display text-[18px] font-bold text-white">{e.quantity}</div>
-              </div>
-              <div className="mt-2.5"><Pill label={m.label} fg={m.fg} bg={m.bg} /></div>
-            </div>
-          );
-        })}
-      </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <Pill label={m.label} fg={m.fg} bg={m.bg} />
+                  {e.is_addon && <span className="rounded-[7px] bg-[#271b3f] px-1.5 py-0.5 text-[10px] font-bold text-[#c9b6f2]">Dodatek{e.rental_price != null ? ` · ${fmtPLN(e.rental_price)}` : ""}</span>}
+                  {e.internal_only && <span className="rounded-[7px] bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-ink-2">Wewnętrzne</span>}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {retired.length > 0 && (
+        <>
+          <h2 className="mb-3 font-display text-[14px] font-bold text-ink-2">Wycofane ({retired.length})</h2>
+          <div className="mb-6 flex flex-col gap-2">
+            {retired.map((e) => (
+              <Link key={e.id} href={`/inventory/${e.id}/edit`} className="flex items-center gap-3 rounded-[12px] border border-border bg-surface px-4 py-2.5 opacity-60 transition hover:opacity-100">
+                <span className="text-[13px] font-semibold text-ink line-through">{e.name}</span>
+                <span className="ml-auto text-[11.5px] text-ink-2">przywróć →</span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* §17.3 Ostatnie zmiany magazynowe (audyt) */}
+      <InventoryAuditList entries={audit} title="Ostatnie zmiany w magazynie" />
     </div>
   );
 }

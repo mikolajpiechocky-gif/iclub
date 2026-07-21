@@ -1258,3 +1258,50 @@ alter table public.app_settings add column if not exists iclub_hourly_rate numer
 alter table public.app_settings add column if not exists iclub_month_threshold integer not null default 4;
 alter table public.app_settings add column if not exists iclub_flat_rate numeric(10,2) not null default 500;
 
+-- ================= 0034: pełny magazyn + audyt zmian (§17) =================
+-- Rozszerzony model pozycji magazynowej.
+alter table public.equipment add column if not exists unit text;
+alter table public.equipment add column if not exists location text;
+alter table public.equipment add column if not exists set_number text;
+alter table public.equipment add column if not exists purchase_date date;
+alter table public.equipment add column if not exists supplier text;
+alter table public.equipment add column if not exists rental_price numeric(10,2);
+alter table public.equipment add column if not exists replacement_value numeric(10,2);
+alter table public.equipment add column if not exists is_rentable boolean not null default false;
+alter table public.equipment add column if not exists is_addon boolean not null default false;
+alter table public.equipment add column if not exists internal_only boolean not null default false;
+
+-- Status „Czyszczenie" (§17: czyszczenie/serwis/uszkodzenia).
+alter type public.equipment_status add value if not exists 'CLEANING';
+
+-- §17.3 Pierwszy etap: WSZYSCY pracownicy mogą wprowadzać i edytować magazyn,
+-- ale TWARDE usunięcie wiersza zostaje po stronie Szefa (pracownicy „wycofują" = active=false).
+drop policy if exists equipment_write on public.equipment;
+drop policy if exists equipment_insert on public.equipment;
+drop policy if exists equipment_update on public.equipment;
+drop policy if exists equipment_delete on public.equipment;
+create policy equipment_insert on public.equipment for insert to authenticated with check (true);
+create policy equipment_update on public.equipment for update to authenticated using (true) with check (true);
+create policy equipment_delete on public.equipment for delete to authenticated using (public.is_owner());
+
+-- §17.3 Audyt każdej zmiany magazynowej (autor, data, stara/nowa wartość).
+create table if not exists public.inventory_audit (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid,                 -- bez FK cascade: log przetrwa usunięcie pozycji
+  item_name text,
+  action text not null,         -- create | update | delete | restore
+  changes jsonb,                -- { pole: { old, new }, ... }
+  actor uuid references public.profiles(id) on delete set null,
+  actor_name text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_inventory_audit_item on public.inventory_audit (item_id, created_at desc);
+alter table public.inventory_audit enable row level security;
+drop policy if exists inventory_audit_select on public.inventory_audit;
+create policy inventory_audit_select on public.inventory_audit for select to authenticated using (true);
+drop policy if exists inventory_audit_insert on public.inventory_audit;
+-- Autor wpisu musi zgadzać się z zalogowanym użytkownikiem (albo null dla operacji systemowej),
+-- żeby nie dało się sfałszować autora zmiany magazynowej przez bezpośredni API.
+create policy inventory_audit_insert on public.inventory_audit for insert to authenticated
+  with check (actor is null or actor = auth.uid());
+

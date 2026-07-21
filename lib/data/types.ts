@@ -447,7 +447,7 @@ export interface InvestmentRecord {
   created_at: string;
 }
 
-export type EquipmentStatus = "AVAILABLE" | "SERVICE" | "DAMAGED";
+export type EquipmentStatus = "AVAILABLE" | "SERVICE" | "DAMAGED" | "CLEANING";
 
 export interface EquipmentRecord {
   id: string;
@@ -455,9 +455,48 @@ export interface EquipmentRecord {
   name: string;
   category: string | null;
   quantity: number;
-  tracking: string;
-  unit_cost: number | null;
+  tracking: string; // QUANTITY | INDIVIDUAL
+  unit_cost: number | null;        // cena zakupu brutto
   status: EquipmentStatus;
   notes: string | null;
-  active: boolean;
+  active: boolean;                 // false = wycofane
+  // §17 rozszerzony model magazynu
+  unit: string | null;             // jednostka (szt., kpl., m…)
+  location: string | null;         // lokalizacja magazynowa
+  set_number: string | null;       // numer zestawu
+  purchase_date: string | null;    // data zakupu
+  supplier: string | null;         // dostawca
+  rental_price: number | null;     // cena wynajmu brutto
+  replacement_value: number | null; // wartość odtworzeniowa
+  is_rentable: boolean;            // możliwa do wynajęcia
+  is_addon: boolean;               // widoczna jako dodatek w rezerwacji
+  internal_only: boolean;          // tylko do użytku wewnętrznego
+}
+
+export const EQUIPMENT_STATUS_LABELS: Record<EquipmentStatus, string> = {
+  AVAILABLE: "Dostępny",
+  SERVICE: "Serwis",
+  DAMAGED: "Uszkodzony",
+  CLEANING: "Czyszczenie",
+};
+
+export const EQUIPMENT_STATUS_META: Record<EquipmentStatus, { label: string; fg: string; bg: string }> = {
+  AVAILABLE: { label: "Dostępny", fg: "#5fd68b", bg: "#16301f" },
+  SERVICE: { label: "Serwis", fg: "#ebb05a", bg: "#332814" },
+  DAMAGED: { label: "Uszkodzony", fg: "#f58585", bg: "#341a1d" },
+  CLEANING: { label: "Czyszczenie", fg: "#7fa8f5", bg: "#182238" },
+};
+
+export const EQUIPMENT_STATUS_ORDER: EquipmentStatus[] = ["AVAILABLE", "CLEANING", "SERVICE", "DAMAGED"];
+
+// §17.3 Wpis audytu zmian magazynowych (autor, data, stara/nowa wartość).
+export interface InventoryAuditRecord {
+  id: string;
+  item_id: string | null;
+  item_name: string | null;
+  action: "create" | "update" | "delete" | "restore";
+  changes: Record<string, { old: unknown; new: unknown }> | null;
+  actor: string | null;
+  actor_name: string | null;
+  created_at: string;
 }
