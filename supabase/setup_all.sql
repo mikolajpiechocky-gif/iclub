@@ -1242,3 +1242,10 @@ alter table public.inquiries add column if not exists olx_last_message text;
 -- Backfill: ostatnia aktywność = ostatnia zmiana (albo utworzenie).
 update public.inquiries set last_activity_at = coalesce(updated_at, created_at) where last_activity_at is null;
 
+-- ================= 0031: wybór namiotu przez typ + wyjątek overbookingu (§10) =================
+-- tent_main:  'M' | 'D' | 'D_BACKDOOR'   ·   tent_extra: null | 'M' | 'D' | 'D_BACKDOOR' | 'GASTRO'
+alter table public.reservations add column if not exists tent_main text;
+alter table public.reservations add column if not exists tent_extra text;
+alter table public.reservations add column if not exists overbooking_override boolean not null default false;
+alter table public.reservations add column if not exists overbooking_reason text;
+

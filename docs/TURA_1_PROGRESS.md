@@ -7,7 +7,7 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 
 1. ⬜ Kafelki pulpitu prowadzą do przefiltrowanych list (§4.2).
 2. 🟡 „Wymaga uwagi" prowadzi do konkretnego rekordu (część linkuje do rekordu, część do list).
-3. 🟡 Overbooking namiotów blokowany — jest ostrzeżenie per rozmiar; twardy blok serwer/baza do zrobienia (§10).
+3. ✅ Overbooking namiotów blokowany — twardy blok przy zapisie (serwer), z wyjątkiem Szefa (checkbox + powód) (§10/§3).
 4. ⬜ Mobilny kalendarz pokazuje cały tydzień (§5.2).
 5. ⬜ Priorytetowy widok weekendu (§5.2).
 6. ✅ Powiadomienia pod ikoną dzwonka w nagłówku (§5.5) — licznik, panel, przejście do rekordu, oznaczanie, „Zobacz wszystkie"; usunięto zakładkę.
@@ -15,9 +15,9 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 8. ⬜ Liczba osób nie jest wymagana (§7.1).
 9. ⬜ Daty montażu/demontażu domyślnie ukryte (§8).
 10. ⬜ Domyślnie montaż w dniu imprezy, demontaż następnego dnia (§8).
-11. ⬜ Duże namioty jako pula dwóch egzemplarzy (§10).
-12. ⬜ Duży z tylnymi drzwiami jako konkretny zasób z tej samej puli (§10).
-13. ⬜ Dodatkowy namiot jako osobna sekcja (§10.2).
+11. ✅ Duże namioty jako pula dwóch egzemplarzy (§10).
+12. ✅ Duży z tylnymi drzwiami jako konkretny zasób z tej samej puli (§10).
+13. ✅ Dodatkowy namiot jako osobna sekcja (+ gastronomiczny) (§10.2).
 14. ⬜ Dodatki korzystają z magazynu (§12).
 15. ⬜ Pakiet ma własną cenę niezależną od sumy pozycji (§11).
 16. ⬜ Boczne podsumowanie przelicza cenę na żywo (§13).
@@ -47,3 +47,4 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 - ✅ §5.4: kolory ikon pogody — upał żółty, deszcz niebieski, wiatr pomarańczowy, OK zielony (kalendarz + rezerwacja).
 - ✅ §5.5: dzwonek powiadomień w nagłówku; zakładka „Powiadomienia" usunięta z menu.
 - ✅ §6 Leady: status „Odgrzany", śledzenie ostatniej aktywności, auto-zamykanie po 21 dniach (`automatic_inactivity`, z blokadą Szefa; trasa /api/leads/auto-close dla crona + przycisk), OLX nie nadpisuje ręcznych danych CRM (tylko treść wiadomości), reaktywacja auto+ręczna. Wymaga migracji 0030.
+- ✅ §10 Namioty: wybór przez TYP (Mały/Duży/Duży z drzwiami/Gastro), pule pojemności (mały 1, duży 2 w tym 1 z drzwiami, gastro 1), twardy blok overbookingu przy zapisie z wyjątkiem Szefa (powód). Wymaga migracji 0031.

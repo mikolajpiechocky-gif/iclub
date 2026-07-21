@@ -2,11 +2,76 @@
 // zlecenie (job) i podstawowe etapy (job_stages) — §28/§50 instrukcji master.
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import type { ReservationRecord, ReservationWithRefs, ReservationStatus, BusinessLine } from "./types";
+import type { ReservationRecord, ReservationWithRefs, ReservationStatus, BusinessLine, TentRecord } from "./types";
 import { DEMO_RESERVATIONS } from "./demo-resources";
 import { stagesForBusinessLine } from "@/lib/domain/stages";
 import { listTents } from "./resources";
 import { tentSizeCode } from "@/lib/domain/calendar";
+import { type TentSlots, type TentCapacities, type TentChoice, sumSlots, exceededPools, choiceFromTent } from "@/lib/domain/tents";
+
+// §10: konkretny egzemplarz z wybranego typu (do wyświetlania nazwy/rozmiaru).
+function resolveTentId(choice: string | null | undefined, tents: TentRecord[]): string | null {
+  if (!choice) return null;
+  if (choice === "M") return tents.find((t) => tentSizeCode(t.size) === "M")?.id ?? null;
+  if (choice === "D") return tents.find((t) => tentSizeCode(t.size) === "D" && !t.has_back_door)?.id ?? tents.find((t) => tentSizeCode(t.size) === "D")?.id ?? null;
+  if (choice === "D_BACKDOOR") return tents.find((t) => tentSizeCode(t.size) === "D" && t.has_back_door)?.id ?? null;
+  if (choice === "GASTRO") return tents.find((t) => /gastr/i.test(t.name ?? ""))?.id ?? null;
+  return null;
+}
+
+// Pojemności pul z magazynu (fallback: 1 mały, 2 duże w tym 1 z drzwiami, 1 gastro).
+export async function getTentCapacities(): Promise<TentCapacities> {
+  const tents = await listTents();
+  let small = 0, large = 0, backdoor = 0;
+  for (const t of tents) {
+    if (tentSizeCode(t.size) === "D") { large++; if (t.has_back_door) backdoor++; } else small++;
+  }
+  const gastro = tents.filter((t) => /gastr/i.test(t.name ?? "")).length;
+  return { small: small || 1, large: large || 2, backdoor: backdoor || 1, gastro: gastro || 1 };
+}
+
+// §10.3 Sprawdza overbooking POJEMNOŚCIOWY po typie (mały/duży/z drzwiami/gastro).
+export async function checkTentOverbooking(
+  mine: TentSlots,
+  startDate: string | null,
+  endDate: string | null,
+  excludeId?: string,
+): Promise<{ exceeded: string[]; conflicts: ReservationWithRefs[] }> {
+  if (!startDate || (mine.small + mine.large + mine.backdoor + mine.gastro === 0)) return { exceeded: [], conflicts: [] };
+  const end = endDate ?? startDate;
+  const cap = await getTentCapacities();
+
+  let all: ReservationWithRefs[];
+  if (!isSupabaseConfigured()) {
+    all = DEMO_RESERVATIONS;
+  } else {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("reservations")
+      .select("*, customer:customers(id,name), tent:tents!tent_id(id,name,size,has_back_door), tent2:tents!tent_id_2(id,name,size,has_back_door), package:packages(id,name)")
+      .in("status", ["TEMPORARY", "CONFIRMED"]);
+    if (error) throw new Error(error.message);
+    all = (data ?? []) as ReservationWithRefs[];
+  }
+
+  const overlapping = all.filter((r) => {
+    if (r.id === excludeId) return false;
+    if (r.status !== "TEMPORARY" && r.status !== "CONFIRMED") return false;
+    const rg = reservationRange(r);
+    return rangesOverlap(startDate, end, rg.start, rg.end);
+  });
+
+  let existing: TentSlots = { small: 0, large: 0, backdoor: 0, gastro: 0 };
+  for (const r of overlapping) {
+    const rr = r as unknown as { tent_main?: string | null; tent_extra?: string | null; tent?: { size?: string | null; has_back_door?: boolean } | null; tent2?: { size?: string | null; has_back_door?: boolean } | null };
+    const c1: TentChoice | "" = (rr.tent_main as TentChoice) || (rr.tent ? choiceFromTent(rr.tent.size, rr.tent.has_back_door) : "");
+    const c2: TentChoice | "" = (rr.tent_extra as TentChoice) || (rr.tent2 ? choiceFromTent(rr.tent2.size, rr.tent2.has_back_door) : "");
+    const s = sumSlots([c1, c2]);
+    existing = { small: existing.small + s.small, large: existing.large + s.large, backdoor: existing.backdoor + s.backdoor, gastro: existing.gastro + s.gastro };
+  }
+
+  return { exceeded: exceededPools(existing, mine, cap), conflicts: overlapping };
+}
 
 export interface ReservationInput {
   business_line: BusinessLine;
@@ -20,6 +85,10 @@ export interface ReservationInput {
   guests?: number | null;
   tent_id: string | null;
   tent_id_2?: string | null;
+  tent_main?: string | null;
+  tent_extra?: string | null;
+  overbooking_override?: boolean;
+  overbooking_reason?: string | null;
   package_id: string | null;
   addon_ids: string[];
   rental_items?: string | null;
@@ -61,9 +130,10 @@ export async function createReservation(input: ReservationInput): Promise<{ id: 
     data: { user },
   } = await supabase.auth.getUser();
 
+  const resolved = input.tent_main !== undefined ? await resolveFromChoices(input) : {};
   const { data: reservation, error: rErr } = await supabase
     .from("reservations")
-    .insert({ ...input, created_by: user?.id ?? null })
+    .insert({ ...input, ...resolved, created_by: user?.id ?? null })
     .select("id, business_line, event_type, event_date")
     .single();
   if (rErr) throw new Error(rErr.message);
@@ -95,8 +165,15 @@ export async function createReservation(input: ReservationInput): Promise<{ id: 
 
 export async function updateReservation(id: string, input: ReservationInput): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.from("reservations").update(input).eq("id", id);
+  const resolved = input.tent_main !== undefined ? await resolveFromChoices(input) : {};
+  const { error } = await supabase.from("reservations").update({ ...input, ...resolved }).eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+// Ustala tent_id/tent_id_2 na podstawie wybranych typów (do wyświetlania).
+async function resolveFromChoices(input: ReservationInput): Promise<{ tent_id: string | null; tent_id_2: string | null }> {
+  const tents = await listTents();
+  return { tent_id: resolveTentId(input.tent_main, tents), tent_id_2: resolveTentId(input.tent_extra, tents) };
 }
 
 // Potwierdzenie szczegółów przez klienta (§42) — osobno od edycji rezerwacji.

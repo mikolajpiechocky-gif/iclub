@@ -151,6 +151,10 @@ export interface ReservationRecord {
   guests: number | null;
   tent_id: string | null;
   tent_id_2: string | null;
+  tent_main: string | null;
+  tent_extra: string | null;
+  overbooking_override: boolean;
+  overbooking_reason: string | null;
   package_id: string | null;
   addon_ids: string[];
   rental_items: string | null;

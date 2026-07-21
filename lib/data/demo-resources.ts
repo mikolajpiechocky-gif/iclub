@@ -53,4 +53,4 @@ export const DEMO_RESERVATIONS: ReservationWithRefs[] = [
     notes: "Brak zadatku — rezerwacja tymczasowa.", client_confirmed: false, client_confirmed_at: null,
     invoice_issued: false, invoice_issued_at: null, invoice_number: null, created_at: now, updated_at: now,
   },
-];
+].map((r) => ({ tent_main: null, tent_extra: null, overbooking_override: false, overbooking_reason: null, ...r })) as unknown as ReservationWithRefs[];

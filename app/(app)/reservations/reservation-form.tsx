@@ -8,6 +8,7 @@ import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Al
 import type { ReservationRecord, TentRecord, PackageRecord, AddonRecord, ReservationStatus, BusinessLine } from "@/lib/data/types";
 import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
 import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, type ReservationFormValues, type TentConflict } from "./actions";
+import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
 import { AddressAutocomplete } from "./address-autocomplete";
 
 type CustomerOption = { id: string; name: string };
@@ -32,6 +33,11 @@ export function ReservationForm({
   const [pending, startTransition] = useTransition();
   const isEdit = Boolean(initial);
 
+  // Typ namiotu dla istniejącej rezerwacji: z nowych pól, a dla starszych z egzemplarza.
+  const byId = (id: string | null | undefined) => tents.find((t) => t.id === id);
+  const initialMain = initial?.tent_main ?? (initial?.tent_id ? choiceFromTent(byId(initial.tent_id)?.size ?? null, byId(initial.tent_id)?.has_back_door) : "");
+  const initialExtra = initial?.tent_extra ?? (initial?.tent_id_2 ? choiceFromTent(byId(initial.tent_id_2)?.size ?? null, byId(initial.tent_id_2)?.has_back_door) : "");
+
   const [v, setV] = useState<ReservationFormValues>({
     business_line: initial?.business_line ?? "ICLUB",
     customer_id: initial?.customer_id ?? "",
@@ -41,8 +47,10 @@ export function ReservationForm({
     teardown_date: initial?.teardown_date ?? "",
     location: initial?.location ?? "",
     guests: initial?.guests != null ? String(initial.guests) : "",
-    tent_id: initial?.tent_id ?? "",
-    tent_id_2: initial?.tent_id_2 ?? "",
+    tent_main: initialMain,
+    tent_extra: initialExtra,
+    overbooking_override: initial?.overbooking_override ?? false,
+    overbooking_reason: initial?.overbooking_reason ?? "",
     package_id: initial?.package_id ?? "",
     addon_ids: initial?.addon_ids ?? [],
     rental_items: initial?.rental_items ?? "",
@@ -59,24 +67,24 @@ export function ReservationForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<TentConflict[]>([]);
+  const [exceeded, setExceeded] = useState<string[]>([]);
 
-  // Kontrola dostępności namiotu (ostrzeżenie, nie blokada).
+  // §10.3 Kontrola pojemności namiotów per typ (overbooking = twardy blok przy zapisie).
   useEffect(() => {
     let active = true;
-    const run = async (): Promise<TentConflict[]> => {
+    const run = async () => {
       const start = v.setup_date || v.event_date;
-      const ids = [v.tent_id, v.tent_id_2].filter(Boolean);
-      if (!ids.length || !start) return [];
+      if ((!v.tent_main && !v.tent_extra) || !start) return { exceeded: [], conflicts: [] };
       const end = v.teardown_date || v.event_date || start;
-      return checkTentAvailabilityAction(ids, start, end, initial?.id);
+      return checkTentAvailabilityAction(v.tent_main, v.tent_extra, start, end, initial?.id);
     };
     run().then((res) => {
-      if (active) setConflicts(res);
+      if (active) { setConflicts(res.conflicts); setExceeded(res.exceeded); }
     });
     return () => {
       active = false;
     };
-  }, [v.tent_id, v.tent_id_2, v.setup_date, v.teardown_date, v.event_date, initial?.id]);
+  }, [v.tent_main, v.tent_extra, v.setup_date, v.teardown_date, v.event_date, initial?.id]);
 
   const set = <K extends keyof ReservationFormValues>(k: K, val: ReservationFormValues[K]) =>
     setV((s) => ({ ...s, [k]: val }));
@@ -152,31 +160,34 @@ export function ReservationForm({
         {v.business_line === "ICLUB" ? (
           <SectionCard title="Namiot i pakiet" className="p-5">
             <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
-              <SelectField label="Namiot" value={v.tent_id} onChange={(e) => set("tent_id", e.target.value)}>
-                <option value="">— wybierz namiot —</option>
-                {tents.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}{t.has_back_door ? " (drzwi z tyłu)" : ""}</option>
-                ))}
+              <SelectField label="Namiot główny" value={v.tent_main} onChange={(e) => set("tent_main", e.target.value)}>
+                <option value="">— wybierz —</option>
+                {MAIN_TENT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </SelectField>
-              <SelectField label="Namiot 2 (opcjonalnie)" value={v.tent_id_2} onChange={(e) => set("tent_id_2", e.target.value)}>
-                <option value="">— brak (drugi namiot) —</option>
-                {tents.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}{t.has_back_door ? " (drzwi z tyłu)" : ""}</option>
-                ))}
+              <SelectField label="Dodatkowy namiot" value={v.tent_extra} onChange={(e) => set("tent_extra", e.target.value)}>
+                {EXTRA_TENT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </SelectField>
               <SelectField label="Pakiet" value={v.package_id} onChange={(e) => set("package_id", e.target.value)}>
                 <option value="">— wybierz pakiet —</option>
                 {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </SelectField>
             </div>
-            {conflicts.length > 0 && (
+            {exceeded.length > 0 && (
               <div className="px-5 pb-4">
-                <Alert tone="warn" title={`Możliwy konflikt namiotu (${conflicts.length})`}>
-                  Ten namiot ma nakładające się rezerwacje w podanym terminie:
-                  <ul className="mt-1.5 list-disc pl-4">
-                    {conflicts.map((c) => <li key={c.id}>{c.label}</li>)}
-                  </ul>
-                  <span className="mt-1.5 block">Możesz zapisać mimo to — ostateczna decyzja należy do szefa.</span>
+                <Alert tone="bad" title="Overbooking — brak wolnych zasobów">
+                  Na ten termin brakuje: <b>{exceeded.join(", ")}</b>.
+                  {conflicts.length > 0 && (
+                    <ul className="mt-1.5 list-disc pl-4">
+                      {conflicts.map((c) => <li key={c.id}>{c.label}</li>)}
+                    </ul>
+                  )}
+                  <label className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold text-ink">
+                    <input type="checkbox" checked={v.overbooking_override} onChange={(e) => set("overbooking_override", e.target.checked)} className="h-4 w-4 accent-accent" />
+                    Wyjątek szefa — zapisz mimo overbookingu
+                  </label>
+                  {v.overbooking_override && (
+                    <div className="mt-2"><TextField label="Powód wyjątku" value={v.overbooking_reason} onChange={(e) => set("overbooking_reason", e.target.value)} placeholder="np. drugi komplet od podwykonawcy" /></div>
+                  )}
                 </Alert>
               </div>
             )}

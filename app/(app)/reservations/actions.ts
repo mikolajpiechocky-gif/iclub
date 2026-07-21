@@ -3,11 +3,12 @@
 // rezerwacji automatycznie generuje zlecenie i etapy (warstwa danych).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createReservation, updateReservation, setReservationConfirmed, setInvoiceIssued, findSizeConflicts, type ReservationInput } from "@/lib/data/reservations";
+import { createReservation, updateReservation, setReservationConfirmed, setInvoiceIssued, checkTentOverbooking, type ReservationInput } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
 import { markJobPlannedPaid } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { syncReservationToCalendar } from "@/lib/data/calendar-sync";
+import { sumSlots, type TentChoice } from "@/lib/domain/tents";
 import type { ReservationStatus, BusinessLine } from "@/lib/data/types";
 
 export interface ReservationFormValues {
@@ -19,8 +20,10 @@ export interface ReservationFormValues {
   teardown_date: string;
   location: string;
   guests: string;
-  tent_id: string;
-  tent_id_2: string;
+  tent_main: string;
+  tent_extra: string;
+  overbooking_override: boolean;
+  overbooking_reason: string;
   package_id: string;
   addon_ids: string[];
   rental_items: string;
@@ -86,8 +89,12 @@ function toInput(v: ReservationFormValues): ReservationInput {
     teardown_date: clean(v.teardown_date),
     location: clean(v.location),
     guests: toNumber(v.guests) ?? null,
-    tent_id: v.tent_id.trim() ? v.tent_id.trim() : null,
-    tent_id_2: v.tent_id_2.trim() ? v.tent_id_2.trim() : null,
+    tent_id: null, // ustalane w warstwie danych z wybranego typu
+    tent_id_2: null,
+    tent_main: v.tent_main || null,
+    tent_extra: v.tent_extra || null,
+    overbooking_override: v.overbooking_override,
+    overbooking_reason: v.overbooking_override ? clean(v.overbooking_reason) : null,
     package_id: v.package_id.trim() ? v.package_id.trim() : null,
     addon_ids: v.addon_ids,
     rental_items: clean(v.rental_items),
@@ -109,33 +116,59 @@ export interface TentConflict {
   label: string;
 }
 
-// Sprawdza dostępność namiotu w oknie montaż→demontaż (§8). Ostrzeżenie,
-// nie blokada — szef może świadomie zapisać mimo konfliktu.
+export interface TentAvailability {
+  exceeded: string[]; // przekroczone pule (pusta = OK)
+  conflicts: TentConflict[];
+}
+
+// §10.3 Sprawdza overbooking pojemnościowy dla wybranych typów namiotów.
 export async function checkTentAvailabilityAction(
-  tentIds: string[],
+  tentMain: string,
+  tentExtra: string,
   startDate: string,
   endDate: string,
-  excludeId?: string
-): Promise<TentConflict[]> {
-  const ids = tentIds.filter(Boolean);
-  if (!ids.length || !startDate) return [];
+  excludeId?: string,
+): Promise<TentAvailability> {
+  if (!startDate || (!tentMain && !tentExtra)) return { exceeded: [], conflicts: [] };
   try {
-    // Konflikt liczony POJEMNOŚCIOWO per rozmiar (nie po konkretnym namiocie/kolorze).
-    const conflicts = await findSizeConflicts(ids, startDate, endDate || startDate, excludeId);
-    return conflicts.map((c) => {
-      const from = c.setup_date ?? c.event_date ?? "?";
-      const to = c.teardown_date && c.teardown_date !== from ? `–${c.teardown_date}` : "";
-      return { id: c.id, label: `${c.customer?.name ?? "bez klienta"} — ${c.event_type ?? "impreza"} (${from}${to})` };
-    });
+    const mine = sumSlots([tentMain as TentChoice, tentExtra as TentChoice]);
+    const { exceeded, conflicts } = await checkTentOverbooking(mine, startDate, endDate || startDate, excludeId);
+    return {
+      exceeded,
+      conflicts: conflicts.map((c) => {
+        const from = c.setup_date ?? c.event_date ?? "?";
+        const to = c.teardown_date && c.teardown_date !== from ? `–${c.teardown_date}` : "";
+        return { id: c.id, label: `${c.customer?.name ?? "bez klienta"} — ${c.event_type ?? "impreza"} (${from}${to})` };
+      }),
+    };
   } catch {
-    return [];
+    return { exceeded: [], conflicts: [] };
   }
+}
+
+// Twardy blok overbookingu (§3/§10) — używany przy zapisie. Zwraca komunikat błędu
+// albo null (można zapisać). Wyjątek Szefa wymaga zaznaczenia i powodu.
+async function overbookingBlock(values: ReservationFormValues, excludeId?: string): Promise<string | null> {
+  if (values.business_line !== "ICLUB") return null;
+  const start = values.setup_date || values.event_date;
+  if (!start) return null;
+  const end = values.teardown_date || values.event_date || start;
+  const mine = sumSlots([values.tent_main as TentChoice, values.tent_extra as TentChoice]);
+  const { exceeded } = await checkTentOverbooking(mine, start, end, excludeId);
+  if (!exceeded.length) return null;
+  if (!values.overbooking_override) {
+    return `Overbooking: brak wolnych zasobów (${exceeded.join(", ")}) na ten termin. Zaznacz „wyjątek szefa" i podaj powód, aby zapisać mimo to.`;
+  }
+  if (!values.overbooking_reason.trim()) return "Podaj powód wyjątku overbookingu (decyzja szefa).";
+  return null;
 }
 
 export async function createReservationAction(values: ReservationFormValues): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
   const fieldErrors = validate(values);
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
+  const block = await overbookingBlock(values);
+  if (block) return { ok: false, error: block };
   try {
     const { id } = await createReservation(toInput(values));
     // Nowa rezerwacja z apki → wolno utworzyć wydarzenie w kalendarzu.
@@ -200,6 +233,8 @@ export async function updateReservationAction(id: string, values: ReservationFor
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
   const fieldErrors = validate(values);
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
+  const block = await overbookingBlock(values, id);
+  if (block) return { ok: false, error: block };
   try {
     await updateReservation(id, toInput(values));
     try { await syncReservationToCalendar(id); } catch {}
