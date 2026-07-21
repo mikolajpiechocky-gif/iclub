@@ -98,10 +98,16 @@ export default async function InventoryPage() {
             return (
               <Link key={e.id} href={`/inventory/${e.id}/edit`} className="rounded-[14px] border border-border bg-surface p-4 transition hover:border-accent">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate text-[13.5px] font-bold text-ink">{e.name}</div>
-                    <div className="mt-0.5 text-[11.5px] font-medium text-ink-2">
-                      {[e.category, e.location].filter(Boolean).join(" · ") || "—"}
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {e.photo_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={e.photo_url} alt="" className="h-10 w-10 flex-none rounded-[9px] border border-border object-cover" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="truncate text-[13.5px] font-bold text-ink">{e.name}</div>
+                      <div className="mt-0.5 text-[11.5px] font-medium text-ink-2">
+                        {[e.category, e.location].filter(Boolean).join(" · ") || "—"}
+                      </div>
                     </div>
                   </div>
                   <div className="text-right">

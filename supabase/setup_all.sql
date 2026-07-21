@@ -1326,3 +1326,6 @@ alter table public.reservations add column if not exists assembly_time_at timest
 -- ================= 0038: snapshot wyceny rezerwacji (§11.2) =================
 alter table public.reservations add column if not exists pricing_snapshot jsonb;
 
+-- ================= 0039: zdjęcia pozycji magazynowych (§17) =================
+alter table public.equipment add column if not exists photo_url text;
+

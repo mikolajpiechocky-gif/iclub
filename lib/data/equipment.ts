@@ -7,7 +7,7 @@ import type { EquipmentRecord } from "./types";
 // Domyślne wartości pól rozszerzonego modelu magazynu (§17) dla danych demo.
 const EQ_DEFAULTS = {
   unit: "szt.", location: null, set_number: null, purchase_date: null, supplier: null,
-  rental_price: null, replacement_value: null, is_rentable: false, is_addon: false, internal_only: false,
+  rental_price: null, replacement_value: null, is_rentable: false, is_addon: false, internal_only: false, photo_url: null,
 } as const;
 
 export const DEMO_EQUIPMENT: EquipmentRecord[] = [

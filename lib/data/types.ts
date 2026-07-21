@@ -495,6 +495,7 @@ export interface EquipmentRecord {
   is_rentable: boolean;            // możliwa do wynajęcia
   is_addon: boolean;               // widoczna jako dodatek w rezerwacji
   internal_only: boolean;          // tylko do użytku wewnętrznego
+  photo_url: string | null;        // §17 zdjęcie pozycji (miniatura, data URL)
 }
 
 export const EQUIPMENT_STATUS_LABELS: Record<EquipmentStatus, string> = {

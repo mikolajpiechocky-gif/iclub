@@ -10,6 +10,33 @@ import { createInventoryAction, updateInventoryAction, setInventoryActiveAction,
 
 const CATEGORIES = ["Meble", "Nagłośnienie", "Oświetlenie", "Ogrzewanie", "Namioty", "Dekoracje", "Zasilanie", "Inne"];
 
+// Zmniejsza wybrane zdjęcie do maks. 400 px (dłuższy bok) i zwraca miniaturę jako data URL.
+async function fileToPhoto(file: File): Promise<string> {
+  const dataUrl = await new Promise<string>((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result as string);
+    fr.onerror = () => rej(new Error("Nie udało się odczytać pliku."));
+    fr.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error("Nieprawidłowy obraz."));
+    i.src = dataUrl;
+  });
+  const max = 400;
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", 0.8);
+}
+
 export function InventoryForm({ initial }: { initial?: EquipmentRecord }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -34,9 +61,21 @@ export function InventoryForm({ initial }: { initial?: EquipmentRecord }) {
     is_addon: initial?.is_addon ?? false,
     internal_only: initial?.internal_only ?? false,
     notes: initial?.notes ?? "",
+    photo_url: initial?.photo_url ?? "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+
+  const pickPhoto = async (file: File | null) => {
+    if (!file) return;
+    setFormError(null);
+    try {
+      const dataUrl = await fileToPhoto(file);
+      set("photo_url", dataUrl);
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : "Nie udało się wczytać zdjęcia.");
+    }
+  };
 
   const set = <K extends keyof InventoryFormValues>(k: K, val: InventoryFormValues[K]) => setV((s) => ({ ...s, [k]: val }));
 
@@ -72,6 +111,24 @@ export function InventoryForm({ initial }: { initial?: EquipmentRecord }) {
       {formError && <div className="mb-4"><Alert tone="bad" title="Nie udało się zapisać">{formError}</Alert></div>}
 
       <form onSubmit={submit} className="flex flex-col gap-4">
+        <SectionCard title="Zdjęcie" className="p-5">
+          <div className="flex items-center gap-4 px-5 pb-5">
+            {v.photo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={v.photo_url} alt="Zdjęcie pozycji" className="h-24 w-24 flex-none rounded-[13px] border border-border object-cover" />
+            ) : (
+              <div className="flex h-24 w-24 flex-none items-center justify-center rounded-[13px] border border-dashed border-border bg-surface-2 text-center text-[11px] text-ink-2">brak zdjęcia</div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <label className="cursor-pointer rounded-[10px] border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-2">
+                {v.photo_url ? "Zmień zdjęcie" : "Dodaj zdjęcie"}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => { pickPhoto(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+              </label>
+              {v.photo_url && <button type="button" onClick={() => set("photo_url", "")} className="rounded-[10px] border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-2">Usuń</button>}
+            </div>
+          </div>
+        </SectionCard>
+
         <SectionCard title="Podstawowe" className="p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
             <TextField label="Nazwa" placeholder="Krzesła bankietowe" value={v.name} onChange={(e) => set("name", e.target.value)} error={errors.name} />

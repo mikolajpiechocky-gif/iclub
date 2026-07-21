@@ -25,6 +25,7 @@ export interface InventoryFormValues {
   is_addon: boolean;
   internal_only: boolean;
   notes: string;
+  photo_url: string; // §17 miniatura (data URL) lub ""
 }
 
 export interface ActionResult {
@@ -66,6 +67,10 @@ function validate(v: InventoryFormValues): Record<string, string> {
   if (!v.name.trim()) e.name = "Podaj nazwę pozycji.";
   const q = toNum(v.quantity);
   if (v.quantity.trim() && (q == null || q < 0 || !Number.isInteger(q))) e.quantity = "Ilość musi być liczbą całkowitą ≥ 0.";
+  if (v.photo_url) {
+    if (!/^data:image\/(png|jpe?g|webp);base64,/.test(v.photo_url)) e.name = "Nieprawidłowy plik zdjęcia.";
+    else if (v.photo_url.length > 500_000) e.name = "Zdjęcie za duże — wybierz mniejsze.";
+  }
   for (const [k, label] of [["unit_cost", "Cena zakupu"], ["rental_price", "Cena wynajmu"], ["replacement_value", "Wartość odtworzeniowa"]] as const) {
     if (v[k].trim() && toNum(v[k]) == null) e[k] = `${label} musi być liczbą.`;
   }
@@ -94,6 +99,7 @@ function toInput(v: InventoryFormValues): InventoryInput {
     is_addon: v.is_addon,
     internal_only: v.internal_only,
     notes: clean(v.notes),
+    photo_url: v.photo_url ? v.photo_url : null,
   };
 }
 

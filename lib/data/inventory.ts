@@ -23,6 +23,7 @@ export interface InventoryInput {
   is_addon: boolean;
   internal_only: boolean;
   notes: string | null;
+  photo_url: string | null;
 }
 
 // Pola śledzone w audycie — z etykietami PL (dla czytelnej historii zmian).
@@ -45,11 +46,12 @@ const AUDIT_FIELDS: { key: keyof InventoryInput; label: string }[] = [
   { key: "is_addon", label: "Widoczna jako dodatek" },
   { key: "internal_only", label: "Tylko wewnętrzne" },
   { key: "notes", label: "Notatki" },
+  { key: "photo_url", label: "Zdjęcie" },
 ];
 
 const DEMO_INVENTORY: EquipmentRecord[] = [
-  { id: "demo-eq1", code: "KRZ-100", name: "Krzesła bankietowe", category: "Meble", quantity: 100, tracking: "QUANTITY", unit_cost: 45, status: "AVAILABLE", notes: null, active: true, unit: "szt.", location: "Regał A1", set_number: null, purchase_date: null, supplier: null, rental_price: 5, replacement_value: 60, is_rentable: true, is_addon: true, internal_only: false },
-  { id: "demo-eq2", code: "STO-20", name: "Stoły składane", category: "Meble", quantity: 20, tracking: "QUANTITY", unit_cost: 180, status: "AVAILABLE", notes: null, active: true, unit: "szt.", location: "Regał A2", set_number: null, purchase_date: null, supplier: null, rental_price: 20, replacement_value: 240, is_rentable: true, is_addon: true, internal_only: false },
+  { id: "demo-eq1", code: "KRZ-100", name: "Krzesła bankietowe", category: "Meble", quantity: 100, tracking: "QUANTITY", unit_cost: 45, status: "AVAILABLE", notes: null, active: true, unit: "szt.", location: "Regał A1", set_number: null, purchase_date: null, supplier: null, rental_price: 5, replacement_value: 60, is_rentable: true, is_addon: true, internal_only: false, photo_url: null },
+  { id: "demo-eq2", code: "STO-20", name: "Stoły składane", category: "Meble", quantity: 20, tracking: "QUANTITY", unit_cost: 180, status: "AVAILABLE", notes: null, active: true, unit: "szt.", location: "Regał A2", set_number: null, purchase_date: null, supplier: null, rental_price: 20, replacement_value: 240, is_rentable: true, is_addon: true, internal_only: false, photo_url: null },
 ];
 
 function toRow(input: InventoryInput): Record<string, unknown> {
@@ -85,6 +87,8 @@ async function logChange(
 // obie strony do liczby, aby diff nie generował fałszywych zmian (np. "45.00" vs 45).
 const NUMERIC_KEYS = new Set<keyof InventoryInput>(["quantity", "unit_cost", "rental_price", "replacement_value"]);
 function normVal(key: keyof InventoryInput, v: unknown): unknown {
+  // Zdjęcie: audytujemy tylko obecność (nie zapisujemy w logu ogromnego data URL).
+  if (key === "photo_url") return v ? "zdjęcie" : null;
   if (v === null || v === undefined || v === "") return null;
   if (NUMERIC_KEYS.has(key)) {
     const n = Number(v);
