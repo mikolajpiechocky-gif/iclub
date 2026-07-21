@@ -144,7 +144,7 @@ export function UsersManager({
               <div key={r.id} className="rounded-[12px] border border-border bg-surface p-3.5">
                 {/* Avatar zespołu — zdjęcie zmniejszane po stronie klienta do miniatury. */}
                 <div className="mb-3 flex items-center gap-3">
-                  <Avatar name={r.full_name || r.email} url={r.avatar_url} size={48} />
+                  <Avatar name={r.full_name || r.email} url={r.avatar_url} size={64} />
                   <div className="flex flex-wrap items-center gap-2">
                     <label className={`rounded-[10px] border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-2 ${disabled || pending ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                       {r.avatar_url ? "Zmień zdjęcie" : "Dodaj zdjęcie"}

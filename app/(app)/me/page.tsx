@@ -72,7 +72,7 @@ export default async function EmployeeDashboardPage() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo-iclub.png" alt="iClub" className="mb-4 h-7 w-auto" />
       <div className="mb-4 flex items-center gap-3">
-        <Avatar name={name} url={profile?.avatar_url} size={44} />
+        <Avatar name={name} url={profile?.avatar_url} size={56} />
         <div>
           <div className="font-display text-[18px] font-bold text-white">Cześć, {name}</div>
           <div className="text-[12.5px] font-medium text-ink-2">{jobs.length} {jobs.length === 1 ? "realizacja" : "realizacji"} przypisanych</div>

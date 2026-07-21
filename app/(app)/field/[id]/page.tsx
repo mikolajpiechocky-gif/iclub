@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { Pill } from "@/components/ui";
 import { getJob, getJobStages } from "@/lib/data/jobs";
 import { getCustomer } from "@/lib/data/customers";
+import { listReservationAddons } from "@/lib/data/resources";
 import { listChecklistItems } from "@/lib/data/checklist";
 import { listPayments } from "@/lib/data/payments";
 import { getSignature } from "@/lib/data/signatures";
@@ -25,14 +26,19 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   if (!job) notFound();
 
   const r = job.reservation;
-  const [customer, checklist, payments, signature, photos] = await Promise.all([
+  const [customer, checklist, payments, signature, photos, addonList] = await Promise.all([
     r?.customer_id ? getCustomer(r.customer_id) : Promise.resolve(null),
     listChecklistItems(job.id),
     listPayments(),
     getSignature(job.id),
     listJobPhotos(job.id),
+    listReservationAddons(),
   ]);
   const m = JOB_STATUS_META[job.status];
+
+  // §9.4 Dodatki realizacji → ostrzeżenie o większym czasie pakowania i montażu.
+  const addonName = new Map(addonList.map((a) => [a.id, a.name]));
+  const addonNames = (r?.addon_ids ?? []).map((aid) => addonName.get(aid)).filter((n): n is string => Boolean(n));
 
   const phone = customer?.phone ?? null;
   const address = r?.location || customer?.address || customer?.city || null;
@@ -86,6 +92,14 @@ export default async function FieldRealizationPage({ params }: { params: Promise
             <span key={c as string} className="rounded-[10px] border border-border bg-surface px-2.5 py-2 text-[12px] font-semibold text-ink">{c}</span>
           ))}
         </div>
+
+        {/* §9.4 Ostrzeżenie o dodatkach — większy czas pakowania i montażu. */}
+        {addonNames.length > 0 && (
+          <div className="mb-3.5 rounded-[13px] border border-[#3d3216] bg-[#241e10] px-3.5 py-3 text-[12.5px] text-warn">
+            <div className="font-bold">⚠ Realizacja zawiera dodatkowy sprzęt ({addonNames.length})</div>
+            <div className="mt-0.5 text-[12px] text-warn">Uwzględnij większy czas pakowania i montażu. Dodatki: {addonNames.join(", ")}.</div>
+          </div>
+        )}
 
         {/* Blok: Pakowanie (osobny etap, dzień przed) */}
         <PackingBlock

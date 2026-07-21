@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout";
 import { MetricCard, SectionCard, PrimaryButton, SecondaryButton, Pill, EmptyState } from "@/components/ui";
 import { listReservations } from "@/lib/data/reservations";
+import { listReservationAddons } from "@/lib/data/resources";
 import { listInquiries } from "@/lib/data/inquiries";
 import { listCustomers } from "@/lib/data/customers";
 import { listJobs } from "@/lib/data/jobs";
@@ -21,8 +22,9 @@ const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : "—";
 
 export default async function DashboardPage() {
-  const [reservations, inquiries, customers, jobs, profile, fuelDue, adverts] = await Promise.all([
+  const [reservations, addonList, inquiries, customers, jobs, profile, fuelDue, adverts] = await Promise.all([
     listReservations(),
+    listReservationAddons(),
     listInquiries(),
     listCustomers(),
     listJobs(),
@@ -30,6 +32,15 @@ export default async function DashboardPage() {
     fuelReminderDue(),
     listOlxAdverts(),
   ]);
+  // §4.5 Skrót dodatków realizacji (liczba + najważniejsze nazwy).
+  const addonName = new Map(addonList.map((a) => [a.id, a.name]));
+  const addonSummary = (ids: string[] | null | undefined) => {
+    const names = (ids ?? []).map((id) => addonName.get(id)).filter((n): n is string => Boolean(n));
+    if (names.length === 0) return null;
+    const head = names.slice(0, 3).join(", ");
+    const extra = names.length > 3 ? ` +${names.length - 3}` : "";
+    return { count: names.length, text: head + extra };
+  };
   // Pulpit jest dla szefa — pracownika odsyłamy na jego ekran Start.
   if (profile && profile.role !== "OWNER") redirect("/me");
   const demo = !isSupabaseConfigured();
@@ -153,6 +164,7 @@ export default async function DashboardPage() {
           ) : (
             upcoming.slice(0, 6).map((r) => {
               const m = RESERVATION_STATUS_META[r.status];
+              const addons = addonSummary(r.addon_ids);
               return (
                 <Link key={r.id} href={`/reservations/${r.id}/edit`} className="flex items-center gap-3.5 rounded-[13px] px-3.5 py-3 transition hover:bg-surface-2">
                   <div className="w-14 flex-none text-center">
@@ -162,6 +174,12 @@ export default async function DashboardPage() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[14px] font-bold text-ink">{r.customer?.name ?? r.event_type ?? "Rezerwacja"}</div>
                     <div className="mt-0.5 truncate text-[12px] font-medium text-ink-2">{[r.location, r.tent?.name, r.package?.name].filter(Boolean).join(" · ") || "—"}</div>
+                    {addons && (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <span className="rounded-[6px] bg-[#271b3f] px-1.5 py-0.5 text-[10px] font-bold text-[#c9b6f2]">Dodatki: {addons.count}</span>
+                        <span className="truncate text-[11px] text-ink-2">{addons.text}</span>
+                      </div>
+                    )}
                   </div>
                   <Pill label={m.label} fg={m.fg} bg={m.bg} />
                 </Link>
