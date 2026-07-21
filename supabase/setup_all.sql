@@ -1351,3 +1351,31 @@ drop policy if exists package_items_write on public.package_items;
 create policy package_items_write on public.package_items for all to authenticated
   using (public.is_owner()) with check (public.is_owner());
 
+-- ================= 0042: konkretne egzemplarze sprzętu (§17.2) =================
+create table if not exists public.equipment_instances (
+  id uuid primary key default gen_random_uuid(),
+  equipment_id uuid not null references public.equipment(id) on delete cascade,
+  serial_number text,
+  label text,
+  status public.equipment_status not null default 'AVAILABLE',
+  photo_url text,
+  notes text,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_equipment_instances_eq on public.equipment_instances (equipment_id);
+drop trigger if exists trg_equipment_instances_updated_at on public.equipment_instances;
+create trigger trg_equipment_instances_updated_at before update on public.equipment_instances
+  for each row execute function public.set_updated_at();
+alter table public.equipment_instances enable row level security;
+-- §17.3 wszyscy pracownicy dodają/edytują; twarde usunięcie tylko Szef.
+drop policy if exists equipment_instances_select on public.equipment_instances;
+create policy equipment_instances_select on public.equipment_instances for select to authenticated using (true);
+drop policy if exists equipment_instances_insert on public.equipment_instances;
+create policy equipment_instances_insert on public.equipment_instances for insert to authenticated with check (true);
+drop policy if exists equipment_instances_update on public.equipment_instances;
+create policy equipment_instances_update on public.equipment_instances for update to authenticated using (true) with check (true);
+drop policy if exists equipment_instances_delete on public.equipment_instances;
+create policy equipment_instances_delete on public.equipment_instances for delete to authenticated using (public.is_owner());
+

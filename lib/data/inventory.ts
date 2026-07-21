@@ -67,7 +67,7 @@ async function getActor(supabase: Awaited<ReturnType<typeof createClient>>): Pro
   return { id: user.id, name: (data.full_name as string | null) ?? null };
 }
 
-async function logChange(
+export async function logChange(
   supabase: Awaited<ReturnType<typeof createClient>>,
   item_id: string | null,
   item_name: string | null,

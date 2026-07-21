@@ -535,6 +535,18 @@ export const EQUIPMENT_STATUS_META: Record<EquipmentStatus, { label: string; fg:
 
 export const EQUIPMENT_STATUS_ORDER: EquipmentStatus[] = ["AVAILABLE", "CLEANING", "SERVICE", "DAMAGED"];
 
+// §17.2 Konkretny egzemplarz sprzętu (numer, zdjęcie, stan, historia).
+export interface EquipmentInstanceRecord {
+  id: string;
+  equipment_id: string;
+  serial_number: string | null;
+  label: string | null;
+  status: EquipmentStatus;
+  photo_url: string | null;
+  notes: string | null;
+  active: boolean;
+}
+
 // §17.3 Wpis audytu zmian magazynowych (autor, data, stara/nowa wartość).
 export interface InventoryAuditRecord {
   id: string;
