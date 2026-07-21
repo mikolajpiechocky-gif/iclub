@@ -1228,3 +1228,17 @@ create policy olx_adverts_owner on public.olx_adverts for all to authenticated
   using (public.is_owner()) with check (public.is_owner());
 create index if not exists idx_olx_adverts_valid_to on public.olx_adverts (valid_to);
 
+-- ================= 0030: leady — aktywność, auto-zamykanie, reaktywacja =================
+alter type public.inquiry_status add value if not exists 'REHEATED';
+
+alter table public.inquiries add column if not exists last_activity_at timestamptz;
+alter table public.inquiries add column if not exists auto_close_blocked boolean not null default false;
+alter table public.inquiries add column if not exists lost_reason text;
+alter table public.inquiries add column if not exists reactivation_count integer not null default 0;
+alter table public.inquiries add column if not exists reactivated_at timestamptz;
+alter table public.inquiries add column if not exists previous_status text;
+alter table public.inquiries add column if not exists olx_last_message text;
+
+-- Backfill: ostatnia aktywność = ostatnia zmiana (albo utworzenie).
+update public.inquiries set last_activity_at = coalesce(updated_at, created_at) where last_activity_at is null;
+

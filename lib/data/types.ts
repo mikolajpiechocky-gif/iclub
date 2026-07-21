@@ -5,7 +5,7 @@
 
 export type UserRole = "OWNER" | "EMPLOYEE";
 export type CustomerType = "PRIVATE" | "COMPANY";
-export type InquiryStatus = "NEW" | "CONTACTED" | "OFFER_SENT" | "WAITING" | "WON" | "LOST";
+export type InquiryStatus = "NEW" | "CONTACTED" | "OFFER_SENT" | "WAITING" | "WON" | "LOST" | "REHEATED";
 export type InquirySource = "OLX" | "PHONE" | "WEBSITE_FORM" | "REFERRAL" | "FACEBOOK" | "INSTAGRAM" | "OTHER";
 
 export interface ProfileRecord {
@@ -41,6 +41,14 @@ export interface InquiryRecord {
   source: InquirySource | null;
   status: InquiryStatus;
   notes: string | null;
+  // §6: śledzenie aktywności, auto-zamykanie i reaktywacja leada
+  last_activity_at: string | null;
+  auto_close_blocked: boolean;
+  lost_reason: string | null;
+  reactivation_count: number;
+  reactivated_at: string | null;
+  previous_status: string | null;
+  olx_last_message: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +71,7 @@ export const INQUIRY_STATUS_LABELS: Record<InquiryStatus, string> = {
   WAITING: "Oczekuje",
   WON: "Wygrane",
   LOST: "Przegrane",
+  REHEATED: "Odgrzany",
 };
 
 export const INQUIRY_SOURCE_LABELS: Record<InquirySource, string> = {
@@ -83,10 +92,11 @@ export const INQUIRY_STATUS_META: Record<InquiryStatus, { label: string; fg: str
   WAITING: { label: "Oczekuje", fg: "#9aa0b2", bg: "#22242e" },
   WON: { label: "Wygrane", fg: "#5fd68b", bg: "#16301f" },
   LOST: { label: "Przegrane", fg: "#f58585", bg: "#341a1d" },
+  REHEATED: { label: "Odgrzany", fg: "#f6a94a", bg: "#33230f" },
 };
 
 export const INQUIRY_STATUS_ORDER: InquiryStatus[] = [
-  "NEW", "CONTACTED", "OFFER_SENT", "WAITING", "WON", "LOST",
+  "NEW", "CONTACTED", "OFFER_SENT", "WAITING", "REHEATED", "WON", "LOST",
 ];
 
 // =====================================================================

@@ -3,8 +3,10 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout";
 import { PrimaryButton, EmptyState, Pill } from "@/components/ui";
 import { listInquiries } from "@/lib/data/inquiries";
+import { getCurrentProfile } from "@/lib/data/profiles";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { INQUIRY_STATUS_META, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
+import { AutoCloseButton } from "./lead-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +14,9 @@ const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : "—";
 
 export default async function InquiriesPage() {
-  const inquiries = await listInquiries();
+  const [inquiries, profile] = await Promise.all([listInquiries(), getCurrentProfile()]);
   const demo = !isSupabaseConfigured();
+  const isOwner = profile?.role === "OWNER";
 
   return (
     <div className="mx-auto max-w-[1280px] px-5 py-6 md:px-8">
@@ -21,9 +24,12 @@ export default async function InquiriesPage() {
         title="Zapytania"
         subtitle={`${inquiries.length} ${inquiries.length === 1 ? "zapytanie" : "zapytań"}`}
         actions={
-          <Link href="/inquiries/new">
-            <PrimaryButton icon="plus">Nowe zapytanie</PrimaryButton>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {isOwner && <AutoCloseButton />}
+            <Link href="/inquiries/new">
+              <PrimaryButton icon="plus">Nowe zapytanie</PrimaryButton>
+            </Link>
+          </div>
         }
       />
 

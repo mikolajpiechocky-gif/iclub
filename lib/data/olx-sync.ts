@@ -55,9 +55,25 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
         const lastAt = (pick(th, "updated_at") ?? pick(th, "last_message", "created_at") ?? null) as string | null;
         const notes = [`OLX: ${name}`, advert && `Ogłoszenie: ${advert}`, msgText && `„${msgText}”`].filter(Boolean).join("\n");
 
-        const { data: existing } = await s.from("inquiries").select("id").eq("olx_thread_id", threadId).maybeSingle();
-        if (existing) {
-          await s.from("inquiries").update({ notes, olx_last_message_at: lastAt }).eq("id", (existing as { id: string }).id);
+        const { data: existing } = await s.from("inquiries").select("id, status, reactivation_count").eq("olx_thread_id", threadId).maybeSingle();
+        const ex = existing as { id: string; status: string; reactivation_count: number } | null;
+        const olxMsg = msgText || null;
+
+        if (ex) {
+          // Aktualizujemy TYLKO treść z OLX + znacznik aktywności — ręczne dane CRM
+          // (status, klient, notatki) zostają nietknięte. Przegrany lead „odgrzewa się".
+          const patch: Record<string, unknown> = {
+            olx_last_message: olxMsg,
+            olx_last_message_at: lastAt,
+            last_activity_at: new Date().toISOString(),
+          };
+          if (ex.status === "LOST") {
+            patch.status = "REHEATED";
+            patch.previous_status = "LOST";
+            patch.reactivation_count = (ex.reactivation_count ?? 0) + 1;
+            patch.reactivated_at = new Date().toISOString();
+          }
+          await s.from("inquiries").update(patch).eq("id", ex.id);
           updated++;
         } else {
           await s.from("inquiries").insert({
@@ -66,7 +82,9 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
             event_type: advert || null,
             notes,
             olx_thread_id: threadId,
+            olx_last_message: olxMsg,
             olx_last_message_at: lastAt,
+            last_activity_at: new Date().toISOString(),
           });
           imported++;
         }

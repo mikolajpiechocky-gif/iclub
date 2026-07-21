@@ -34,8 +34,8 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 27. ⬜ Pierwsze 4 realizacje Bartka → czas wolny (§19.1).
 28. ⬜ Piąta+ → konfigurowalne 500 zł + dodatki (§19.2).
 29. ⬜ Koszty i płatności — widoki miesięczne + filtry (§20).
-30. ⬜ Nowa impreza istniejącego klienta → nowy lead (§6.3).
-31. ⬜ Powrót do starego zapytania reaktywuje lead (§6.3).
+30. ✅ Nowa impreza istniejącego klienta → nowy lead (§6.3) — każde zapytanie to osobny rekord powiązany z klientem; nowy wątek OLX = nowy lead.
+31. ✅ Powrót do starego zapytania reaktywuje lead (§6.3) — nowa wiadomość OLX do przegranego = „Odgrzany" (auto), plus ręczny przycisk „Odgrzej leada"; zachowana historia (poprzedni status, licznik i data reaktywacji).
 32. ✅ Globalne nazewnictwo poprawione (§23: iClub, zadatek, Szef).
 33. ✅ `lint`/typecheck bez błędów.
 34. ✅ `build` bez błędów.
@@ -46,3 +46,4 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 - ✅ §4.3: usunięto kafelek „Konflikty namiotu" (walidacja ma blokować, nie informować).
 - ✅ §5.4: kolory ikon pogody — upał żółty, deszcz niebieski, wiatr pomarańczowy, OK zielony (kalendarz + rezerwacja).
 - ✅ §5.5: dzwonek powiadomień w nagłówku; zakładka „Powiadomienia" usunięta z menu.
+- ✅ §6 Leady: status „Odgrzany", śledzenie ostatniej aktywności, auto-zamykanie po 21 dniach (`automatic_inactivity`, z blokadą Szefa; trasa /api/leads/auto-close dla crona + przycisk), OLX nie nadpisuje ręcznych danych CRM (tylko treść wiadomości), reaktywacja auto+ręczna. Wymaga migracji 0030.
