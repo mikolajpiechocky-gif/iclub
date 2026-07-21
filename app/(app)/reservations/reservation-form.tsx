@@ -133,16 +133,16 @@ export function ReservationForm({
     };
   }, [v.tent_main, v.tent_extra, occStart, occEnd, initial?.id]);
 
-  // §12.3 Live-kontrola dostępności dodatków magazynowych w tym terminie.
+  // §12.3/§11 Live-kontrola dostępności dodatków i pozycji z pakietu w tym terminie.
   useEffect(() => {
     let active = true;
-    checkAddonAvailabilityAction(v.addon_ids, v.addon_qty, occStart, occEnd, initial?.id).then((s) => {
+    checkAddonAvailabilityAction(v.addon_ids, v.addon_qty, v.package_id, occStart, occEnd, initial?.id).then((s) => {
       if (active) setAddonShortages(s);
     });
     return () => {
       active = false;
     };
-  }, [v.addon_ids, v.addon_qty, occStart, occEnd, initial?.id]);
+  }, [v.addon_ids, v.addon_qty, v.package_id, occStart, occEnd, initial?.id]);
 
   const set = <K extends keyof ReservationFormValues>(k: K, val: ReservationFormValues[K]) =>
     setV((s) => ({ ...s, [k]: val }));

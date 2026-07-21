@@ -205,7 +205,7 @@ async function overbookingBlock(values: ReservationFormValues, excludeId?: strin
   // Namioty i dodatki sprawdzamy równolegle (niezależne zapytania).
   const [{ exceeded }, { shortages }] = await Promise.all([
     checkTentOverbooking(mine, start, end, excludeId),
-    checkAddonOverbooking(values.addon_ids, values.addon_qty, start, end, excludeId),
+    checkAddonOverbooking(values.addon_ids, values.addon_qty, values.package_id || null, start, end, excludeId),
   ]);
   const problems = [...exceeded, ...shortages.map((s) => `${s.name} (potrzeba ${s.requested}, wolne ${Math.max(0, s.stock - s.used)} z ${s.stock})`)];
   if (!problems.length) return null;
@@ -216,17 +216,18 @@ async function overbookingBlock(values: ReservationFormValues, excludeId?: strin
   return null;
 }
 
-// §12.3 Live-sprawdzenie dostępności dodatków (dla formularza).
+// §12.3/§11 Live-sprawdzenie dostępności dodatków i pozycji z pakietu (dla formularza).
 export async function checkAddonAvailabilityAction(
   addonIds: string[],
   addonQty: Record<string, number>,
+  packageId: string,
   startDate: string,
   endDate: string,
   excludeId?: string,
 ): Promise<AddonShortage[]> {
-  if (!startDate || !addonIds.length) return [];
+  if (!startDate || (!addonIds.length && !packageId)) return [];
   try {
-    const { shortages } = await checkAddonOverbooking(addonIds, addonQty, startDate, endDate || startDate, excludeId);
+    const { shortages } = await checkAddonOverbooking(addonIds, addonQty, packageId || null, startDate, endDate || startDate, excludeId);
     return shortages;
   } catch {
     return [];

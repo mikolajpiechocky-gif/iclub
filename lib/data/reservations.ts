@@ -79,44 +79,65 @@ export interface AddonShortage { id: string; name: string; stock: number; used: 
 export async function checkAddonOverbooking(
   addonIds: string[],
   addonQty: Record<string, number> | null | undefined,
+  packageId: string | null,
   startDate: string | null,
   endDate: string | null,
   excludeId?: string,
 ): Promise<{ shortages: AddonShortage[] }> {
-  if (!isSupabaseConfigured() || !startDate || !addonIds.length) return { shortages: [] };
+  if (!isSupabaseConfigured() || !startDate) return { shortages: [] };
   const end = endDate ?? startDate;
   const supabase = await createClient();
 
-  // Stany tylko dla pozycji magazynowych (equipment). Legacy addony bez stanu pomijamy.
-  const { data: eqData } = await supabase.from("equipment").select("id, name, quantity").in("id", addonIds);
+  // Skład pakietów: mapa packageId → { equipmentId: ilość } (§11 pozycje pakietu rezerwują sprzęt).
+  const { data: piData } = await supabase.from("package_items").select("package_id, equipment_id, quantity");
+  const compByPkg = new Map<string, Map<string, number>>();
+  for (const it of (piData ?? []) as { package_id: string; equipment_id: string; quantity: number }[]) {
+    if (!compByPkg.has(it.package_id)) compByPkg.set(it.package_id, new Map());
+    compByPkg.get(it.package_id)!.set(it.equipment_id, Number(it.quantity));
+  }
+
+  // Fizyczne zapotrzebowanie rezerwacji: pozycje z pakietu + dodatki. Dodatek podaje ILOŚĆ
+  // CAŁKOWITĄ danej pozycji, więc pokrywa to, co w pakiecie (bez podwójnego liczenia).
+  const usageFor = (aIds: string[] | null, aQty: Record<string, number> | null, pkgId: string | null): Map<string, number> => {
+    const use = new Map<string, number>();
+    if (pkgId && compByPkg.has(pkgId)) for (const [eq, q] of compByPkg.get(pkgId)!) use.set(eq, q);
+    for (const eq of aIds ?? []) use.set(eq, Math.max(1, Math.round(aQty?.[eq] ?? 1)));
+    return use;
+  };
+
+  const myUse = usageFor(addonIds, addonQty ?? null, packageId);
+  const relevant = [...myUse.keys()];
+  if (!relevant.length) return { shortages: [] };
+
+  // Stany magazynowe dla istotnych pozycji. Legacy addony bez wiersza w equipment pomijamy.
+  const { data: eqData } = await supabase.from("equipment").select("id, name, quantity").in("id", relevant);
   const stock = new Map<string, { name: string; quantity: number }>();
   for (const e of (eqData ?? []) as { id: string; name: string; quantity: number }[]) stock.set(e.id, { name: e.name, quantity: Number(e.quantity) });
   if (stock.size === 0) return { shortages: [] };
 
   const { data } = await supabase
     .from("reservations")
-    .select("id, addon_ids, addon_qty, setup_date, teardown_date, event_date, status")
+    .select("id, addon_ids, addon_qty, package_id, setup_date, teardown_date, event_date, status")
     .in("status", ["TEMPORARY", "CONFIRMED"]);
-  const rows = (data ?? []) as { id: string; addon_ids: string[] | null; addon_qty: Record<string, number> | null; setup_date: string | null; teardown_date: string | null; event_date: string | null }[];
+  const rows = (data ?? []) as { id: string; addon_ids: string[] | null; addon_qty: Record<string, number> | null; package_id: string | null; setup_date: string | null; teardown_date: string | null; event_date: string | null }[];
 
   const used = new Map<string, number>();
   for (const r of rows) {
     if (r.id === excludeId) continue;
     const rg = reservationRange(r);
     if (!rangesOverlap(startDate, end, rg.start, rg.end)) continue;
-    for (const id of r.addon_ids ?? []) {
-      if (!stock.has(id)) continue;
-      used.set(id, (used.get(id) ?? 0) + Math.max(1, Math.round(r.addon_qty?.[id] ?? 1)));
+    for (const [eq, q] of usageFor(r.addon_ids, r.addon_qty, r.package_id)) {
+      if (!stock.has(eq)) continue;
+      used.set(eq, (used.get(eq) ?? 0) + q);
     }
   }
 
   const shortages: AddonShortage[] = [];
-  for (const id of addonIds) {
-    const st = stock.get(id);
+  for (const [eq, requested] of myUse) {
+    const st = stock.get(eq);
     if (!st) continue;
-    const requested = Math.max(1, Math.round(addonQty?.[id] ?? 1));
-    const u = used.get(id) ?? 0;
-    if (u + requested > st.quantity) shortages.push({ id, name: st.name, stock: st.quantity, used: u, requested });
+    const u = used.get(eq) ?? 0;
+    if (u + requested > st.quantity) shortages.push({ id: eq, name: st.name, stock: st.quantity, used: u, requested });
   }
   return { shortages };
 }
