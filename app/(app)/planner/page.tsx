@@ -1,4 +1,4 @@
-// app/(app)/planner/page.tsx — Planer tras (§37). Tylko właściciel.
+// app/(app)/planner/page.tsx — Planer tras (§37). Tylko szef.
 import { PageHeader } from "@/components/layout";
 import { Alert } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
@@ -13,8 +13,8 @@ export default async function PlannerPage() {
   if (profile && profile.role !== "OWNER") {
     return (
       <div className="mx-auto max-w-[900px] px-5 py-6 md:px-8">
-        <PageHeader title="Planer tras" subtitle="Dostępne dla właściciela" />
-        <Alert tone="info" title="Brak dostępu">Planer tras dostępny tylko dla właściciela.</Alert>
+        <PageHeader title="Planer tras" subtitle="Dostępne dla szefa" />
+        <Alert tone="info" title="Brak dostępu">Planer tras dostępny tylko dla szefa.</Alert>
       </div>
     );
   }

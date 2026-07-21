@@ -1,4 +1,4 @@
-// POST /api/olx/sync — synchronizacja rozmów OLX → zapytania. Dostęp: właściciel
+// POST /api/olx/sync — synchronizacja rozmów OLX → zapytania. Dostęp: szef
 // (z sesji) LUB cron z sekretem (Authorization: Bearer OLX_CRON_SECRET).
 import { NextRequest, NextResponse } from "next/server";
 import { syncOlxThreads } from "@/lib/data/olx-sync";

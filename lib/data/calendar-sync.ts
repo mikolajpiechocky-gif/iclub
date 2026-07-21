@@ -133,7 +133,7 @@ export async function syncReservationToCalendar(reservationId: string, opts: { a
     lines.push(`Płatność: ${r.payment_upfront ? "opłacone z góry" : "przy odbiorze"}`);
   }
   if (r.price != null) lines.push(`Wartość: ${r.price} zł`);
-  if (r.deposit) lines.push(`Zaliczka: ${r.deposit} zł`);
+  if (r.deposit) lines.push(`Zadatek: ${r.deposit} zł`);
   if (balance != null) lines.push(`Do zapłaty: ${balance} zł`);
   lines.push("— zarządzane przez iClub Management —");
 

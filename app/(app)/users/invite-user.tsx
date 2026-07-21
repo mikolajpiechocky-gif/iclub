@@ -1,6 +1,6 @@
 "use client";
 // Dodanie nowego użytkownika. Po utworzeniu pokazuje jednorazowo hasło tymczasowe
-// do przekazania pracownikowi (zmieni je po zalogowaniu). Tylko właściciel.
+// do przekazania pracownikowi (zmieni je po zalogowaniu). Tylko szef.
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SectionCard, TextField, PrimaryButton, Alert } from "@/components/ui";
@@ -65,7 +65,7 @@ export function InviteUser({ canInvite }: { canInvite: boolean }) {
           <TextField label="E-mail" type="email" placeholder="jan@przyklad.pl" value={email} onChange={(e) => setEmail(e.target.value)} />
           <PrimaryButton type="submit" icon="plus" disabled={pending}>{pending ? "Tworzenie…" : "Utwórz konto"}</PrimaryButton>
         </form>
-        <p className="mt-2 text-[12px] text-ink-2">Nowe konto ma rolę <strong>Pracownik</strong> — właściciela nadasz na liście powyżej.</p>
+        <p className="mt-2 text-[12px] text-ink-2">Nowe konto ma rolę <strong>Pracownik</strong> — szefa nadasz na liście powyżej.</p>
       </div>
     </SectionCard>
   );

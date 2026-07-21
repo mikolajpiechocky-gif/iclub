@@ -176,7 +176,7 @@ export function ReservationForm({
                   <ul className="mt-1.5 list-disc pl-4">
                     {conflicts.map((c) => <li key={c.id}>{c.label}</li>)}
                   </ul>
-                  <span className="mt-1.5 block">Możesz zapisać mimo to — ostateczna decyzja należy do właściciela.</span>
+                  <span className="mt-1.5 block">Możesz zapisać mimo to — ostateczna decyzja należy do szefa.</span>
                 </Alert>
               </div>
             )}
@@ -230,7 +230,7 @@ export function ReservationForm({
               )}
             </div>
             <TextField label="Rabat (zł)" inputMode="numeric" placeholder="0" value={v.discount} onChange={(e) => set("discount", e.target.value)} error={errors.discount} />
-            <TextField label="Zaliczka (zł)" inputMode="numeric" placeholder="2000" value={v.deposit} onChange={(e) => set("deposit", e.target.value)} error={errors.deposit} />
+            <TextField label="Zadatek (zł)" inputMode="numeric" placeholder="2000" value={v.deposit} onChange={(e) => set("deposit", e.target.value)} error={errors.deposit} />
             <SelectField label="Źródło" value={v.source} onChange={(e) => set("source", e.target.value)}>
               <option value="">— nie podano —</option>
               {(Object.keys(INQUIRY_SOURCE_LABELS) as (keyof typeof INQUIRY_SOURCE_LABELS)[]).map((s) => (

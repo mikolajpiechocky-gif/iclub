@@ -7,7 +7,7 @@ import { addAvailabilityAction, removeAvailabilityAction } from "./actions";
 
 export interface AvailabilityEntry {
   id: string;
-  who: string | null; // nazwa pracownika (widok właściciela) lub null
+  who: string | null; // nazwa pracownika (widok szefa) lub null
   start_date: string;
   end_date: string;
   note: string | null;

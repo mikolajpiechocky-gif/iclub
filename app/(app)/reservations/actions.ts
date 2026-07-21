@@ -54,7 +54,7 @@ function num(s: string): string | undefined {
 function validate(v: ReservationFormValues): Record<string, string> {
   const e: Record<string, string> = {};
   if (!STATUSES.includes(v.status)) e.status = "Wybierz status.";
-  for (const [k, label] of [["guests", "Liczba osób"], ["price", "Cena"], ["discount", "Rabat"], ["deposit", "Zaliczka"]] as const) {
+  for (const [k, label] of [["guests", "Liczba osób"], ["price", "Cena"], ["discount", "Rabat"], ["deposit", "Zadatek"]] as const) {
     const val = num(v[k]);
     if (val && isNaN(Number(val.replace(",", ".")))) e[k] = `${label} musi być liczbą.`;
   }
@@ -110,7 +110,7 @@ export interface TentConflict {
 }
 
 // Sprawdza dostępność namiotu w oknie montaż→demontaż (§8). Ostrzeżenie,
-// nie blokada — właściciel może świadomie zapisać mimo konfliktu.
+// nie blokada — szef może świadomie zapisać mimo konfliktu.
 export async function checkTentAvailabilityAction(
   tentIds: string[],
   startDate: string,
@@ -150,7 +150,7 @@ export async function createReservationAction(values: ReservationFormValues): Pr
 export async function markReservationConfirmedAction(id: string, confirmed: boolean): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
   const me = await getCurrentProfile();
-  if (me?.role !== "OWNER") return { ok: false, error: "Tylko właściciel zmienia potwierdzenie klienta." };
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko szef zmienia potwierdzenie klienta." };
   try {
     await setReservationConfirmed(id, confirmed);
     revalidatePath(`/reservations/${id}`);
@@ -166,7 +166,7 @@ export async function markReservationConfirmedAction(id: string, confirmed: bool
 export async function markRealizationDoneAction(reservationId: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
   const me = await getCurrentProfile();
-  if (me?.role !== "OWNER") return { ok: false, error: "Tylko właściciel oznacza realizację jako zakończoną." };
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko szef oznacza realizację jako zakończoną." };
   try {
     const job = await getJobByReservation(reservationId);
     if (!job) return { ok: false, error: "Brak powiązanego zlecenia." };
@@ -185,7 +185,7 @@ export async function markRealizationDoneAction(reservationId: string): Promise<
 export async function markInvoiceIssuedAction(id: string, issued: boolean, invoiceNumber: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
   const me = await getCurrentProfile();
-  if (me?.role !== "OWNER") return { ok: false, error: "Tylko właściciel zmienia status faktury." };
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko szef zmienia status faktury." };
   try {
     await setInvoiceIssued(id, issued, invoiceNumber.trim() || null);
     revalidatePath(`/reservations/${id}`);

@@ -29,7 +29,7 @@ export interface PlannerResult {
 
 export async function optimizeRouteAction(date: string, vehicleId: string): Promise<PlannerResult> {
   const profile = await getCurrentProfile();
-  if (profile?.role !== "OWNER") return { ok: false, error: "Planer tras dostępny dla właściciela." };
+  if (profile?.role !== "OWNER") return { ok: false, error: "Planer tras dostępny dla szefa." };
   if (!date) return { ok: false, error: "Wybierz dzień." };
   if (!isGoogleMapsConfigured()) return { ok: false, error: "Podłącz klucz Google Maps, aby optymalizować trasy." };
 

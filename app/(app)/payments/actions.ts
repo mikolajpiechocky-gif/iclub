@@ -56,7 +56,7 @@ export async function createPaymentAction(v: PaymentFormValues): Promise<ActionR
 export async function verifyPaymentAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const p = await getCurrentProfile();
-  if (p?.role !== "OWNER") return { ok: false, error: "Tylko właściciel weryfikuje płatności." };
+  if (p?.role !== "OWNER") return { ok: false, error: "Tylko szef weryfikuje płatności." };
   try {
     await setPaymentStatus(id, "PAID");
     revalidatePath("/payments");

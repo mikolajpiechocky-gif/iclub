@@ -50,7 +50,7 @@ export async function createCostAction(v: CostFormValues): Promise<ActionResult>
 export async function verifyCostAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const p = await getCurrentProfile();
-  if (p?.role !== "OWNER") return { ok: false, error: "Tylko właściciel weryfikuje koszty." };
+  if (p?.role !== "OWNER") return { ok: false, error: "Tylko szef weryfikuje koszty." };
   try {
     await setCostStatus(id, "VERIFIED");
     revalidatePath("/costs");

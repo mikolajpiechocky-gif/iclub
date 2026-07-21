@@ -1,5 +1,5 @@
 "use client";
-// Panel użytkowników: imię, e-mail, rola + reset hasła. Tylko właściciel.
+// Panel użytkowników: imię, e-mail, rola + reset hasła. Tylko szef.
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SectionCard, Alert, Pill } from "@/components/ui";
@@ -109,7 +109,7 @@ export function UsersManager({
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
                   {isSelf ? (
                     <span className="flex items-center gap-2">
-                      <Pill label={r.role === "OWNER" ? "Właściciel" : "Pracownik"} fg={r.role === "OWNER" ? "#b98cf5" : "#7fa8f5"} bg={r.role === "OWNER" ? "#271b3f" : "#182238"} />
+                      <Pill label={r.role === "OWNER" ? "Szef" : "Pracownik"} fg={r.role === "OWNER" ? "#b98cf5" : "#7fa8f5"} bg={r.role === "OWNER" ? "#271b3f" : "#182238"} />
                       <span className="text-[11.5px] font-semibold text-ink-2">(Ty)</span>
                     </span>
                   ) : (
@@ -120,7 +120,7 @@ export function UsersManager({
                       className="rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-[13px] font-semibold text-ink outline-none focus:border-brand"
                     >
                       <option value="EMPLOYEE">Pracownik</option>
-                      <option value="OWNER">Właściciel</option>
+                      <option value="OWNER">Szef</option>
                     </select>
                   )}
                   <button

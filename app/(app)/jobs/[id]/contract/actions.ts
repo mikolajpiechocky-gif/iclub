@@ -1,5 +1,5 @@
 "use server";
-// Server Actions: status umowy (§44). Zarządza właściciel.
+// Server Actions: status umowy (§44). Zarządza szef.
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentProfile } from "@/lib/data/profiles";
@@ -15,7 +15,7 @@ export async function setContractStatusAction(jobId: string, status: ContractSta
   if (!isSupabaseConfigured())
     return { ok: false, error: "Tryb demo: skonfiguruj Supabase, aby zapisać (docs/SUPABASE_SETUP.md)." };
   const p = await getCurrentProfile();
-  if (p?.role !== "OWNER") return { ok: false, error: "Tylko właściciel zarządza umowami." };
+  if (p?.role !== "OWNER") return { ok: false, error: "Tylko szef zarządza umowami." };
   try {
     await setContractStatus(jobId, status);
     revalidatePath(`/jobs/${jobId}/contract`);

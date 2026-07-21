@@ -1,5 +1,5 @@
 // Warstwa danych: profile użytkowników i bieżąca tożsamość.
-// W TRYBIE DEMO zwraca udawanego właściciela, aby ekrany działały bez Supabase.
+// W TRYBIE DEMO zwraca udawanego szefa, aby ekrany działały bez Supabase.
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { ProfileRecord } from "./types";
@@ -32,7 +32,7 @@ export async function getCurrentProfile(): Promise<ProfileRecord | null> {
   return data as ProfileRecord;
 }
 
-// Id właścicieli — do powiadamiania o prośbach pracowników (np. o przypisanie).
+// Id szefi — do powiadamiania o prośbach pracowników (np. o przypisanie).
 export async function listOwnerIds(): Promise<string[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();

@@ -1,5 +1,5 @@
 // app/(app)/reservations/[id]/page.tsx — Rezerwacja = realizacja.
-// Jedno miejsce dla właściciela: sprzedaż + operacje (etapy, zespół, pojazdy,
+// Jedno miejsce dla szefa: sprzedaż + operacje (etapy, zespół, pojazdy,
 // transport, umowa). Zlecenie jest technicznym rekordem 1:1 z rezerwacją.
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -62,9 +62,9 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
     { h: "Terminy", rows: [["Montaż", fmtDate(reservation.setup_date)], ["Demontaż", fmtDate(reservation.teardown_date)], ["Lokalizacja", reservation.location ?? "—"]] },
     { h: "Namiot i pakiet", rows: [["Namiot", (r as { tent?: { name?: string } }).tent?.name ?? "—"], ["Pakiet", (r as { package?: { name?: string } }).package?.name ?? "—"]] },
   ];
-  // Rozliczenie (Wartość/Rabat/Zaliczka) — tylko właściciel; pracownika to nie dotyczy.
+  // Rozliczenie (Wartość/Rabat/Zadatek) — tylko szef; pracownika to nie dotyczy.
   if (isOwner) {
-    cards.push({ h: "Rozliczenie", rows: [["Wartość", fmtPLN(reservation.price)], ["Rabat", fmtPLN(reservation.discount ?? 0)], ["Zaliczka", fmtPLN(reservation.deposit ?? 0)]] });
+    cards.push({ h: "Rozliczenie", rows: [["Wartość", fmtPLN(reservation.price)], ["Rabat", fmtPLN(reservation.discount ?? 0)], ["Zadatek", fmtPLN(reservation.deposit ?? 0)]] });
   }
 
   return (
@@ -161,7 +161,7 @@ async function SafeReservationOps(props: OpsProps) {
     console.error("ReservationOps failed:", e);
     return (
       <div className="mt-4 rounded-card border border-[#3a1c1f] bg-[#251215] p-4 text-[12.5px] text-bad">
-        Nie udało się załadować sekcji realizacji. Odśwież stronę — jeśli błąd wraca, zgłoś właścicielowi.
+        Nie udało się załadować sekcji realizacji. Odśwież stronę — jeśli błąd wraca, zgłoś szefowi.
       </div>
     );
   }

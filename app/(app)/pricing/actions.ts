@@ -32,7 +32,7 @@ function num(s: string): number | null {
 export async function updatePricingAction(v: PricingFormValues): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const p = await getCurrentProfile();
-  if (p?.role !== "OWNER") return { ok: false, error: "Tylko właściciel edytuje cennik." };
+  if (p?.role !== "OWNER") return { ok: false, error: "Tylko szef edytuje cennik." };
 
   // Walidacja wszystkich kwot przed jakimkolwiek zapisem.
   const fieldErrors: Record<string, string> = {};

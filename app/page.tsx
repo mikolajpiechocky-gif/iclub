@@ -1,4 +1,4 @@
-// app/page.tsx — wejście: przekierowanie wg roli (właściciel → pulpit, pracownik → jego Start).
+// app/page.tsx — wejście: przekierowanie wg roli (szef → pulpit, pracownik → jego Start).
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/data/profiles";
 

@@ -1,4 +1,4 @@
-// app/(app)/settings/page.tsx — Ustawienia aplikacji (§51). Tylko właściciel.
+// app/(app)/settings/page.tsx — Ustawienia aplikacji (§51). Tylko szef.
 import { PageHeader } from "@/components/layout";
 import { Alert } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
@@ -15,8 +15,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   if (profile && profile.role !== "OWNER") {
     return (
       <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
-        <PageHeader title="Ustawienia" subtitle="Dostępne dla właściciela" />
-        <Alert tone="info" title="Brak dostępu">Konfigurację cen, bazy i rozliczeń zmienia tylko właściciel.</Alert>
+        <PageHeader title="Ustawienia" subtitle="Dostępne dla szefa" />
+        <Alert tone="info" title="Brak dostępu">Konfigurację cen, bazy i rozliczeń zmienia tylko szef.</Alert>
       </div>
     );
   }

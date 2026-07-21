@@ -1,4 +1,4 @@
-// GET /api/olx/connect — start autoryzacji OLX (tylko właściciel). Generuje state
+// GET /api/olx/connect — start autoryzacji OLX (tylko szef). Generuje state
 // (cookie anty-CSRF) i przekierowuje na zgodę OLX z redirect_uri = /api/olx/callback.
 import { NextRequest, NextResponse } from "next/server";
 import { buildAuthorizeUrl } from "@/lib/integrations/olx";

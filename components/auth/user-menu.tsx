@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { ProfileRecord } from "@/lib/data/types";
 
-const ROLE_LABEL: Record<string, string> = { OWNER: "Właściciel", EMPLOYEE: "Pracownik" };
+const ROLE_LABEL: Record<string, string> = { OWNER: "Szef", EMPLOYEE: "Pracownik" };
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);

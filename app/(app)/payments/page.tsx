@@ -56,7 +56,7 @@ export default async function PaymentsPage() {
 
       <div className="mt-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
         <Icon name="warning" className="h-4 w-4 flex-none" />
-        Gotówka „zgłoszona przez pracownika” wymaga weryfikacji właściciela, zanim zostanie uznana za zapłaconą.
+        Gotówka „zgłoszona przez pracownika” wymaga weryfikacji szefa, zanim zostanie uznana za zapłaconą.
       </div>
     </div>
   );

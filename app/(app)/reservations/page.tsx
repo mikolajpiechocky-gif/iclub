@@ -45,7 +45,7 @@ export default async function ReservationsPage() {
             <table className="w-full text-left">
               <thead className="border-b border-border bg-[#12131a] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">
                 <tr>
-                  {["Klient", "Impreza", "Termin", "Namiot", "Pakiet", "Zaliczka", "Status", ""].map((h, i) => (
+                  {["Klient", "Impreza", "Termin", "Namiot", "Pakiet", "Zadatek", "Status", ""].map((h, i) => (
                     <th key={i} className="px-4 py-3 font-bold">{h}</th>
                   ))}
                 </tr>
@@ -84,7 +84,7 @@ export default async function ReservationsPage() {
                   <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ink-2">
                     <span>📅 {fmtDate(r.event_date)}</span>
                     {r.location && <span>📍 {r.location}</span>}
-                    <span>💰 zaliczka {fmtPLN(r.deposit)}</span>
+                    <span>💰 zadatek {fmtPLN(r.deposit)}</span>
                   </div>
                 </Link>
               );

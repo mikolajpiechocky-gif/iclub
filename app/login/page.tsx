@@ -36,7 +36,7 @@ export default function LoginPage() {
       );
       return;
     }
-    router.push("/"); // root przekieruje wg roli (właściciel → pulpit, pracownik → Start)
+    router.push("/"); // root przekieruje wg roli (szef → pulpit, pracownik → Start)
     router.refresh();
   };
 
@@ -116,10 +116,6 @@ export default function LoginPage() {
             </form>
           )}
         </div>
-
-        <p className="mt-5 text-center text-[11.5px] text-muted">
-          Konta zakłada właściciel w panelu Supabase — patrz docs/SUPABASE_SETUP.md
-        </p>
       </div>
     </div>
   );

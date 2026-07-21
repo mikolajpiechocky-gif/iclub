@@ -12,16 +12,16 @@ export const dynamic = "force-dynamic";
 const fmtPLN = (v: number | null | undefined) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
 
-const roleLabel = (r: string) => (r === "OWNER" ? "Właściciel" : "Pracownik");
+const roleLabel = (r: string) => (r === "OWNER" ? "Szef" : "Pracownik");
 
 export default async function EmployeesPage() {
   const profile = await getCurrentProfile();
   if (profile && profile.role !== "OWNER") {
     return (
       <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
-        <PageHeader title="Pracownicy" subtitle="Moduł dostępny dla właściciela" />
+        <PageHeader title="Pracownicy" subtitle="Moduł dostępny dla szefa" />
         <Alert tone="info" title="Brak dostępu">
-          Stawki i wynagrodzenia widzi tylko właściciel. Twoje zarobki znajdziesz w swoim panelu (wkrótce).
+          Stawki i wynagrodzenia widzi tylko szef. Twoje zarobki znajdziesz w swoim panelu (wkrótce).
         </Alert>
       </div>
     );
@@ -36,7 +36,7 @@ export default async function EmployeesPage() {
 
       {demo && (
         <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
-          Tryb demo — dane przykładowe. Pracowników zakłada właściciel w panelu Supabase (Authentication → Users).
+          Tryb demo — dane przykładowe. Pracowników zakłada szef w panelu Supabase (Authentication → Users).
         </div>
       )}
 

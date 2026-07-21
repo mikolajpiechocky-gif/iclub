@@ -1,4 +1,4 @@
-// app/(app)/pricing/page.tsx — Cennik pakietów i dodatków (§51). Tylko właściciel.
+// app/(app)/pricing/page.tsx — Cennik pakietów i dodatków (§51). Tylko szef.
 import { PageHeader } from "@/components/layout";
 import { Alert } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
@@ -13,8 +13,8 @@ export default async function PricingPage() {
   if (profile && profile.role !== "OWNER") {
     return (
       <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
-        <PageHeader title="Cennik" subtitle="Dostępne dla właściciela" />
-        <Alert tone="info" title="Brak dostępu">Cennik pakietów i dodatków edytuje tylko właściciel.</Alert>
+        <PageHeader title="Cennik" subtitle="Dostępne dla szefa" />
+        <Alert tone="info" title="Brak dostępu">Cennik pakietów i dodatków edytuje tylko szef.</Alert>
       </div>
     );
   }

@@ -21,7 +21,7 @@ export default async function MediaPage() {
 
   return (
     <div className="mx-auto max-w-md px-4 py-4 pb-8">
-      <PageHeader title="Zgłoszenia i szkody" subtitle="Zgłoś problem — właściciel go obsłuży" />
+      <PageHeader title="Zgłoszenia i szkody" subtitle="Zgłoś problem — szef go obsłuży" />
 
       {demo && (
         <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12px] text-warn">Tryb demo — dane przykładowe.</div>

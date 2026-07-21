@@ -1,5 +1,5 @@
 "use client";
-// Pasek akcji umowy: druk/PDF + zmiana statusu (właściciel).
+// Pasek akcji umowy: druk/PDF + zmiana statusu (szef).
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SecondaryButton, PrimaryButton, Pill } from "@/components/ui";

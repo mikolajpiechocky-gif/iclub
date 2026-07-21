@@ -37,7 +37,7 @@ const NUMERIC_FIELDS: (keyof SettingsFormValues)[] = [
 export async function updateSettingsAction(v: SettingsFormValues): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const p = await getCurrentProfile();
-  if (p?.role !== "OWNER") return { ok: false, error: "Tylko właściciel zmienia ustawienia." };
+  if (p?.role !== "OWNER") return { ok: false, error: "Tylko szef zmienia ustawienia." };
 
   const fieldErrors: Record<string, string> = {};
   const base = v.base_address.trim();

@@ -15,8 +15,8 @@ export default async function VehiclesPage() {
   if (profile && profile.role !== "OWNER") {
     return (
       <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
-        <PageHeader title="Flota" subtitle="Dostępne dla właściciela" />
-        <Alert tone="info" title="Brak dostępu">Zarządzanie flotą jest dostępne dla właściciela.</Alert>
+        <PageHeader title="Flota" subtitle="Dostępne dla szefa" />
+        <Alert tone="info" title="Brak dostępu">Zarządzanie flotą jest dostępne dla szefa.</Alert>
       </div>
     );
   }

@@ -123,7 +123,7 @@ export function JobTeam({
             </div>
             <PrimaryButton onClick={() => pick && run(() => assignEmployeeAction(jobId, pick))} disabled={pending || !pick}>Przypisz</PrimaryButton>
             {pick && unavailable.has(pick) && (
-              <div className="w-full"><Alert tone="warn" title="Pracownik oznaczył niedostępność">Możesz przypisać mimo to (decyzja właściciela), ale sprawdź termin.</Alert></div>
+              <div className="w-full"><Alert tone="warn" title="Pracownik oznaczył niedostępność">Możesz przypisać mimo to (decyzja szefa), ale sprawdź termin.</Alert></div>
             )}
           </div>
         )}
@@ -132,7 +132,7 @@ export function JobTeam({
         {isOwner && (
           <div className="mt-3.5 flex flex-wrap items-end gap-2.5 border-t border-border-soft pt-3.5">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="bonus" className="text-[12px] font-semibold text-ink-2">Bonus właściciela do zlecenia (zł)</label>
+              <label htmlFor="bonus" className="text-[12px] font-semibold text-ink-2">Bonus szefa do zlecenia (zł)</label>
               <input id="bonus" inputMode="numeric" value={bonus} onChange={(e) => setBonus(e.target.value)} placeholder="0" className="min-h-[44px] w-40 rounded-field border border-border bg-surface-2 px-3.5 text-[14px] text-ink outline-none focus:border-accent" />
             </div>
             <SecondaryButton onClick={() => run(() => setOwnerBonusAction(jobId, bonus))} disabled={pending}>Zapisz bonus</SecondaryButton>
@@ -144,11 +144,11 @@ export function JobTeam({
           <div className="mt-3.5 border-t border-border-soft pt-3.5">
             {amIAssigned ? (
               <Alert tone="ok" title="Jesteś przypisany do tego zlecenia">
-                Przypisanie jest wiążące — odpiąć może tylko właściciel.
+                Przypisanie jest wiążące — odpiąć może tylko szef.
               </Alert>
             ) : amIRequested ? (
               <div>
-                <Alert tone="warn" title="Prośba wysłana">Czeka na akceptację właściciela.</Alert>
+                <Alert tone="warn" title="Prośba wysłana">Czeka na akceptację szefa.</Alert>
                 {myRequestId && (
                   <div className="mt-2">
                     <SecondaryButton onClick={() => run(() => withdrawRequestAction(myRequestId, jobId))} disabled={pending}>Wycofaj prośbę</SecondaryButton>

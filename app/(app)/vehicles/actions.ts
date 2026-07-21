@@ -54,7 +54,7 @@ function toInput(v: VehicleFormValues): VehicleInput {
 
 async function ownerError(): Promise<string | null> {
   const p = await getCurrentProfile();
-  return p?.role === "OWNER" ? null : "Tylko właściciel zarządza flotą.";
+  return p?.role === "OWNER" ? null : "Tylko szef zarządza flotą.";
 }
 
 export async function createVehicleAction(v: VehicleFormValues): Promise<ActionResult> {

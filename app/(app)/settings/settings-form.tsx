@@ -1,5 +1,5 @@
 "use client";
-// Formularz ustawień aplikacji (§51) — tylko właściciel.
+// Formularz ustawień aplikacji (§51) — tylko szef.
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SectionCard, TextField, PrimaryButton, Alert } from "@/components/ui";

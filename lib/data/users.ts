@@ -1,5 +1,5 @@
 // Warstwa danych: zarządzanie użytkownikami (profile + role). Zapis tylko OWNER
-// (RLS: profiles_update_self dopuszcza właściciela). W demo — dane przykładowe.
+// (RLS: profiles_update_self dopuszcza szefa). W demo — dane przykładowe.
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { ProfileRecord, UserRole } from "./types";

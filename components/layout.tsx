@@ -115,7 +115,7 @@ export function AppSidebar({ profile, unread = 0 }: { profile: ProfileRecord | n
 /* ---------------------- MobileBottomNavigation ------------------------ */
 export function MobileBottomNavigation({ isOwner = false }: { isOwner?: boolean }) {
   const pathname = usePathname();
-  // „Start" prowadzi do właściwego ekranu domowego: pulpit (właściciel) / ekran pracownika.
+  // „Start" prowadzi do właściwego ekranu domowego: pulpit (szef) / ekran pracownika.
   const items = BOTTOM_NAV.map((it) => (it.href === "/me" ? { ...it, href: isOwner ? "/dashboard" : "/me" } : it));
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-[#17181f] bg-panel px-2 pt-2 pb-3.5 md:hidden" aria-label="Nawigacja główna">

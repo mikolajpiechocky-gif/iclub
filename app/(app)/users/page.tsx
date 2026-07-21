@@ -15,8 +15,8 @@ export default async function UsersPage() {
   if (profile && profile.role !== "OWNER") {
     return (
       <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
-        <PageHeader title="Użytkownicy" subtitle="Dostępne dla właściciela" />
-        <Alert tone="info" title="Brak dostępu">Zarządzanie użytkownikami i rolami dostępne jest tylko dla właściciela.</Alert>
+        <PageHeader title="Użytkownicy" subtitle="Dostępne dla szefa" />
+        <Alert tone="info" title="Brak dostępu">Zarządzanie użytkownikami i rolami dostępne jest tylko dla szefa.</Alert>
       </div>
     );
   }

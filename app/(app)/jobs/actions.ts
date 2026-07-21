@@ -1,5 +1,5 @@
 "use server";
-// Server Actions: przypisania pracowników do zlecenia + bonus właściciela (§9, §10).
+// Server Actions: przypisania pracowników do zlecenia + bonus szefa (§9, §10).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentProfile } from "@/lib/data/profiles";
@@ -21,7 +21,7 @@ const DEMO = "Tryb demo: skonfiguruj Supabase, aby zapisywać (docs/SUPABASE_SET
 
 async function ownerError(): Promise<string | null> {
   const p = await getCurrentProfile();
-  return p?.role === "OWNER" ? null : "Tylko właściciel może wykonać tę akcję.";
+  return p?.role === "OWNER" ? null : "Tylko szef może wykonać tę akcję.";
 }
 
 export async function assignEmployeeAction(jobId: string, profileId: string): Promise<ActionResult> {
@@ -67,7 +67,7 @@ export async function toggleLeadAction(id: string, jobId: string, isLead: boolea
   }
 }
 
-// Pracownik PROSI o przypisanie (status REQUESTED). Właściciel musi zaakceptować.
+// Pracownik PROSI o przypisanie (status REQUESTED). Szef musi zaakceptować.
 export async function selfClaimAction(jobId: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const p = await getCurrentProfile();
@@ -89,7 +89,7 @@ export async function selfClaimAction(jobId: string): Promise<ActionResult> {
   }
 }
 
-// Właściciel akceptuje prośbę pracownika o przypisanie.
+// Szef akceptuje prośbę pracownika o przypisanie.
 export async function approveAssignmentAction(id: string, jobId: string, profileId: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const err = await ownerError();
@@ -98,7 +98,7 @@ export async function approveAssignmentAction(id: string, jobId: string, profile
     const approved = await approveAssignment(id);
     if (approved) {
       const job = await getJob(jobId);
-      await createNotification(profileId, "Przypisanie zaakceptowane", `Właściciel zaakceptował Twoje przypisanie: ${jobLabel(job)}${job?.event_date ? " · " + job.event_date : ""}`, "ASSIGNMENT", jobId);
+      await createNotification(profileId, "Przypisanie zaakceptowane", `Szef zaakceptował Twoje przypisanie: ${jobLabel(job)}${job?.event_date ? " · " + job.event_date : ""}`, "ASSIGNMENT", jobId);
     }
     revalidatePath(`/jobs/${jobId}`);
     return { ok: true };
@@ -107,7 +107,7 @@ export async function approveAssignmentAction(id: string, jobId: string, profile
   }
 }
 
-// Właściciel odrzuca prośbę (usuwa ją) i powiadamia pracownika.
+// Szef odrzuca prośbę (usuwa ją) i powiadamia pracownika.
 export async function rejectAssignmentAction(id: string, jobId: string, profileId: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const err = await ownerError();

@@ -1,5 +1,5 @@
 // GET /api/olx/callback — powrót z OLX. Weryfikuje state, wymienia code na token
-// użytkownika i zapisuje (service_role). Tylko właściciel.
+// użytkownika i zapisuje (service_role). Tylko szef.
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCode, getMe } from "@/lib/integrations/olx";
 import { saveOlxTokens } from "@/lib/data/olx";

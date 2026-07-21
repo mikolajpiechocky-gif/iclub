@@ -1,5 +1,5 @@
 // Integracja OLX (Partner API) — wyłącznie po stronie serwera.
-// OAuth authorization_code (autoryzacja konta właściciela) + odczyt wątków/wiadomości.
+// OAuth authorization_code (autoryzacja konta szefa) + odczyt wątków/wiadomości.
 import { OLX_CLIENT_ID, OLX_CLIENT_SECRET, OLX_SCOPE, OLX_TOKEN_URL, OLX_AUTHORIZE_URL, OLX_API_BASE } from "./config";
 
 export interface OlxToken {
@@ -8,7 +8,7 @@ export interface OlxToken {
   expires_in: number;
 }
 
-// URL zgody: właściciel konta OLX loguje się i autoryzuje aplikację.
+// URL zgody: szef konta OLX loguje się i autoryzuje aplikację.
 export function buildAuthorizeUrl(redirectUri: string, state: string): string {
   const p = new URLSearchParams({
     client_id: String(OLX_CLIENT_ID),
@@ -71,7 +71,7 @@ export const getThreads = (token: string, offset = 0, limit = 100) =>
 export const getMessages = (token: string, threadId: string, offset = 0, limit = 100) =>
   olxGet<Record<string, unknown>>(`/threads/${threadId}/messages?offset=${offset}&limit=${limit}`, token);
 
-// Ogłoszenia właściciela + statystyki (wyświetlenia, odsłony numeru).
+// Ogłoszenia szefa + statystyki (wyświetlenia, odsłony numeru).
 export const getAdverts = (token: string, offset = 0, limit = 100) =>
   olxGet<Record<string, unknown>>(`/adverts?offset=${offset}&limit=${limit}`, token);
 export const getAdvertStatistics = (token: string, advertId: string) =>

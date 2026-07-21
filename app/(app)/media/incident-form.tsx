@@ -38,7 +38,7 @@ export function IncidentForm({ jobs }: { jobs: { id: string; label: string }[] }
     <div className="rounded-card-lg border border-[#3a1c1f] bg-surface p-4">
       <div className="mb-3 flex items-center gap-2 text-bad"><Icon name="warning" className="h-5 w-5" /><span className="font-display text-[15px] font-bold">Zgłoś szkodę / incydent</span></div>
 
-      {saved && <div className="mb-3"><Alert tone="ok" title="Zgłoszenie zapisane">Dziękujemy — właściciel je zobaczy.</Alert></div>}
+      {saved && <div className="mb-3"><Alert tone="ok" title="Zgłoszenie zapisane">Dziękujemy — szef je zobaczy.</Alert></div>}
       {error && <div className="mb-3"><Alert tone="bad" title="Nie udało się zapisać">{error}</Alert></div>}
 
       <form onSubmit={submit} className="flex flex-col gap-3">

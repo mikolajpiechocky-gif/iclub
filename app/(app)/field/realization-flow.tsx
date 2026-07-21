@@ -340,7 +340,7 @@ function SettlementPanel({ jobId, ctx, pending, onDone }: { jobId: string; ctx: 
       </div>
 
       {reported ? (
-        <div className="mb-3"><Alert tone="ok" title="Płatność zgłoszona">Właściciel zweryfikuje odbiór w zakładce Płatności.</Alert></div>
+        <div className="mb-3"><Alert tone="ok" title="Płatność zgłoszona">Szef zweryfikuje odbiór w zakładce Płatności.</Alert></div>
       ) : (
         <>
           {error && <div className="mb-2.5"><Alert tone="bad" title="Błąd">{error}</Alert></div>}

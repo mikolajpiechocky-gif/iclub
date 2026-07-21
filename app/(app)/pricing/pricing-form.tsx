@@ -1,5 +1,5 @@
 "use client";
-// Formularz cennika (§51) — ceny pakietów i dodatków. Tylko właściciel.
+// Formularz cennika (§51) — ceny pakietów i dodatków. Tylko szef.
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SectionCard, PrimaryButton, Alert } from "@/components/ui";

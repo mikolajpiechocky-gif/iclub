@@ -59,7 +59,7 @@ export async function assignEmployee(jobId: string, profileId: string, isLead = 
   if (error) throw new Error(error.message);
 }
 
-// Właściciel akceptuje prośbę pracownika o przypisanie. Zwraca, czy wiersz istniał
+// Szef akceptuje prośbę pracownika o przypisanie. Zwraca, czy wiersz istniał
 // (do pominięcia powiadomienia, gdy prośba w międzyczasie zniknęła — wyścig).
 export async function approveAssignment(id: string): Promise<boolean> {
   const supabase = await createClient();

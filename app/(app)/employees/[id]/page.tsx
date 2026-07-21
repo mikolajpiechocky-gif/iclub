@@ -15,8 +15,8 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   if (profile && profile.role !== "OWNER") {
     return (
       <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
-        <PageHeader title="Pracownik" subtitle="Moduł dostępny dla właściciela" back={{ href: "/employees", label: "Pracownicy" }} />
-        <Alert tone="info" title="Brak dostępu">Stawki widzi tylko właściciel.</Alert>
+        <PageHeader title="Pracownik" subtitle="Moduł dostępny dla szefa" back={{ href: "/employees", label: "Pracownicy" }} />
+        <Alert tone="info" title="Brak dostępu">Stawki widzi tylko szef.</Alert>
       </div>
     );
   }

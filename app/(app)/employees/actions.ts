@@ -35,7 +35,7 @@ export async function saveEmployeeRateAction(profileId: string, v: RateFormValue
     return { ok: false, error: "Tryb demo: aby zapisać stawki, skonfiguruj Supabase (docs/SUPABASE_SETUP.md)." };
 
   const profile = await getCurrentProfile();
-  if (profile?.role !== "OWNER") return { ok: false, error: "Tylko właściciel może zmieniać stawki." };
+  if (profile?.role !== "OWNER") return { ok: false, error: "Tylko szef może zmieniać stawki." };
 
   try {
     await upsertEmployeeRate(profileId, {

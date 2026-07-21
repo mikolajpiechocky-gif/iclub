@@ -61,7 +61,7 @@ export async function getEventWeather(location: string, date: string): Promise<E
     const precip = d.precipitation_sum?.[0] ?? null;
     const code = d.weathercode?.[0] ?? null;
 
-    // Progi i zalecenia terenowe (ustalone z właścicielem):
+    // Progi i zalecenia terenowe (ustalone z szefem):
     //  wiatr > 25 km/h → dodatkowe mocowania; temp > 23°C → wentylator; deszcz → osłona dmuchawy.
     const rainy =
       (precip != null && precip >= 0.5) ||

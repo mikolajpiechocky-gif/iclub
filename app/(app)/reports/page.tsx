@@ -28,8 +28,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   if (profile && profile.role !== "OWNER") {
     return (
       <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
-        <PageHeader title="Raporty" subtitle="Dostępne dla właściciela" />
-        <Alert tone="info" title="Brak dostępu">Rentowność i pełne finanse widzi tylko właściciel.</Alert>
+        <PageHeader title="Raporty" subtitle="Dostępne dla szefa" />
+        <Alert tone="info" title="Brak dostępu">Rentowność i pełne finanse widzi tylko szef.</Alert>
       </div>
     );
   }

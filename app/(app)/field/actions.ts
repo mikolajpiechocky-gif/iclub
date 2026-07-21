@@ -26,7 +26,7 @@ export async function advanceStageAction(stageId: string, jobId: string, status:
 }
 
 // Krok „Rozliczenie”: pracownik zgłasza odbiór płatności na miejscu.
-// Gotówka trafia do weryfikacji przez właściciela (status REPORTED),
+// Gotówka trafia do weryfikacji przez szefa (status REPORTED),
 // pozostałe metody oznaczamy jako opłacone.
 export async function reportFieldPaymentAction(jobId: string, method: PaymentMethod, amount: number): Promise<ActionResult> {
   if (!isSupabaseConfigured())

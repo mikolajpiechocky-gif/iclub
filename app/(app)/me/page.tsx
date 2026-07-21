@@ -94,7 +94,7 @@ export default async function EmployeeDashboardPage() {
           <Link href={`/field/${next.id}`} className="bg-brand mt-3 flex min-h-[44px] w-full items-center justify-center rounded-[13px] text-[14px] font-bold text-white">Otwórz realizację</Link>
         </div>
       ) : (
-        <div className="mb-4"><EmptyState icon="truck" title="Brak przypisanych realizacji" desc="Gdy właściciel przypisze Cię do zlecenia (lub podejmiesz wolne), pojawi się tutaj." /></div>
+        <div className="mb-4"><EmptyState icon="truck" title="Brak przypisanych realizacji" desc="Gdy szef przypisze Cię do zlecenia (lub podejmiesz wolne), pojawi się tutaj." /></div>
       )}
 
       {/* 2. kafelek: nieprzypisane realizacje iClub do zgarnięcia */}
@@ -104,7 +104,7 @@ export default async function EmployeeDashboardPage() {
             <span className="font-display text-[13.5px] font-bold text-ok">Rezerwacje do zgarnięcia</span>
             <span className="ml-auto rounded-full bg-[#16301f] px-2 py-0.5 text-[11px] font-bold text-ok">{claimable.length}</span>
           </div>
-          <div className="px-3 pb-1.5 text-[11.5px] text-ink-2">Nieprzypisane realizacje iClub — poproś, właściciel zatwierdzi.</div>
+          <div className="px-3 pb-1.5 text-[11.5px] text-ink-2">Nieprzypisane realizacje iClub — poproś, szef zatwierdzi.</div>
           {claimableCards.map(({ j, km, earn }) => (
             <Link key={j.id} href={`/reservations/${j.reservation_id}`} className="block rounded-[12px] px-3 py-2.5 transition hover:bg-surface-2">
               <div className="flex items-start justify-between gap-3">
