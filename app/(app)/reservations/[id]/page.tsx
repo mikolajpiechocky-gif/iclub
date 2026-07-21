@@ -136,6 +136,32 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
         ))}
       </div>
 
+      {isOwner && reservation.pricing_snapshot && (
+        <div className="mt-4 rounded-card-lg border border-border bg-surface p-5">
+          <div className="mb-2.5 flex items-baseline gap-2">
+            <span className="text-[13px] font-bold text-white">Zapamiętana wycena</span>
+            <span className="text-[11px] font-semibold text-ink-2">z dnia {fmtDate(reservation.pricing_snapshot.saved_at)}</span>
+          </div>
+          <div className="flex flex-col gap-1 text-[13px]">
+            {reservation.pricing_snapshot.package && (
+              <div className="flex justify-between"><span className="text-ink-2">Pakiet: {reservation.pricing_snapshot.package.name}</span><span className="font-semibold text-ink">{fmtPLN(reservation.pricing_snapshot.package.price)}</span></div>
+            )}
+            {reservation.pricing_snapshot.addons.map((a, i) => (
+              <div key={i} className="flex justify-between"><span className="text-ink-2">{a.name}</span><span className="font-semibold text-ink">{fmtPLN(a.price)}</span></div>
+            ))}
+            {reservation.pricing_snapshot.transport_price > 0 && (
+              <div className="flex justify-between"><span className="text-ink-2">Transport</span><span className="font-semibold text-ink">{fmtPLN(reservation.pricing_snapshot.transport_price)}</span></div>
+            )}
+            {reservation.pricing_snapshot.discount_amount > 0 && (
+              <div className="flex justify-between"><span className="text-ink-2">Rabat</span><span className="font-semibold text-ok">− {fmtPLN(reservation.pricing_snapshot.discount_amount)}</span></div>
+            )}
+            <div className="flex justify-between border-t border-border-soft pt-1.5 font-bold text-white"><span>Razem</span><span>{fmtPLN(reservation.pricing_snapshot.total)}</span></div>
+            <div className="flex justify-between"><span className="text-ink-2">Zadatek</span><span className="font-semibold text-ink">{fmtPLN(reservation.pricing_snapshot.deposit)}</span></div>
+          </div>
+          <p className="mt-2 text-[11px] text-ink-2">Kopia z chwili zapisu — późniejsze zmiany cennika jej nie zmieniają.</p>
+        </div>
+      )}
+
       {job ? (
         <SafeReservationOps job={job} isOwner={isOwner} profile={profile} />
       ) : (

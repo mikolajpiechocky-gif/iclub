@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, useEffect } from "react";
 import { PageHeader } from "@/components/layout";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
-import type { ReservationRecord, TentRecord, PackageRecord, AddonRecord, ReservationStatus, BusinessLine } from "@/lib/data/types";
+import type { ReservationRecord, TentRecord, PackageRecord, AddonRecord, ReservationStatus, BusinessLine, PricingSnapshot } from "@/lib/data/types";
 import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
 import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
 import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
@@ -80,6 +80,7 @@ export function ReservationForm({
     deposit: initial?.deposit != null ? String(initial.deposit) : "",
     event_start_time: initial?.event_start_time ?? "",
     assembly_time: initial?.assembly_time ?? "",
+    pricing_snapshot: initial?.pricing_snapshot ? JSON.stringify(initial.pricing_snapshot) : "",
     is_invoice: initial?.is_invoice ?? false,
     source: initial?.source ?? "",
     status: initial?.status ?? "TEMPORARY",
@@ -169,6 +170,18 @@ export function ReservationForm({
     setErrors({});
     setFormError(null);
     // §8: przy zwiniętej sekcji dat wyślij puste montaż/demontaż — serwer nada domyślne.
+    // §11.2 Snapshot wyceny z chwili zapisu (odporny na późniejsze zmiany cennika).
+    const snapshot: PricingSnapshot = {
+      package: selectedPackage ? { name: selectedPackage.name, price: packagePrice } : null,
+      addons: addons.filter((a) => v.addon_ids.includes(a.id)).map((a) => ({ name: a.name, price: Number(a.price || 0) })),
+      transport_price: transportPrice,
+      discount_type: v.discount_type,
+      discount_value: discountValueNum,
+      discount_amount: order.discountAmount,
+      deposit: depositNum,
+      total: order.total,
+      saved_at: new Date().toISOString(),
+    };
     // §13: dołącz wyliczoną kwotę rabatu i ustalony zadatek (sugestia, jeśli nietknięty).
     const payload: ReservationFormValues = {
       ...v,
@@ -176,6 +189,7 @@ export function ReservationForm({
       teardown_date: showCustomDates ? v.teardown_date : "",
       discount_amount: String(order.discountAmount),
       deposit: depositValue,
+      pricing_snapshot: JSON.stringify(snapshot),
     };
     startTransition(async () => {
       const res = isEdit

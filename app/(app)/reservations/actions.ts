@@ -14,7 +14,7 @@ import { clientTransportPrice, tripClass } from "@/lib/domain/transport";
 import { getSettings } from "@/lib/data/settings";
 import { geocode, routeLeg } from "@/lib/integrations/google-maps";
 import { isGoogleMapsConfigured } from "@/lib/integrations/google-maps/config";
-import type { ReservationStatus, BusinessLine } from "@/lib/data/types";
+import type { ReservationStatus, BusinessLine, PricingSnapshot } from "@/lib/data/types";
 
 export interface ReservationFormValues {
   business_line: BusinessLine;
@@ -43,6 +43,7 @@ export interface ReservationFormValues {
   deposit: string;
   event_start_time: string; // §9.1 godzina rozpoczęcia imprezy
   assembly_time: string;    // §9.3 ustalona godzina montażu (opcjonalnie)
+  pricing_snapshot: string; // §11.2 kopia wyceny (JSON zbudowany w formularzu)
   is_invoice: boolean;
   source: string;
   status: ReservationStatus;
@@ -84,6 +85,13 @@ function toNumber(s: string): number | null {
   if (!t) return null;
   const n = Number(t.replace(",", "."));
   return isNaN(n) ? null : n;
+}
+
+// §11.2 Snapshot wyceny budowany w formularzu i przekazany jako JSON.
+function parseSnapshot(s: string): PricingSnapshot | null {
+  const t = s.trim();
+  if (!t) return null;
+  try { return JSON.parse(t) as PricingSnapshot; } catch { return null; }
 }
 
 // §8: następny dzień po dacie "YYYY-MM-DD" (bez wpływu strefy czasowej).
@@ -136,6 +144,7 @@ function toInput(v: ReservationFormValues): ReservationInput {
     deposit: toNumber(v.deposit) ?? 0,
     event_start_time: clean(v.event_start_time),
     assembly_time: clean(v.assembly_time),
+    pricing_snapshot: parseSnapshot(v.pricing_snapshot),
     is_invoice: v.is_invoice,
     source: clean(v.source),
     status: v.status,

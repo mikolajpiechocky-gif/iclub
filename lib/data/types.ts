@@ -140,6 +140,19 @@ export interface AddonRecord {
   sort: number;
 }
 
+// §11.2 Snapshot wyceny rezerwacji — kopia z chwili zapisu (odporna na zmiany cennika).
+export interface PricingSnapshot {
+  package: { name: string; price: number } | null;
+  addons: { name: string; price: number }[];
+  transport_price: number;
+  discount_type: string;
+  discount_value: number;
+  discount_amount: number;
+  deposit: number;
+  total: number;
+  saved_at: string;
+}
+
 export interface ReservationRecord {
   id: string;
   business_line: BusinessLine;
@@ -173,6 +186,7 @@ export interface ReservationRecord {
   assembly_time: string | null;     // ustalona (ręcznie) godzina montażu
   assembly_time_by: string | null;  // kto ustalił ręcznie
   assembly_time_at: string | null;  // kiedy ustalono ręcznie
+  pricing_snapshot: PricingSnapshot | null; // §11.2 kopia wyceny z chwili zapisu
   is_invoice: boolean;
   source: string | null;
   status: ReservationStatus;

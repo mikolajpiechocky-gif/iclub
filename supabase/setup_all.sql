@@ -1323,3 +1323,6 @@ alter table public.reservations add column if not exists assembly_time time;
 alter table public.reservations add column if not exists assembly_time_by uuid references public.profiles(id) on delete set null;
 alter table public.reservations add column if not exists assembly_time_at timestamptz;
 
+-- ================= 0038: snapshot wyceny rezerwacji (§11.2) =================
+alter table public.reservations add column if not exists pricing_snapshot jsonb;
+

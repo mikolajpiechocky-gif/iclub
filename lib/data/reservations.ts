@@ -2,7 +2,7 @@
 // zlecenie (job) i podstawowe etapy (job_stages) — §28/§50 instrukcji master.
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import type { ReservationRecord, ReservationWithRefs, ReservationStatus, BusinessLine, TentRecord } from "./types";
+import type { ReservationRecord, ReservationWithRefs, ReservationStatus, BusinessLine, TentRecord, PricingSnapshot } from "./types";
 import { DEMO_RESERVATIONS } from "./demo-resources";
 import { stagesForBusinessLine } from "@/lib/domain/stages";
 import { listTents } from "./resources";
@@ -102,6 +102,7 @@ export interface ReservationInput {
   deposit?: number;
   event_start_time?: string | null; // §9.1 godzina rozpoczęcia imprezy
   assembly_time?: string | null;    // §9.3 ustalona (ręcznie) godzina montażu
+  pricing_snapshot?: PricingSnapshot | null; // §11.2 kopia wyceny
   is_invoice?: boolean;
   source?: string | null;
   status: ReservationStatus;
