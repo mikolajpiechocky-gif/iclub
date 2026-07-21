@@ -108,6 +108,7 @@ function toInput(v: ReservationFormValues): ReservationInput {
     const t = s.trim();
     return t ? t : null;
   };
+  const isIclub = v.business_line !== "EQUIPMENT_RENTAL";
   const expires_at =
     v.status === "TEMPORARY"
       ? new Date(Date.now() + DEFAULT_HOLD_HOURS * 3600 * 1000).toISOString()
@@ -133,9 +134,10 @@ function toInput(v: ReservationFormValues): ReservationInput {
     overbooking_override: v.overbooking_override,
     overbooking_reason: v.overbooking_override ? clean(v.overbooking_reason) : null,
     package_id: v.package_id.trim() ? v.package_id.trim() : null,
-    addon_ids: v.addon_ids,
+    // Dodatki iClub tylko dla linii iClub — wypożyczalnia nie zajmuje stanu dodatków (§12.3).
+    addon_ids: isIclub ? v.addon_ids : [],
     // §12.2 zapisz ilości tylko dla wybranych dodatków (≥ 1).
-    addon_qty: Object.fromEntries(v.addon_ids.map((id) => [id, Math.max(1, Math.round(v.addon_qty?.[id] ?? 1))])),
+    addon_qty: isIclub ? Object.fromEntries(v.addon_ids.map((id) => [id, Math.max(1, Math.round(v.addon_qty?.[id] ?? 1))])) : {},
     rental_items: clean(v.rental_items),
     delivery_time: clean(v.delivery_time),
     payment_upfront: v.payment_upfront,
@@ -200,9 +202,11 @@ async function overbookingBlock(values: ReservationFormValues, excludeId?: strin
   // Okno zajętości = montaż → demontaż z tą samą domyślną logiką co zapis (§8).
   const end = values.teardown_date || (values.event_date ? nextDayIso(values.event_date) : start);
   const mine = sumSlots([values.tent_main as TentChoice, values.tent_extra as TentChoice]);
-  const { exceeded } = await checkTentOverbooking(mine, start, end, excludeId);
-  // §12.3 Dostępność dodatków magazynowych w tym terminie.
-  const { shortages } = await checkAddonOverbooking(values.addon_ids, values.addon_qty, start, end, excludeId);
+  // Namioty i dodatki sprawdzamy równolegle (niezależne zapytania).
+  const [{ exceeded }, { shortages }] = await Promise.all([
+    checkTentOverbooking(mine, start, end, excludeId),
+    checkAddonOverbooking(values.addon_ids, values.addon_qty, start, end, excludeId),
+  ]);
   const problems = [...exceeded, ...shortages.map((s) => `${s.name} (potrzeba ${s.requested}, wolne ${Math.max(0, s.stock - s.used)} z ${s.stock})`)];
   if (!problems.length) return null;
   if (!values.overbooking_override) {

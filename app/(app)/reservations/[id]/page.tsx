@@ -11,7 +11,7 @@ import { getCustomer } from "@/lib/data/customers";
 import { getJobByReservation, getJobStages } from "@/lib/data/jobs";
 import { listJobAssignments } from "@/lib/data/assignments";
 import { listEmployees } from "@/lib/data/employees";
-import { getCurrentProfile } from "@/lib/data/profiles";
+import { getCurrentProfile, getProfileName } from "@/lib/data/profiles";
 import { predictedEarnings } from "@/lib/domain/earnings";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
@@ -47,6 +47,8 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
   const r = job?.reservation ?? reservation;
   const rm = RESERVATION_STATUS_META[reservation.status];
   const isOwner = profile?.role === "OWNER";
+  // §9.3 Autor ręcznego ustalenia godziny montażu (jeśli był).
+  const assemblyBy = reservation.assembly_time && reservation.assembly_time_by ? await getProfileName(reservation.assembly_time_by) : null;
 
   const weather = reservation.event_date && reservation.location
     ? await getEventWeather(reservation.location, reservation.event_date)
@@ -135,6 +137,10 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
           </div>
         ))}
       </div>
+
+      {reservation.assembly_time && (assemblyBy || reservation.assembly_time_at) && (
+        <p className="mt-3 text-[12px] text-ink-2">Godzinę montażu ({reservation.assembly_time}) ustalono ręcznie{assemblyBy ? ` — ${assemblyBy}` : ""}{reservation.assembly_time_at ? `, ${fmtDate(reservation.assembly_time_at)}` : ""}.</p>
+      )}
 
       {isOwner && reservation.pricing_snapshot && (
         <div className="mt-4 rounded-card-lg border border-border bg-surface p-5">

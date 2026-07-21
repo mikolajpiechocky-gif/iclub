@@ -32,6 +32,14 @@ export async function getCurrentProfile(): Promise<ProfileRecord | null> {
   return data as ProfileRecord;
 }
 
+// Imię profilu po id (np. autor ręcznego ustalenia godziny montażu). null gdy brak.
+export async function getProfileName(id: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = await createClient();
+  const { data } = await supabase.from("profiles").select("full_name").eq("id", id).maybeSingle();
+  return (data?.full_name as string | null) ?? null;
+}
+
 // Id szefi — do powiadamiania o prośbach pracowników (np. o przypisanie).
 export async function listOwnerIds(): Promise<string[]> {
   if (!isSupabaseConfigured()) return [];

@@ -107,14 +107,20 @@ export function ReservationForm({
   );
   const [showCustomDates, setShowCustomDates] = useState(hadCustomDates);
 
+  // Okno zajętości DOKŁADNIE takie jak zapis/blok serwerowy (§8): przy zwiniętej sekcji
+  // dat montaż/demontaż są zerowane, a domyślny demontaż to dzień po imprezie. Dzięki temu
+  // live-check pokazuje ten sam konflikt, który zablokuje serwer (bez „ślepego zaułka").
+  const effSetup = showCustomDates ? v.setup_date : "";
+  const effTeardown = showCustomDates ? v.teardown_date : "";
+  const occStart = effSetup || v.event_date || "";
+  const occEnd = effTeardown || (v.event_date ? nextDay(v.event_date) : occStart);
+
   // §10.3 Kontrola pojemności namiotów per typ (overbooking = twardy blok przy zapisie).
   useEffect(() => {
     let active = true;
     const run = async () => {
-      const start = v.setup_date || v.event_date;
-      if ((!v.tent_main && !v.tent_extra) || !start) return { exceeded: [], conflicts: [] };
-      const end = v.teardown_date || v.event_date || start;
-      return checkTentAvailabilityAction(v.tent_main, v.tent_extra, start, end, initial?.id);
+      if ((!v.tent_main && !v.tent_extra) || !occStart) return { exceeded: [], conflicts: [] };
+      return checkTentAvailabilityAction(v.tent_main, v.tent_extra, occStart, occEnd, initial?.id);
     };
     run().then((res) => {
       if (active) { setConflicts(res.conflicts); setExceeded(res.exceeded); }
@@ -122,20 +128,18 @@ export function ReservationForm({
     return () => {
       active = false;
     };
-  }, [v.tent_main, v.tent_extra, v.setup_date, v.teardown_date, v.event_date, initial?.id]);
+  }, [v.tent_main, v.tent_extra, occStart, occEnd, initial?.id]);
 
   // §12.3 Live-kontrola dostępności dodatków magazynowych w tym terminie.
   useEffect(() => {
     let active = true;
-    const start = v.setup_date || v.event_date || "";
-    const end = v.teardown_date || v.event_date || start;
-    checkAddonAvailabilityAction(v.addon_ids, v.addon_qty, start, end, initial?.id).then((s) => {
+    checkAddonAvailabilityAction(v.addon_ids, v.addon_qty, occStart, occEnd, initial?.id).then((s) => {
       if (active) setAddonShortages(s);
     });
     return () => {
       active = false;
     };
-  }, [v.addon_ids, v.addon_qty, v.setup_date, v.teardown_date, v.event_date, initial?.id]);
+  }, [v.addon_ids, v.addon_qty, occStart, occEnd, initial?.id]);
 
   const set = <K extends keyof ReservationFormValues>(k: K, val: ReservationFormValues[K]) =>
     setV((s) => ({ ...s, [k]: val }));
