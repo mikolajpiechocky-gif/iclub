@@ -8,6 +8,8 @@ export interface TransportCalcRecord {
   vehicle_id: string | null;
   kind: string;
   distance_km: number | null;
+  one_way_km: number | null;
+  returns_to_base: boolean;
   consumption: number | null;
   fuel_price: number | null;
   fuel_cost: number | null;
@@ -22,6 +24,8 @@ export interface TransportInput {
   vehicle_id: string | null;
   kind: string;
   distance_km: number | null;
+  one_way_km: number | null;
+  returns_to_base: boolean;
   consumption: number | null;
   fuel_price: number | null;
   fuel_cost: number | null;

@@ -23,11 +23,11 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 16. ⬜ Boczne podsumowanie przelicza cenę na żywo (§13).
 17. ⬜ Rabat % lub kwotowy, obejmuje całe zamówienie (§13.4).
 18. ⬜ Zadatek domyślnie 300 zł + transport (§13.6).
-19. ⬜ Transport przelicza się po wpisaniu adresu (§14.3).
-20. ⬜ Widełki transportowe zgodne z dokumentem (§15).
-21. ⬜ D×2 / D×4 wpływają tylko na koszt wewnętrzny (§16).
-22. ⬜ Dokładnie 100 km = wyjazd bliski (§16.3).
-23. ⬜ Daleki wyjazd > 100 km w jedną stronę (§16.3).
+19. ✅ Transport przelicza się z mapy — „Oblicz z mapy" zwraca odległość w jedną stronę + sugerowaną cenę i klasę trasy (§14.3).
+20. ✅ Widełki transportowe zgodne z dokumentem — `TRANSPORT_BRACKETS`, cena dla klienta wg odległości w jedną stronę, >400 km → wycena indywidualna (§15).
+21. ✅ D×2 / D×4 wpływają tylko na koszt wewnętrzny (paliwo + eksploatacja liczone od planowanych km); cena klienta niezależna od mnożnika (§16).
+22. ✅ Dokładnie 100 km = wyjazd bliski (`tripClass`: daleki dopiero >100) (§16.3).
+23. ✅ Daleki wyjazd > 100 km w jedną stronę — powrót do bazy zablokowany, wymuszony D×2 (§16.3).
 24. 🟡 Flota jednym źródłem danych o pojazdach (istnieje; scalenie transport/paliwo do potwierdzenia, §14).
 25. ⬜ Magazyn w pełni edytowalny (§17).
 26. ⬜ Audyt każdej zmiany magazynowej (§17.3).
@@ -48,3 +48,4 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 - ✅ §5.5: dzwonek powiadomień w nagłówku; zakładka „Powiadomienia" usunięta z menu.
 - ✅ §6 Leady: status „Odgrzany", śledzenie ostatniej aktywności, auto-zamykanie po 21 dniach (`automatic_inactivity`, z blokadą Szefa; trasa /api/leads/auto-close dla crona + przycisk), OLX nie nadpisuje ręcznych danych CRM (tylko treść wiadomości), reaktywacja auto+ręczna. Wymaga migracji 0030.
 - ✅ §10 Namioty: wybór przez TYP (Mały/Duży/Duży z drzwiami/Gastro), pule pojemności (mały 1, duży 2 w tym 1 z drzwiami, gastro 1), twardy blok overbookingu przy zapisie z wyjątkiem Szefa (powód). Wymaga migracji 0031.
+- ✅ §15–16 Transport: widełki cenowe dla klienta wg odległości w jedną stronę (20/50/100/150/200/250/300/400 km → 200/300/350/400/450/500/600/900 zł; >400 km indywidualnie), mnożnik przejazdu D×2 (auto zostaje) / D×4 (wraca do bazy, tylko ≤100 km) wpływa wyłącznie na koszt wewnętrzny, klasyfikacja bliski ≤100 / daleki >100. Wymaga migracji 0032.

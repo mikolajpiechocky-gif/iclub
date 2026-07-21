@@ -1249,3 +1249,7 @@ alter table public.reservations add column if not exists tent_extra text;
 alter table public.reservations add column if not exists overbooking_override boolean not null default false;
 alter table public.reservations add column if not exists overbooking_reason text;
 
+-- ================= 0032: transport — odległość w jedną stronę + powrót do bazy (§16) =================
+alter table public.transport_calculations add column if not exists one_way_km numeric(7,1);
+alter table public.transport_calculations add column if not exists returns_to_base boolean not null default false;
+

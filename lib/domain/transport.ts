@@ -28,3 +28,35 @@ export function fuelPriceForType(fuelType: string | null, prices: FuelPrices): n
   if (t.includes("lpg")) return prices.lpg;
   return prices.diesel;
 }
+
+// §15 Widełki transportowe — cena dla KLIENTA wg odległości W JEDNĄ STRONĘ (brutto).
+export const TRANSPORT_BRACKETS: { maxKm: number; price: number }[] = [
+  { maxKm: 20, price: 200 },
+  { maxKm: 50, price: 300 },
+  { maxKm: 100, price: 350 },
+  { maxKm: 150, price: 400 },
+  { maxKm: 200, price: 450 },
+  { maxKm: 250, price: 500 },
+  { maxKm: 300, price: 600 },
+  { maxKm: 400, price: 900 },
+];
+// Cena dla klienta albo null (> 400 km → wycena indywidualna Szefa).
+export function clientTransportPrice(oneWayKm: number): number | null {
+  for (const b of TRANSPORT_BRACKETS) if (oneWayKm <= b.maxKm) return b.price;
+  return null;
+}
+
+// §16.3 Klasyfikacja: dokładnie 100 km = bliski; daleki dopiero POWYŻEJ 100 km.
+export function tripClass(oneWayKm: number): "near" | "far" {
+  return oneWayKm > 100 ? "far" : "near";
+}
+
+// §16 Mnożnik przejazdu: pracownik zostaje na miejscu (D×2) albo wraca do bazy (D×4).
+export function tripMultiplier(returnsToBase: boolean): 2 | 4 {
+  return returnsToBase ? 4 : 2;
+}
+
+// Planowane kilometry = odległość w jedną stronę × mnożnik.
+export function plannedKm(oneWayKm: number, returnsToBase: boolean): number {
+  return Math.round(oneWayKm * tripMultiplier(returnsToBase) * 10) / 10;
+}
