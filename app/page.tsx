@@ -1,8 +1,8 @@
-// app/page.tsx — wejście: przekierowanie do pulpitu właściciela.
-// INTEGRACJA: nadpisuje istniejący app/page.tsx z szablonu Next.js.
-// TODO(backend): tutaj docelowo logika logowania / wyboru roli.
+// app/page.tsx — wejście: przekierowanie wg roli (właściciel → pulpit, pracownik → jego Start).
 import { redirect } from "next/navigation";
+import { getCurrentProfile } from "@/lib/data/profiles";
 
-export default function RootPage() {
-  redirect("/dashboard");
+export default async function RootPage() {
+  const profile = await getCurrentProfile();
+  redirect(profile && profile.role !== "OWNER" ? "/me" : "/dashboard");
 }

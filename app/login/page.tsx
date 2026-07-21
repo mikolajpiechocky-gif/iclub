@@ -36,7 +36,7 @@ export default function LoginPage() {
       );
       return;
     }
-    router.push("/dashboard");
+    router.push("/"); // root przekieruje wg roli (właściciel → pulpit, pracownik → Start)
     router.refresh();
   };
 

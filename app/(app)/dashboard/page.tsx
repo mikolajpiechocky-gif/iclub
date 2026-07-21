@@ -1,5 +1,6 @@
 // app/(app)/dashboard/page.tsx — Pulpit właściciela (RSC, dane z Supabase lub demo).
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout";
 import { MetricCard, SectionCard, PrimaryButton, SecondaryButton, Pill, EmptyState } from "@/components/ui";
 import { listReservations } from "@/lib/data/reservations";
@@ -8,6 +9,8 @@ import { listCustomers } from "@/lib/data/customers";
 import { listJobs } from "@/lib/data/jobs";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { fuelReminderDue } from "@/lib/data/settings";
+import { listTents } from "@/lib/data/resources";
+import { tentSizeCode } from "@/lib/domain/calendar";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { RESERVATION_STATUS_META, type ReservationWithRefs } from "@/lib/data/types";
 
@@ -23,31 +26,48 @@ function resRange(r: ReservationWithRefs) {
   return { start, end };
 }
 
-function countTentConflicts(reservations: ReservationWithRefs[]): number {
+// Konflikt POJEMNOŚCIOWY per rozmiar: rezerwacja jest w konflikcie, gdy w jej oknie
+// zajętych sztuk danego rozmiaru jest więcej niż masz w magazynie (capacity).
+function codesOf(r: ReservationWithRefs): string[] {
+  const cs: string[] = [];
+  if (r.tent?.size) cs.push(tentSizeCode(r.tent.size));
+  if (r.tent2?.size) cs.push(tentSizeCode(r.tent2.size));
+  return cs;
+}
+function countSizeConflicts(reservations: ReservationWithRefs[], capacity: Record<string, number>): number {
   const active = reservations.filter(
-    (r) => r.tent_id && (r.status === "TEMPORARY" || r.status === "CONFIRMED") && (r.setup_date || r.event_date)
+    (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && (r.setup_date || r.event_date)
   );
-  let count = 0;
-  for (let i = 0; i < active.length; i++) {
-    for (let j = i + 1; j < active.length; j++) {
-      if (active[i].tent_id !== active[j].tent_id) continue;
-      const a = resRange(active[i]);
-      const b = resRange(active[j]);
-      if (a.start && b.start && a.start <= (b.end ?? b.start) && (a.end ?? a.start) >= b.start) count++;
+  const overlaps = (a: ReservationWithRefs, b: ReservationWithRefs) => {
+    const ra = resRange(a), rb = resRange(b);
+    return Boolean(ra.start && rb.start && ra.start <= (rb.end ?? rb.start) && (ra.end ?? ra.start) >= rb.start);
+  };
+  const conflicted = new Set<string>();
+  for (const r of active) {
+    for (const code of new Set(codesOf(r))) {
+      let used = 0;
+      for (const o of active) {
+        if (!overlaps(r, o)) continue;
+        used += codesOf(o).filter((c) => c === code).length;
+      }
+      if (used > (capacity[code] ?? 0)) conflicted.add(r.id);
     }
   }
-  return count;
+  return conflicted.size;
 }
 
 export default async function DashboardPage() {
-  const [reservations, inquiries, customers, jobs, profile, fuelDue] = await Promise.all([
+  const [reservations, inquiries, customers, jobs, profile, fuelDue, tents] = await Promise.all([
     listReservations(),
     listInquiries(),
     listCustomers(),
     listJobs(),
     getCurrentProfile(),
     fuelReminderDue(),
+    listTents(),
   ]);
+  // Pulpit jest dla właściciela — pracownika odsyłamy na jego ekran Start.
+  if (profile && profile.role !== "OWNER") redirect("/me");
   const demo = !isSupabaseConfigured();
   const isOwner = profile?.role === "OWNER";
 
@@ -67,7 +87,12 @@ export default async function DashboardPage() {
   const noDeposit = reservations.filter(
     (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && (!r.deposit || r.deposit === 0)
   );
-  const conflicts = countTentConflicts(reservations);
+  const tentCapacity: Record<string, number> = {};
+  for (const t of tents) {
+    const c = tentSizeCode(t.size);
+    tentCapacity[c] = (tentCapacity[c] ?? 0) + 1;
+  }
+  const conflicts = countSizeConflicts(reservations, tentCapacity);
   const plannedJobs = jobs.filter((j) => j.status === "PLANNED").length;
 
   const kpis = [
@@ -81,7 +106,7 @@ export default async function DashboardPage() {
 
   const attention: { tone: "bad" | "warn"; title: string; desc: string; href: string }[] = [];
   if (isOwner && fuelDue) attention.push({ tone: "warn", title: "Zaktualizuj ceny paliwa", desc: "Minęły 2 tygodnie od ostatniej aktualizacji cen paliwa.", href: "/settings" });
-  if (conflicts > 0) attention.push({ tone: "bad", title: `Konflikt namiotu (${conflicts})`, desc: "Nakładające się rezerwacje tego samego namiotu.", href: "/calendar" });
+  if (conflicts > 0) attention.push({ tone: "bad", title: `Konflikt namiotów (${conflicts})`, desc: "Za mało namiotów danego rozmiaru na te terminy.", href: "/calendar" });
   for (const r of toConfirm.slice(0, 4)) {
     attention.push({ tone: "warn", title: "Potwierdź z klientem (≤7 dni)", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}` });
   }

@@ -3,7 +3,7 @@
 // rezerwacji automatycznie generuje zlecenie i etapy (warstwa danych).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createReservation, updateReservation, setReservationConfirmed, setInvoiceIssued, findTentConflicts, type ReservationInput } from "@/lib/data/reservations";
+import { createReservation, updateReservation, setReservationConfirmed, setInvoiceIssued, findSizeConflicts, type ReservationInput } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
 import { markJobPlannedPaid } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
@@ -120,17 +120,13 @@ export async function checkTentAvailabilityAction(
   const ids = tentIds.filter(Boolean);
   if (!ids.length || !startDate) return [];
   try {
-    // Sprawdzamy oba namioty (slot 1 i 2); scalamy i deduplikujemy po id rezerwacji.
-    const byId = new Map<string, TentConflict>();
-    for (const tentId of ids) {
-      const conflicts = await findTentConflicts(tentId, startDate, endDate || startDate, excludeId);
-      for (const c of conflicts) {
-        const from = c.setup_date ?? c.event_date ?? "?";
-        const to = c.teardown_date && c.teardown_date !== from ? `–${c.teardown_date}` : "";
-        byId.set(c.id, { id: c.id, label: `${c.customer?.name ?? "bez klienta"} — ${c.event_type ?? "impreza"} (${from}${to})` });
-      }
-    }
-    return [...byId.values()];
+    // Konflikt liczony POJEMNOŚCIOWO per rozmiar (nie po konkretnym namiocie/kolorze).
+    const conflicts = await findSizeConflicts(ids, startDate, endDate || startDate, excludeId);
+    return conflicts.map((c) => {
+      const from = c.setup_date ?? c.event_date ?? "?";
+      const to = c.teardown_date && c.teardown_date !== from ? `–${c.teardown_date}` : "";
+      return { id: c.id, label: `${c.customer?.name ?? "bez klienta"} — ${c.event_type ?? "impreza"} (${from}${to})` };
+    });
   } catch {
     return [];
   }

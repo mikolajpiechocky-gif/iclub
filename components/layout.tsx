@@ -19,31 +19,31 @@ import type { ProfileRecord } from "@/lib/data/types";
 /* Konfiguracja nawigacji — pełna dla sidebar desktop, pogrupowana. */
 const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { href: string; label: string; icon: IconName; badge?: string; ownerOnly?: boolean }[] }[] = [
   { group: "Główne", tint: "#14b8c4", items: [
-    { href: "/dashboard", label: "Pulpit", icon: "home" },
+    { href: "/dashboard", label: "Pulpit", icon: "home", ownerOnly: true },
     { href: "/calendar", label: "Kalendarz", icon: "calendar" },
     { href: "/planner", label: "Planer tras", icon: "navigation", ownerOnly: true },
     { href: "/notifications", label: "Powiadomienia", icon: "inbox" },
   ]},
   { group: "Sprzedaż", tint: "#7c3aed", items: [
-    { href: "/inquiries", label: "Zapytania", icon: "inbox" },
+    { href: "/inquiries", label: "Zapytania", icon: "inbox", ownerOnly: true },
     { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },
     { href: "/field", label: "Realizacje", icon: "truck" },
   ]},
   { group: "Zasoby", tint: "#3b82f6", items: [
     { href: "/customers", label: "Klienci", icon: "users" },
     { href: "/inventory", label: "Magazyn", icon: "box" },
-    { href: "/employees", label: "Pracownicy", icon: "users" },
-    { href: "/vehicles", label: "Flota", icon: "truck" },
+    { href: "/employees", label: "Pracownicy", icon: "users", ownerOnly: true },
+    { href: "/vehicles", label: "Flota", icon: "truck", ownerOnly: true },
   ]},
-  { group: "Finanse", tint: "#22c55e", ownerOnly: true, items: [
+  { group: "Finanse", tint: "#22c55e", items: [
     { href: "/pricing", label: "Cennik", icon: "doc" },
-    { href: "/costs", label: "Koszty", icon: "coins" },
-    { href: "/payments", label: "Płatności", icon: "card" },
-    { href: "/reports", label: "Raporty", icon: "chart" },
+    { href: "/costs", label: "Koszty", icon: "coins", ownerOnly: true },
+    { href: "/payments", label: "Płatności", icon: "card", ownerOnly: true },
+    { href: "/reports", label: "Raporty", icon: "chart", ownerOnly: true },
   ]},
   { group: "System", tint: "#64748b", items: [
     { href: "/media", label: "Zgłoszenia i szkody", icon: "camera" },
-    { href: "/service", label: "Serwis", icon: "refresh" },
+    { href: "/service", label: "Serwis", icon: "refresh", ownerOnly: true },
     { href: "/users", label: "Użytkownicy", icon: "users", ownerOnly: true },
     { href: "/settings", label: "Ustawienia", icon: "gear", ownerOnly: true },
   ]},

@@ -5,6 +5,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { ReservationRecord, ReservationWithRefs, ReservationStatus, BusinessLine } from "./types";
 import { DEMO_RESERVATIONS } from "./demo-resources";
 import { stagesForBusinessLine } from "@/lib/domain/stages";
+import { listTents } from "./resources";
+import { tentSizeCode } from "@/lib/domain/calendar";
 
 export interface ReservationInput {
   business_line: BusinessLine;
@@ -166,4 +168,75 @@ export async function findTentConflicts(
     const rg = reservationRange(r);
     return rangesOverlap(startDate, end, rg.start, rg.end);
   });
+}
+
+// Konflikt POJEMNOŚCIOWY per ROZMIAR (nie po konkretnym namiocie/kolorze):
+// dla wybranych namiotów sprawdza, czy w oknie zmieści się jeszcze tyle sztuk danego
+// rozmiaru, ile masz w magazynie. Zwraca kolidujące rezerwacje, gdy pojemność przekroczona.
+export async function findSizeConflicts(
+  wantedTentIds: string[],
+  startDate: string | null,
+  endDate: string | null,
+  excludeId?: string
+): Promise<ReservationWithRefs[]> {
+  const ids = wantedTentIds.filter(Boolean);
+  if (!ids.length || !startDate) return [];
+  const end = endDate ?? startDate;
+
+  // Mapa namiot→rozmiar (M/D) + pojemność (ile sztuk danego rozmiaru w magazynie).
+  const tents = await listTents();
+  const codeById = new Map<string, "M" | "D">();
+  const capacity: Record<string, number> = {};
+  for (const t of tents) {
+    const code = tentSizeCode(t.size);
+    codeById.set(t.id, code);
+    capacity[code] = (capacity[code] ?? 0) + 1;
+  }
+
+  // Ile sztuk danego rozmiaru chce ta rezerwacja (slot 1 + 2).
+  const wantByCode: Record<string, number> = {};
+  for (const id of ids) {
+    const code = codeById.get(id);
+    if (code) wantByCode[code] = (wantByCode[code] ?? 0) + 1;
+  }
+  if (!Object.keys(wantByCode).length) return [];
+
+  // Wszystkie aktywne rezerwacje (do policzenia zajętości rozmiaru w oknie).
+  let all: ReservationWithRefs[];
+  if (!isSupabaseConfigured()) {
+    all = DEMO_RESERVATIONS;
+  } else {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("reservations")
+      .select("*, customer:customers(id,name), tent:tents!tent_id(id,name), package:packages(id,name)")
+      .in("status", ["TEMPORARY", "CONFIRMED"]);
+    if (error) throw new Error(error.message);
+    all = (data ?? []) as ReservationWithRefs[];
+  }
+
+  const overlapping = all.filter((r) => {
+    if (r.id === excludeId) return false;
+    if (r.status !== "TEMPORARY" && r.status !== "CONFIRMED") return false;
+    const rg = reservationRange(r);
+    return rangesOverlap(startDate, end, rg.start, rg.end);
+  });
+
+  const conflicts = new Map<string, ReservationWithRefs>();
+  for (const code of Object.keys(wantByCode)) {
+    const cap = capacity[code] ?? 0;
+    let used = 0;
+    const users: ReservationWithRefs[] = [];
+    for (const r of overlapping) {
+      let slots = 0;
+      if (r.tent_id && codeById.get(r.tent_id) === code) slots++;
+      if (r.tent_id_2 && codeById.get(r.tent_id_2) === code) slots++;
+      if (slots > 0) {
+        used += slots;
+        users.push(r);
+      }
+    }
+    if (used + wantByCode[code] > cap) for (const u of users) conflicts.set(u.id, u);
+  }
+  return [...conflicts.values()];
 }
