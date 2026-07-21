@@ -70,3 +70,9 @@ export const getThreads = (token: string, offset = 0, limit = 100) =>
   olxGet<Record<string, unknown>>(`/threads?offset=${offset}&limit=${limit}`, token);
 export const getMessages = (token: string, threadId: string, offset = 0, limit = 100) =>
   olxGet<Record<string, unknown>>(`/threads/${threadId}/messages?offset=${offset}&limit=${limit}`, token);
+
+// Ogłoszenia właściciela + statystyki (wyświetlenia, odsłony numeru).
+export const getAdverts = (token: string, offset = 0, limit = 100) =>
+  olxGet<Record<string, unknown>>(`/adverts?offset=${offset}&limit=${limit}`, token);
+export const getAdvertStatistics = (token: string, advertId: string) =>
+  olxGet<Record<string, unknown>>(`/adverts/${advertId}/statistics`, token);

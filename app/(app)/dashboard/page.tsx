@@ -10,6 +10,8 @@ import { listJobs } from "@/lib/data/jobs";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { fuelReminderDue } from "@/lib/data/settings";
 import { listTents } from "@/lib/data/resources";
+import { listOlxAdverts } from "@/lib/data/olx-adverts";
+import { analyzeFleet } from "@/lib/domain/olx-adverts";
 import { tentSizeCode } from "@/lib/domain/calendar";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { RESERVATION_STATUS_META, type ReservationWithRefs } from "@/lib/data/types";
@@ -57,7 +59,7 @@ function countSizeConflicts(reservations: ReservationWithRefs[], capacity: Recor
 }
 
 export default async function DashboardPage() {
-  const [reservations, inquiries, customers, jobs, profile, fuelDue, tents] = await Promise.all([
+  const [reservations, inquiries, customers, jobs, profile, fuelDue, tents, adverts] = await Promise.all([
     listReservations(),
     listInquiries(),
     listCustomers(),
@@ -65,6 +67,7 @@ export default async function DashboardPage() {
     getCurrentProfile(),
     fuelReminderDue(),
     listTents(),
+    listOlxAdverts(),
   ]);
   // Pulpit jest dla właściciela — pracownika odsyłamy na jego ekran Start.
   if (profile && profile.role !== "OWNER") redirect("/me");
@@ -107,6 +110,8 @@ export default async function DashboardPage() {
   const attention: { tone: "bad" | "warn"; title: string; desc: string; href: string }[] = [];
   if (isOwner && fuelDue) attention.push({ tone: "warn", title: "Zaktualizuj ceny paliwa", desc: "Minęły 2 tygodnie od ostatniej aktualizacji cen paliwa.", href: "/settings" });
   if (conflicts > 0) attention.push({ tone: "bad", title: `Konflikt namiotów (${conflicts})`, desc: "Za mało namiotów danego rozmiaru na te terminy.", href: "/calendar" });
+  const advToReact = analyzeFleet(adverts).summary.toReact;
+  if (advToReact > 0) attention.push({ tone: "warn", title: `Ogłoszenia do reakcji (${advToReact})`, desc: "Wygasają wkrótce lub już wygasły — sprawdź moduł Ogłoszenia OLX.", href: "/adverts" });
   for (const r of toConfirm.slice(0, 4)) {
     attention.push({ tone: "warn", title: "Potwierdź z klientem (≤7 dni)", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}` });
   }

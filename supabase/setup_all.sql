@@ -1206,3 +1206,25 @@ alter table public.inquiries add column if not exists olx_thread_id text;
 alter table public.inquiries add column if not exists olx_last_message_at timestamptz;
 create unique index if not exists uq_inquiries_olx_thread on public.inquiries (olx_thread_id) where olx_thread_id is not null;
 
+-- ================= 0029: ogłoszenia OLX (monitoring + statystyki) =================
+create table if not exists public.olx_adverts (
+  olx_id text primary key,
+  title text,
+  status text,
+  url text,
+  valid_to timestamptz,
+  olx_created_at timestamptz,
+  views integer not null default 0,
+  phones integer not null default 0,
+  prev_views integer,
+  prev_phones integer,
+  prev_synced_at timestamptz,
+  last_synced_at timestamptz not null default now(),
+  raw jsonb
+);
+alter table public.olx_adverts enable row level security;
+drop policy if exists olx_adverts_owner on public.olx_adverts;
+create policy olx_adverts_owner on public.olx_adverts for all to authenticated
+  using (public.is_owner()) with check (public.is_owner());
+create index if not exists idx_olx_adverts_valid_to on public.olx_adverts (valid_to);
+

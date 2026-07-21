@@ -13,6 +13,7 @@ const LINKS: { href: string; label: string; icon: IconName; ownerOnly?: boolean 
   { href: "/customers", label: "Klienci", icon: "users" },
   { href: "/inquiries", label: "Zapytania", icon: "inbox", ownerOnly: true },
   { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },
+  { href: "/adverts", label: "Ogłoszenia OLX", icon: "tag", ownerOnly: true },
   { href: "/pricing", label: "Cennik", icon: "doc" },
   { href: "/media", label: "Zgłoszenia i szkody", icon: "camera" },
   { href: "/planner", label: "Planer tras", icon: "navigation", ownerOnly: true },

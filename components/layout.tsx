@@ -30,6 +30,7 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
     { href: "/inquiries", label: "Zapytania", icon: "inbox", ownerOnly: true },
     { href: "/reservations", label: "Rezerwacje", icon: "bookmark" },
     { href: "/field", label: "Realizacje", icon: "truck" },
+    { href: "/adverts", label: "Ogłoszenia OLX", icon: "tag", ownerOnly: true },
   ]},
   { group: "Zasoby", tint: "#3b82f6", items: [
     { href: "/customers", label: "Klienci", icon: "users" },
