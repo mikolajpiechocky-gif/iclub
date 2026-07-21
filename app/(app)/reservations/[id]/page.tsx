@@ -186,6 +186,7 @@ async function ReservationOps({
     id: a.id,
     profile_id: a.profile_id,
     full_name: a.employee?.full_name ?? "—",
+    avatar_url: a.employee?.avatar_url ?? null,
     is_lead: a.is_lead,
     status: a.status,
     earnings: a.rate ? predictedEarnings(a.rate, job.business_line, ownerBonus, settings.iclub_hours) : null,

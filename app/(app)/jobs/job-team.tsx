@@ -4,6 +4,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SectionCard, PrimaryButton, SecondaryButton, Pill, Alert } from "@/components/ui";
+import { Avatar } from "@/components/avatar";
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
 import {
   assignEmployeeAction, removeAssignmentAction, toggleLeadAction, selfClaimAction, setOwnerBonusAction,
@@ -17,6 +18,7 @@ export interface AssignmentView {
   id: string;
   profile_id: string;
   full_name: string;
+  avatar_url: string | null;
   is_lead: boolean;
   status: "REQUESTED" | "APPROVED";
   earnings: EarningsBreakdown | null;
@@ -67,6 +69,7 @@ export function JobTeam({
           <div className="flex flex-col gap-2.5">
             {approved.map((a) => (
               <div key={a.id} className="flex flex-wrap items-center gap-3 rounded-[13px] border border-border bg-surface-2 px-3.5 py-3">
+                <Avatar name={a.full_name} url={a.avatar_url} size={40} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[13.5px] font-bold text-ink">{a.full_name}</span>
@@ -97,6 +100,7 @@ export function JobTeam({
             <div className="flex flex-col gap-2.5">
               {requests.map((a) => (
                 <div key={a.id} className="flex flex-wrap items-center gap-3 rounded-[13px] border border-[#3d3216] bg-[#241e10] px-3.5 py-3">
+                  <Avatar name={a.full_name} url={a.avatar_url} size={40} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[13.5px] font-bold text-ink">{a.full_name}</div>
                     {a.earnings && <div className="mt-0.5 text-[12px] text-ink-2">Zarobek: <span className="font-bold text-ok">{fmtPLN(a.earnings.total)}</span></div>}

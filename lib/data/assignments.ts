@@ -12,7 +12,7 @@ export interface JobAssignment {
   is_lead: boolean;
   status: AssignmentStatus;
   note: string | null;
-  employee: { id: string; full_name: string; role: string } | null;
+  employee: { id: string; full_name: string; role: string; avatar_url?: string | null } | null;
   rate: EmployeeRate | null;
 }
 
@@ -32,7 +32,7 @@ export async function listJobAssignments(jobId: string): Promise<JobAssignment[]
   const supabase = await createClient();
   const { data: rows, error } = await supabase
     .from("job_assignments")
-    .select("*, employee:profiles!profile_id(id, full_name, role)")
+    .select("*, employee:profiles!profile_id(id, full_name, role, avatar_url)")
     .eq("job_id", jobId)
     .order("is_lead", { ascending: false });
   if (error) throw new Error(error.message);
