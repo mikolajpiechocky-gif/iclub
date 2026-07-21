@@ -26,11 +26,16 @@ const clean = (s: string) => (s.trim() ? s.trim() : null);
 function validate(v: InstanceFormValues): Record<string, string> {
   const e: Record<string, string> = {};
   if (!v.serial_number.trim() && !v.label.trim()) e.label = "Podaj numer seryjny lub oznaczenie egzemplarza.";
-  if (v.photo_url) {
-    if (!/^data:image\/(png|jpe?g|webp);base64,/.test(v.photo_url)) e.label = "Nieprawidłowy plik zdjęcia.";
-    else if (v.photo_url.length > 500_000) e.label = "Zdjęcie za duże — wybierz mniejsze.";
-  }
   return e;
+}
+
+// Zdjęcie sprawdzamy osobno (komunikat na poziomie formularza, nie nadpisuje pola).
+// Limit liczony po realnych bajtach (base64 puchnie o ~33%).
+function photoError(dataUrl: string): string | null {
+  if (!dataUrl) return null;
+  if (!/^data:image\/(png|jpe?g|webp);base64,/.test(dataUrl)) return "Nieprawidłowy plik zdjęcia.";
+  if (Math.floor(dataUrl.length * 0.75) > 500_000) return "Zdjęcie za duże — wybierz mniejsze.";
+  return null;
 }
 
 function toInput(v: InstanceFormValues): InstanceInput {
@@ -47,6 +52,8 @@ export async function createInstanceAction(equipmentId: string, v: InstanceFormV
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const fieldErrors = validate(v);
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
+  const pe = photoError(v.photo_url);
+  if (pe) return { ok: false, error: pe };
   try {
     const { id } = await createInstance(equipmentId, toInput(v));
     revalidatePath(`/inventory/${equipmentId}/edit`);
@@ -60,6 +67,8 @@ export async function updateInstanceAction(id: string, equipmentId: string, v: I
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   const fieldErrors = validate(v);
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
+  const pe = photoError(v.photo_url);
+  if (pe) return { ok: false, error: pe };
   try {
     await updateInstance(id, toInput(v));
     revalidatePath(`/inventory/${equipmentId}/edit`);

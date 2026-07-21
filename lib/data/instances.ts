@@ -57,7 +57,8 @@ export async function createInstance(equipmentId: string, input: InstanceInput):
   const { data, error } = await supabase.from("equipment_instances").insert({ equipment_id: equipmentId, ...input }).select("id").single();
   if (error) throw new Error(error.message);
   const id = (data as { id: string }).id;
-  await logChange(supabase, id, nameOf(input), "create", null);
+  // Historia pod ID pozycji nadrzędnej — żeby była widoczna w „Historia zmian" pozycji.
+  await logChange(supabase, equipmentId, `Egzemplarz: ${nameOf(input)}`, "create", null);
   return { id };
 }
 
@@ -66,7 +67,7 @@ export async function updateInstance(id: string, input: InstanceInput): Promise<
   const before = await getInstance(id);
   const { error } = await supabase.from("equipment_instances").update(input).eq("id", id);
   if (error) throw new Error(error.message);
-  await logChange(supabase, id, nameOf(input), "update", before ? diff(before, input) : null);
+  await logChange(supabase, before?.equipment_id ?? null, `Egzemplarz: ${nameOf(input)}`, "update", before ? diff(before, input) : null);
 }
 
 export async function setInstanceActive(id: string, active: boolean): Promise<void> {
@@ -74,5 +75,5 @@ export async function setInstanceActive(id: string, active: boolean): Promise<vo
   const before = await getInstance(id);
   const { error } = await supabase.from("equipment_instances").update({ active }).eq("id", id);
   if (error) throw new Error(error.message);
-  await logChange(supabase, id, before ? nameOf(before) : null, active ? "restore" : "delete", { "Aktywny": { old: before?.active ?? null, new: active } });
+  await logChange(supabase, before?.equipment_id ?? null, `Egzemplarz: ${before ? nameOf(before) : ""}`, active ? "restore" : "delete", { "Aktywny": { old: before?.active ?? null, new: active } });
 }
