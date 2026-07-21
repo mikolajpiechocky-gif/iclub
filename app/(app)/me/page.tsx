@@ -127,7 +127,7 @@ export default async function EmployeeDashboardPage() {
                   {/* §19.5 forma wynagrodzenia + premie gwarantowane/możliwe */}
                   <div className="mt-1.5 text-[11px] font-semibold text-ink-2">
                     {settlement.form === "free_time"
-                      ? `${settlement.freeHours} h czasu wolnego · ${fmtPLN2(settlement.baseValue)}`
+                      ? `${settlement.baseLabel} (${settlement.freeHours} h · ${fmtPLN2(settlement.baseValue)})`
                       : `Ryczałt ${fmtPLN2(settlement.baseValue)}`}
                     {settlement.guaranteed.map((b) => (
                       <span key={b.label} className="ml-1.5 text-ok">+{fmtPLN(b.amount)} {b.label.split(" ")[0].toLowerCase()}</span>

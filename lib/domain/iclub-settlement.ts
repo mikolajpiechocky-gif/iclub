@@ -29,6 +29,13 @@ export interface RealizationSettlement {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+// §19.1 Czas wolny wyrażony w dniach (8 h = 1 dzień roboczy w Taurusie).
+export function freeTimeLabel(freeHours: number): string {
+  const days = freeHours / 8;
+  if (Number.isInteger(days) && days >= 1) return days === 1 ? "1 dzień wolny" : `${days} dni wolne`;
+  return `${freeHours} h czasu wolnego`;
+}
+
 export function rulesFromSettings(s: { iclub_hours: number; iclub_hourly_rate: number; iclub_month_threshold: number; iclub_flat_rate: number }): IclubSettlementRules {
   return {
     freeHours: s.iclub_hours,
@@ -57,7 +64,7 @@ export function settlementForRealization(
     form = "free_time";
     freeHours = rules.freeHours;
     baseValue = round2(rules.freeHours * rules.hourlyRate);
-    baseLabel = `${rules.freeHours} h czasu wolnego`;
+    baseLabel = freeTimeLabel(rules.freeHours);
   } else {
     form = "flat";
     freeHours = null;
