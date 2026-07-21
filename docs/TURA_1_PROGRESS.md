@@ -19,7 +19,7 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 12. ✅ Duży z tylnymi drzwiami jako konkretny zasób z tej samej puli (§10).
 13. ✅ Dodatkowy namiot jako osobna sekcja (+ gastronomiczny) (§10.2).
 14. ⬜ Dodatki korzystają z magazynu (§12).
-15. ⬜ Pakiet ma własną cenę niezależną od sumy pozycji (§11).
+15. ✅ Pakiet ma własną cenę niezależną od sumy pozycji — `PackageRecord.base_price` to samodzielne pole edytowane w „Oferta i cennik"; rezerwacja bierze cenę pakietu wprost (nie liczy jej z pozycji). Pełny skład pakietu + snapshot (§11.2) zależą od modułu magazynu (§17) — do zrobienia osobno.
 16. ⬜ Boczne podsumowanie przelicza cenę na żywo (§13).
 17. ⬜ Rabat % lub kwotowy, obejmuje całe zamówienie (§13.4).
 18. ⬜ Zadatek domyślnie 300 zł + transport (§13.6).
@@ -33,7 +33,7 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 26. ⬜ Audyt każdej zmiany magazynowej (§17.3).
 27. ⬜ Pierwsze 4 realizacje Bartka → czas wolny (§19.1).
 28. ⬜ Piąta+ → konfigurowalne 500 zł + dodatki (§19.2).
-29. ⬜ Koszty i płatności — widoki miesięczne + filtry (§20).
+29. ✅ Koszty i płatności — widoki miesięczne + filtry — domyślnie bieżący miesiąc, nawigacja ‹ ›/Ten miesiąc/Rok/Wszystko (`PeriodBar`), filtry (koszty: kategoria+status; płatności: metoda+status) przez `FilterSelect`, podsumowanie przefiltrowanego widoku (suma kosztów / do weryfikacji; wpłynęło / do zapłaty / zaległe). Filtry po polach spoza modelu (dostawca, pojazd, pracownik, klient, termin) — do dodania po rozszerzeniu schematu (§20).
 30. ✅ Nowa impreza istniejącego klienta → nowy lead (§6.3) — każde zapytanie to osobny rekord powiązany z klientem; nowy wątek OLX = nowy lead.
 31. ✅ Powrót do starego zapytania reaktywuje lead (§6.3) — nowa wiadomość OLX do przegranego = „Odgrzany" (auto), plus ręczny przycisk „Odgrzej leada"; zachowana historia (poprzedni status, licznik i data reaktywacji).
 32. ✅ Globalne nazewnictwo poprawione (§23: iClub, zadatek, Szef).
