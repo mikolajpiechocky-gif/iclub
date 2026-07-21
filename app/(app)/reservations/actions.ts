@@ -9,6 +9,11 @@ import { markJobPlannedPaid } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { syncReservationToCalendar } from "@/lib/data/calendar-sync";
 import { sumSlots, type TentChoice } from "@/lib/domain/tents";
+import type { DiscountType } from "@/lib/domain/order-pricing";
+import { clientTransportPrice, tripClass } from "@/lib/domain/transport";
+import { getSettings } from "@/lib/data/settings";
+import { geocode, routeLeg } from "@/lib/integrations/google-maps";
+import { isGoogleMapsConfigured } from "@/lib/integrations/google-maps/config";
 import type { ReservationStatus, BusinessLine } from "@/lib/data/types";
 
 export interface ReservationFormValues {
@@ -30,7 +35,11 @@ export interface ReservationFormValues {
   delivery_time: string;
   payment_upfront: boolean;
   price: string;
-  discount: string;
+  // §13.4 Rabat: typ + wartość wprowadzona; discount_amount to wyliczona kwota (zł) z formularza.
+  discount_type: DiscountType;
+  discount_value: string;
+  discount_amount: string;
+  transport_price: string; // §13.3 cena transportu dla klienta
   deposit: string;
   is_invoice: boolean;
   source: string;
@@ -57,9 +66,9 @@ function num(s: string): string | undefined {
 function validate(v: ReservationFormValues): Record<string, string> {
   const e: Record<string, string> = {};
   if (!STATUSES.includes(v.status)) e.status = "Wybierz status.";
-  for (const [k, label] of [["guests", "Liczba osób"], ["price", "Cena"], ["discount", "Rabat"], ["deposit", "Zadatek"]] as const) {
+  for (const [k, label] of [["guests", "Liczba osób"], ["price", "Cena"], ["discount_value", "Rabat"], ["transport_price", "Transport"], ["deposit", "Zadatek"]] as const) {
     const val = num(v[k]);
-    if (val && isNaN(Number(val.replace(",", ".")))) e[k] = `${label} musi być liczbą.`;
+    if (val && isNaN(Number(val.replace(",", ".")))) e[k === "discount_value" ? "discount_value" : k] = `${label} musi być liczbą.`;
   }
   return e;
 }
@@ -114,7 +123,10 @@ function toInput(v: ReservationFormValues): ReservationInput {
     delivery_time: clean(v.delivery_time),
     payment_upfront: v.payment_upfront,
     price: toNumber(v.price),
-    discount: toNumber(v.discount) ?? 0,
+    discount: toNumber(v.discount_amount) ?? 0, // faktyczna kwota rabatu wyliczona w formularzu
+    discount_type: v.discount_type === "PERCENT" ? "PERCENT" : "AMOUNT",
+    discount_value: toNumber(v.discount_value),
+    transport_price: toNumber(v.transport_price),
     deposit: toNumber(v.deposit) ?? 0,
     is_invoice: v.is_invoice,
     source: clean(v.source),
@@ -175,6 +187,28 @@ async function overbookingBlock(values: ReservationFormValues, excludeId?: strin
   }
   if (!values.overbooking_reason.trim()) return "Podaj powód wyjątku overbookingu (decyzja szefa).";
   return null;
+}
+
+export interface ReservationTransportResult {
+  ok: boolean;
+  km?: number;          // odległość w jedną stronę
+  price?: number | null; // cena z widełek (null = > 400 km, wycena indywidualna)
+  farTrip?: boolean;
+  error?: string;
+}
+
+// §14.3 Transport rezerwacji z adresu: baza → lokalizacja → odległość w jedną stronę
+// → cena z widełek + klasa trasy.
+export async function computeReservationTransportAction(location: string): Promise<ReservationTransportResult> {
+  if (!location.trim()) return { ok: false, error: "Podaj najpierw lokalizację rezerwacji." };
+  if (!isGoogleMapsConfigured()) return { ok: false, error: "Podłącz klucz Google Maps (docs/INTEGRATIONS.md), aby liczyć transport." };
+  const { base_address } = await getSettings();
+  const [baseGeo, destGeo] = await Promise.all([geocode(base_address), geocode(location)]);
+  if (!baseGeo || !destGeo) return { ok: false, error: "Nie udało się wyznaczyć trasy — sprawdź adres." };
+  const leg = await routeLeg(baseGeo, destGeo);
+  if (!leg) return { ok: false, error: "Nie udało się wyznaczyć trasy." };
+  const km = Math.round(leg.km * 10) / 10;
+  return { ok: true, km, price: clientTransportPrice(km), farTrip: tripClass(km) === "far" };
 }
 
 export async function createReservationAction(values: ReservationFormValues): Promise<ActionResult> {

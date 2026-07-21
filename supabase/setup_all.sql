@@ -1305,3 +1305,8 @@ drop policy if exists inventory_audit_insert on public.inventory_audit;
 create policy inventory_audit_insert on public.inventory_audit for insert to authenticated
   with check (actor is null or actor = auth.uid());
 
+-- ================= 0035: kalkulator rezerwacji — rabat %/kwotowy + transport (§13) =================
+alter table public.reservations add column if not exists discount_type text not null default 'AMOUNT';
+alter table public.reservations add column if not exists discount_value numeric(10,2);
+alter table public.reservations add column if not exists transport_price numeric(10,2);
+

@@ -7,8 +7,9 @@ import { PageHeader } from "@/components/layout";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
 import type { ReservationRecord, TentRecord, PackageRecord, AddonRecord, ReservationStatus, BusinessLine } from "@/lib/data/types";
 import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
-import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, type ReservationFormValues, type TentConflict } from "./actions";
+import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
 import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
+import { computeOrderPrice, suggestedDeposit } from "@/lib/domain/order-pricing";
 import { AddressAutocomplete } from "./address-autocomplete";
 
 type CustomerOption = { id: string; name: string };
@@ -66,7 +67,10 @@ export function ReservationForm({
     delivery_time: initial?.delivery_time ?? "",
     payment_upfront: initial?.payment_upfront ?? false,
     price: initial?.price != null ? String(initial.price) : "",
-    discount: initial?.discount != null ? String(initial.discount) : "",
+    discount_type: initial?.discount_type === "PERCENT" ? "PERCENT" : "AMOUNT",
+    discount_value: initial?.discount_value != null ? String(initial.discount_value) : "",
+    discount_amount: initial?.discount != null ? String(initial.discount) : "",
+    transport_price: initial?.transport_price != null ? String(initial.transport_price) : "",
     deposit: initial?.deposit != null ? String(initial.deposit) : "",
     is_invoice: initial?.is_invoice ?? false,
     source: initial?.source ?? "",
@@ -77,6 +81,9 @@ export function ReservationForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<TentConflict[]>([]);
   const [exceeded, setExceeded] = useState<string[]>([]);
+  // §13.6 Zadatek: śledzimy, czy Szef zmienił go ręcznie (wtedy nie nadpisujemy sugestią).
+  const [depositTouched, setDepositTouched] = useState(isEdit);
+  const [transportMsg, setTransportMsg] = useState<string | null>(null);
 
   // §8 Rozwijana sekcja niestandardowych dat. Domyślnie zwinięta; rozwinięta,
   // gdy istniejąca rezerwacja ma daty inne niż domyślne (montaż = impreza, demontaż = +1 dzień).
@@ -118,16 +125,43 @@ export function ReservationForm({
     .filter((a) => v.addon_ids.includes(a.id))
     .reduce((sum, a) => sum + Number(a.price || 0), 0);
 
-  // Podpowiedź ceny z cennika: pakiet + wybrane dodatki (§51).
+  // §13 Kalkulacja na żywo: pakiet + dodatki + transport − rabat = razem; zadatek; pozostało.
   const packagePrice = Number(packages.find((p) => p.id === v.package_id)?.base_price ?? 0);
-  const suggestedPrice = packagePrice + addonsTotal;
+  const transportPrice = Number(v.transport_price.replace(",", ".")) || 0;
+  const discountValueNum = Number(v.discount_value.replace(",", ".")) || 0;
+  const order = computeOrderPrice({ packagePrice, addonsTotal, transportPrice, discountType: v.discount_type, discountValue: discountValueNum });
+  const suggestedDep = suggestedDeposit(transportPrice); // §13.6 300 zł + transport
+  const depositValue = depositTouched ? v.deposit : String(suggestedDep);
+  const depositNum = Number(depositValue.replace(",", ".")) || 0;
+  const remaining = Math.max(0, Math.round((order.total - depositNum) * 100) / 100);
+
+  // §14.3 Transport rezerwacji z adresu (odległość w jedną stronę → widełki).
+  const computeTransport = () => {
+    setTransportMsg(null);
+    startTransition(async () => {
+      const res = await computeReservationTransportAction(v.location);
+      if (res.ok && res.km != null) {
+        if (res.price != null) set("transport_price", String(res.price));
+        setTransportMsg(`W jedną stronę ≈ ${res.km} km · ${res.farTrip ? "daleki" : "bliski"}${res.price != null ? ` · widełki ${res.price} zł` : " · > 400 km, wycena indywidualna"}`);
+      } else {
+        setTransportMsg(res.error ?? "Błąd");
+      }
+    });
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
     setFormError(null);
     // §8: przy zwiniętej sekcji dat wyślij puste montaż/demontaż — serwer nada domyślne.
-    const payload: ReservationFormValues = showCustomDates ? v : { ...v, setup_date: "", teardown_date: "" };
+    // §13: dołącz wyliczoną kwotę rabatu i ustalony zadatek (sugestia, jeśli nietknięty).
+    const payload: ReservationFormValues = {
+      ...v,
+      setup_date: showCustomDates ? v.setup_date : "",
+      teardown_date: showCustomDates ? v.teardown_date : "",
+      discount_amount: String(order.discountAmount),
+      deposit: depositValue,
+    };
     startTransition(async () => {
       const res = isEdit
         ? await updateReservationAction(initial!.id, payload)
@@ -143,7 +177,7 @@ export function ReservationForm({
   };
 
   return (
-    <div className="mx-auto max-w-[900px] px-5 py-6 md:px-8">
+    <div className="mx-auto max-w-[1200px] px-5 py-6 md:px-8">
       <PageHeader
         title={isEdit ? "Edycja rezerwacji" : "Nowa rezerwacja"}
         subtitle={isEdit ? "Zaktualizuj dane rezerwacji" : "Zapisanie utworzy też zlecenie i etapy realizacji"}
@@ -154,7 +188,8 @@ export function ReservationForm({
         <div className="mb-4"><Alert tone="bad" title="Nie udało się zapisać">{formError}</Alert></div>
       )}
 
-      <form onSubmit={submit} className="flex flex-col gap-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <form onSubmit={submit} className="flex flex-col gap-4 lg:col-start-1 lg:row-start-1">
         <SectionCard title="Klient i lokalizacja" className="p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-4 sm:grid-cols-2">
             <SelectField label="Linia biznesowa" value={v.business_line} onChange={(e) => set("business_line", e.target.value as BusinessLine)}>
@@ -277,17 +312,29 @@ export function ReservationForm({
         </SectionCard>
 
         <SectionCard title="Rozliczenie" className="p-5">
-          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 px-5 pb-2 sm:grid-cols-3">
             <div>
-              <TextField label="Wartość (zł)" inputMode="numeric" placeholder="6800" value={v.price} onChange={(e) => set("price", e.target.value)} error={errors.price} />
-              {suggestedPrice > 0 && (
-                <button type="button" onClick={() => set("price", String(suggestedPrice))} className="mt-1.5 text-[12px] font-semibold text-accent-soft">
-                  Z cennika: {fmtPLN(suggestedPrice)} →
+              <TextField label="Wartość końcowa (zł)" inputMode="numeric" placeholder="6800" value={v.price} onChange={(e) => set("price", e.target.value)} error={errors.price} />
+              {order.total > 0 && (
+                <button type="button" onClick={() => set("price", String(order.total))} className="mt-1.5 text-[12px] font-semibold text-accent-soft">
+                  Z kalkulatora: {fmtPLN(order.total)} →
                 </button>
               )}
             </div>
-            <TextField label="Rabat (zł)" inputMode="numeric" placeholder="0" value={v.discount} onChange={(e) => set("discount", e.target.value)} error={errors.discount} />
-            <TextField label="Zadatek (zł)" inputMode="numeric" placeholder="2000" value={v.deposit} onChange={(e) => set("deposit", e.target.value)} error={errors.deposit} />
+            <div>
+              <TextField label="Transport dla klienta (zł)" inputMode="decimal" placeholder="0" value={v.transport_price} onChange={(e) => set("transport_price", e.target.value)} error={errors.transport_price} />
+              <button type="button" onClick={computeTransport} disabled={pending} className="mt-1.5 text-[12px] font-semibold text-accent-soft">Oblicz z adresu →</button>
+              {transportMsg && <div className="mt-1 text-[11px] text-ink-2">{transportMsg}</div>}
+            </div>
+            <div>
+              <TextField label="Zadatek (zł)" inputMode="numeric" placeholder="300" value={depositValue} onChange={(e) => { setDepositTouched(true); set("deposit", e.target.value); }} error={errors.deposit} />
+              {!depositTouched && <div className="mt-1 text-[11px] text-ink-2">Sugestia: 300 zł + transport = {fmtPLN(suggestedDep)}</div>}
+            </div>
+            <SelectField label="Rabat" value={v.discount_type} onChange={(e) => set("discount_type", e.target.value === "PERCENT" ? "PERCENT" : "AMOUNT")}>
+              <option value="AMOUNT">Kwotowy (zł)</option>
+              <option value="PERCENT">Procentowy (%)</option>
+            </SelectField>
+            <TextField label={v.discount_type === "PERCENT" ? "Rabat (%)" : "Rabat (zł)"} inputMode="decimal" placeholder="0" value={v.discount_value} onChange={(e) => set("discount_value", e.target.value)} error={errors.discount_value} hint={v.discount_type === "PERCENT" && order.discountAmount > 0 ? `= ${fmtPLN(order.discountAmount)}` : undefined} />
             <SelectField label="Źródło" value={v.source} onChange={(e) => set("source", e.target.value)}>
               <option value="">— nie podano —</option>
               {(Object.keys(INQUIRY_SOURCE_LABELS) as (keyof typeof INQUIRY_SOURCE_LABELS)[]).map((s) => (
@@ -314,6 +361,33 @@ export function ReservationForm({
           </PrimaryButton>
         </div>
       </form>
+
+      {/* §13 Boczne podsumowanie — na żywo. Sticky na desktopie, rozwijane na mobile. */}
+      <aside className="lg:col-start-2 lg:row-start-1 lg:sticky lg:top-4 lg:self-start">
+        <details open className="overflow-hidden rounded-card-lg border border-border bg-surface">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3">
+            <span className="font-display text-[15px] font-bold text-white">Podsumowanie</span>
+            <span className="font-display text-[16px] font-bold text-accent-soft">{fmtPLN(order.total)}</span>
+          </summary>
+          <div className="flex flex-col gap-2 border-t border-border px-4 py-3.5 text-[13px]">
+            <div className="flex justify-between"><span className="text-ink-2">Pakiet</span><span className="font-semibold text-ink">{fmtPLN(packagePrice)}</span></div>
+            <div className="flex justify-between"><span className="text-ink-2">Dodatki</span><span className="font-semibold text-ink">{fmtPLN(addonsTotal)}</span></div>
+            <div className="flex justify-between"><span className="text-ink-2">Transport</span><span className="font-semibold text-ink">{fmtPLN(transportPrice)}</span></div>
+            {order.discountAmount > 0 && (
+              <div className="flex justify-between"><span className="text-ink-2">Rabat{v.discount_type === "PERCENT" ? ` (${discountValueNum}%)` : ""}</span><span className="font-semibold text-ok">− {fmtPLN(order.discountAmount)}</span></div>
+            )}
+            <div className="mt-1 flex justify-between border-t border-border-soft pt-2 text-[14px] font-bold text-white"><span>Razem</span><span>{fmtPLN(order.total)}</span></div>
+            <div className="flex justify-between"><span className="text-ink-2">Zadatek</span><span className="font-semibold text-ink">{fmtPLN(depositNum)}</span></div>
+            <div className="flex justify-between"><span className="text-ink-2">Pozostało</span><span className="font-bold text-warn">{fmtPLN(remaining)}</span></div>
+            {order.total > 0 && Number(v.price.replace(",", ".")) !== order.total && (
+              <button type="button" onClick={() => set("price", String(order.total))} className="mt-1.5 rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-[12.5px] font-semibold text-accent-soft">
+                Zastosuj cenę {fmtPLN(order.total)}
+              </button>
+            )}
+          </div>
+        </details>
+      </aside>
+      </div>
     </div>
   );
 }

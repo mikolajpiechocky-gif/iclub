@@ -161,7 +161,10 @@ export interface ReservationRecord {
   delivery_time: string | null;
   payment_upfront: boolean;
   price: number | null;
-  discount: number;
+  discount: number;            // faktyczna kwota rabatu (zł, wyliczona)
+  discount_type: string;       // §13.4 AMOUNT | PERCENT
+  discount_value: number | null; // wartość wprowadzona (% lub zł)
+  transport_price: number | null; // §13.3 cena transportu dla klienta
   deposit: number;
   is_invoice: boolean;
   source: string | null;

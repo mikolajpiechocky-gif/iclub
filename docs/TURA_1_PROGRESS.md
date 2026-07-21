@@ -20,9 +20,9 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 13. ✅ Dodatkowy namiot jako osobna sekcja (+ gastronomiczny) (§10.2).
 14. ✅ Dodatki korzystają z magazynu — katalog dodatków w rezerwacji pochodzi z pozycji magazynowych oznaczonych „widoczna jako dodatek" (`listReservationAddons` = magazyn `is_addon`/aktywne/nie‑wewnętrzne, cena = cena wynajmu), uzupełniony o legacy `addons` dla zgodności wstecznej. Pełne sterowanie ilością +/- (§12.2) — do dodania osobno (§12).
 15. ✅ Pakiet ma własną cenę niezależną od sumy pozycji — `PackageRecord.base_price` to samodzielne pole edytowane w „Oferta i cennik"; rezerwacja bierze cenę pakietu wprost (nie liczy jej z pozycji). Pełny skład pakietu + snapshot (§11.2) zależą od modułu magazynu (§17) — do zrobienia osobno.
-16. ⬜ Boczne podsumowanie przelicza cenę na żywo (§13).
-17. ⬜ Rabat % lub kwotowy, obejmuje całe zamówienie (§13.4).
-18. ⬜ Zadatek domyślnie 300 zł + transport (§13.6).
+16. ✅ Boczne podsumowanie przelicza cenę na żywo — przyklejony panel (desktop) / rozwijany (mobile): pakiet + dodatki + transport − rabat = razem, zadatek, pozostało; „Zastosuj cenę" ustawia wartość końcową (§13).
+17. ✅ Rabat % lub kwotowy — `discount_type` (AMOUNT/PERCENT) + wartość; rabat obejmuje pakiet+dodatki+transport (`computeOrderPrice`), zapisywana też faktyczna kwota rabatu (§13.4).
+18. ✅ Zadatek domyślnie 300 zł + transport — `suggestedDeposit`, auto-sugestia dopóki Szef nie zmieni ręcznie; „Oblicz z adresu" liczy transport z widełek (§13.6/§14.3). Wymaga migracji 0035.
 19. ✅ Transport przelicza się z mapy — „Oblicz z mapy" zwraca odległość w jedną stronę + sugerowaną cenę i klasę trasy (§14.3).
 20. ✅ Widełki transportowe zgodne z dokumentem — `TRANSPORT_BRACKETS`, cena dla klienta wg odległości w jedną stronę, >400 km → wycena indywidualna (§15).
 21. ✅ D×2 / D×4 wpływają tylko na koszt wewnętrzny (paliwo + eksploatacja liczone od planowanych km); cena klienta niezależna od mnożnika (§16).
