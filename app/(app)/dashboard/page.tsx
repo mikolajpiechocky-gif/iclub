@@ -59,9 +59,10 @@ export default async function DashboardPage() {
   const near7 = upcoming.filter((r) => r.event_date! <= plus7Str).length;
   const toConfirm = upcoming.filter((r) => r.event_date! <= plus7Str && !r.client_confirmed);
   const newInquiries = inquiries.filter((q) => q.status === "NEW").length;
-  const noDeposit = reservations.filter(
-    // numeric z Postgresa bywa stringiem ("0.00") — koercja przed porównaniem.
-    (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && !Number(r.deposit)
+  // „Niepotwierdzone": aktywna rezerwacja czekająca na podpis umowy LUB wpłatę zadatku.
+  // (numeric z Postgresa bywa stringiem "0.00" — koercja przed porównaniem.)
+  const unconfirmed = reservations.filter(
+    (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && (!r.client_confirmed || !Number(r.deposit))
   );
   const plannedJobs = jobs.filter((j) => j.status === "PLANNED").length;
 
@@ -69,7 +70,7 @@ export default async function DashboardPage() {
   const kpis = [
     { label: "Najbliższe (7 dni)", value: String(near7), sub: toConfirm.length ? `${toConfirm.length} do potwierdzenia` : `${upcoming.length} nadchodzących`, tone: (toConfirm.length ? "warn" : "neutral") as "warn" | "neutral", href: toConfirm.length ? "/reservations?filter=to-confirm" : "/reservations?filter=upcoming7" },
     { label: "Nowe zapytania", value: String(newInquiries), sub: `${inquiries.length} łącznie`, tone: "neutral" as const, href: "/inquiries?status=NEW" },
-    { label: "Rezerwacje bez zadatku", value: String(noDeposit.length), sub: noDeposit.length ? "wymaga uwagi" : "brak", tone: (noDeposit.length ? "warn" : "neutral") as "warn" | "neutral", href: "/reservations?filter=no-deposit" },
+    { label: "Niepotwierdzone", value: String(unconfirmed.length), sub: unconfirmed.length ? "wymaga uwagi" : "brak", tone: (unconfirmed.length ? "warn" : "neutral") as "warn" | "neutral", href: "/reservations?filter=unconfirmed" },
     { label: "Zlecenia zaplanowane", value: String(plannedJobs), sub: `${jobs.length} zleceń`, tone: "neutral" as const, href: "/reservations?filter=upcoming" },
     { label: "Klienci", value: String(customers.length), sub: "w bazie", tone: "neutral" as const, href: "/customers" },
   ];
@@ -87,8 +88,9 @@ export default async function DashboardPage() {
   for (const r of invoicesToDo.slice(0, 4)) {
     attention.push({ tone: "warn", title: "Wystaw fakturę VAT", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}` });
   }
-  for (const r of noDeposit.slice(0, 4)) {
-    attention.push({ tone: "warn", title: "Rezerwacja bez zadatku", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}/edit` });
+  for (const r of unconfirmed.slice(0, 4)) {
+    const reason = !r.client_confirmed && !Number(r.deposit) ? "brak umowy i zadatku" : !r.client_confirmed ? "oczekuje na umowę" : "oczekuje na zadatek";
+    attention.push({ tone: "warn", title: "Niepotwierdzona rezerwacja", desc: `${r.customer?.name ?? "—"} · ${reason} · ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}/edit` });
   }
 
   const recentInquiries = inquiries.slice(0, 5);

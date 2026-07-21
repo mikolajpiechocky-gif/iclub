@@ -76,7 +76,7 @@ export const DEMO_UPCOMING: Array<{ id: string; day: string; time: string; clien
 export const DEMO_KPIS = [
   { label: "Najbliższe (7 dni)", value: "6", sub: "2 w ten weekend", tone: "neutral" as const },
   { label: "Nowe zapytania", value: "5", sub: "3 dziś", tone: "neutral" as const },
-  { label: "Rezerwacje bez zadatku", value: "2", sub: "wymaga uwagi", tone: "warn" as const },
+  { label: "Niepotwierdzone", value: "2", sub: "wymaga uwagi", tone: "warn" as const },
   { label: "Konflikty sprzętu", value: "1", sub: "6×8 Blue", tone: "bad" as const },
   { label: "Zaległe płatności", value: formatPLN(4890), sub: "4 faktury", tone: "bad" as const },
   { label: "Koszty do weryfikacji", value: "3", sub: "240 zł paliwo", tone: "warn" as const },
@@ -84,7 +84,7 @@ export const DEMO_KPIS = [
 
 export const DEMO_ATTENTION = [
   { tone: "bad" as const, title: "Konflikt sprzętu: 6×8 Blue", desc: "Zlecenia #1042 i #1047 nakładają się 18–19 lip", cta: "Rozwiąż" },
-  { tone: "warn" as const, title: "Rezerwacja bez zadatku", desc: "#1051 — Wieczór panieński, termin za 6 dni", cta: "Ponaglij" },
+  { tone: "warn" as const, title: "Niepotwierdzona rezerwacja", desc: "#1051 — Wieczór panieński, oczekuje na zadatek", cta: "Ponaglij" },
   { tone: "bad" as const, title: "Zaległa płatność 1 800 zł", desc: "#1038 — Nowak, 9 dni po terminie", cta: "Zobacz" },
   { tone: "warn" as const, title: "Koszt do weryfikacji", desc: "Paliwo 240 zł — zgłosił Marek W.", cta: "Zatwierdź" },
   { tone: "bad" as const, title: "Szkoda: rozdarcie poszycia", desc: "6×8 Green — pilność wysoka", cta: "Zobacz" },

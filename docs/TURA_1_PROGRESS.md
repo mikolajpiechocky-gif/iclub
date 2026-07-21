@@ -5,7 +5,7 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 
 ## Kryteria zakończenia (§24)
 
-1. ✅ Kafelki pulpitu prowadzą do przefiltrowanych list — MetricCard klikalny (`href`), filtry `?filter=` w rezerwacjach (bez zadatku / najbliższe 7 dni / do potwierdzenia / nadchodzące / faktura), `?status=` w zapytaniach, banner filtra z „Wyczyść" (§4.2).
+1. ✅ Kafelki pulpitu prowadzą do przefiltrowanych list — MetricCard klikalny (`href`), filtry `?filter=` w rezerwacjach (niepotwierdzone / najbliższe 7 dni / do potwierdzenia / nadchodzące / faktura), `?status=` w zapytaniach, banner filtra z „Wyczyść" (§4.2).
 2. ✅ „Wymaga uwagi" — każda pozycja linkuje do miejsca rozwiązania (rekord rezerwacji, ustawienia cen paliwa, moduł ogłoszeń) (§4.4).
 3. ✅ Overbooking namiotów blokowany — twardy blok przy zapisie (serwer), z wyjątkiem Szefa (checkbox + powód) (§10/§3).
 4. ✅ Mobilny kalendarz pokazuje cały tydzień — komponent `MobileCalendar` (7 kolumn bez poziomego przewijania, krótkie nazwy dni, kompaktowe kropki/licznik, kliknięcie dnia → agenda); siatka miesiąca tylko na desktopie (§5.2).

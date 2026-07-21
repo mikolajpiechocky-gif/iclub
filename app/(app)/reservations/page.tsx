@@ -15,10 +15,11 @@ const fmtPLN = (v: number | null) =>
 
 // §4.2 Filtry z pulpitu (klikalne kafelki prowadzą do przefiltrowanej listy).
 const FILTERS: Record<string, { label: string; test: (r: ReservationRecord, ctx: { todayStr: string; plus7Str: string }) => boolean }> = {
-  "no-deposit": {
-    label: "Bez zadatku",
-    // numeric z Postgresa bywa stringiem ("0.00") — koercja przed porównaniem.
-    test: (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && !Number(r.deposit),
+  "unconfirmed": {
+    label: "Niepotwierdzone",
+    // Aktywna rezerwacja bez podpisanej umowy LUB bez wpłaconego zadatku.
+    // (numeric z Postgresa bywa stringiem "0.00" — koercja przed porównaniem.)
+    test: (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && (!r.client_confirmed || !Number(r.deposit)),
   },
   "upcoming7": {
     label: "Najbliższe (7 dni)",
