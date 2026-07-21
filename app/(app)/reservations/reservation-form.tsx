@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, useEffect } from "react";
 import { PageHeader } from "@/components/layout";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
-import type { ReservationRecord, TentRecord, PackageRecord, AddonRecord, ReservationStatus, BusinessLine, PricingSnapshot } from "@/lib/data/types";
+import type { ReservationRecord, TentRecord, PackageRecord, ReservationAddon, ReservationStatus, BusinessLine, PricingSnapshot } from "@/lib/data/types";
 import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
 import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
 import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
@@ -41,7 +41,7 @@ export function ReservationForm({
   customers: CustomerOption[];
   tents: TentRecord[];
   packages: PackageRecord[];
-  addons: AddonRecord[];
+  addons: ReservationAddon[];
   assemblyConfig?: AssemblyConfig;
 }) {
   const router = useRouter();
@@ -68,6 +68,7 @@ export function ReservationForm({
     overbooking_reason: initial?.overbooking_reason ?? "",
     package_id: initial?.package_id ?? "",
     addon_ids: initial?.addon_ids ?? [],
+    addon_qty: initial?.addon_qty ?? {},
     rental_items: initial?.rental_items ?? "",
     delivery_time: initial?.delivery_time ?? "",
     payment_upfront: initial?.payment_upfront ?? false,
@@ -125,14 +126,23 @@ export function ReservationForm({
     setV((s) => ({ ...s, [k]: val }));
 
   const toggleAddon = (id: string) =>
-    setV((s) => ({
-      ...s,
-      addon_ids: s.addon_ids.includes(id) ? s.addon_ids.filter((a) => a !== id) : [...s.addon_ids, id],
-    }));
+    setV((s) => {
+      if (s.addon_ids.includes(id)) {
+        const nextQty = { ...s.addon_qty };
+        delete nextQty[id];
+        return { ...s, addon_ids: s.addon_ids.filter((a) => a !== id), addon_qty: nextQty };
+      }
+      return { ...s, addon_ids: [...s.addon_ids, id], addon_qty: { ...s.addon_qty, [id]: s.addon_qty[id] ?? 1 } };
+    });
 
+  // §12.2 Ilość dodatku (min 1). Zmiana natychmiast przelicza cenę i podsumowanie.
+  const setAddonQty = (id: string, qty: number) =>
+    setV((s) => ({ ...s, addon_qty: { ...s.addon_qty, [id]: Math.max(1, Math.round(qty) || 1) } }));
+
+  const qtyOf = (id: string) => Math.max(1, Math.round(v.addon_qty[id] ?? 1));
   const addonsTotal = addons
     .filter((a) => v.addon_ids.includes(a.id))
-    .reduce((sum, a) => sum + Number(a.price || 0), 0);
+    .reduce((sum, a) => sum + Number(a.price || 0) * qtyOf(a.id), 0);
 
   // §13 Kalkulacja na żywo: pakiet + dodatki + transport − rabat = razem; zadatek; pozostało.
   const selectedPackage = packages.find((p) => p.id === v.package_id);
@@ -173,7 +183,7 @@ export function ReservationForm({
     // §11.2 Snapshot wyceny z chwili zapisu (odporny na późniejsze zmiany cennika).
     const snapshot: PricingSnapshot = {
       package: selectedPackage ? { name: selectedPackage.name, price: packagePrice } : null,
-      addons: addons.filter((a) => v.addon_ids.includes(a.id)).map((a) => ({ name: a.name, price: Number(a.price || 0) })),
+      addons: addons.filter((a) => v.addon_ids.includes(a.id)).map((a) => ({ name: qtyOf(a.id) > 1 ? `${a.name} ×${qtyOf(a.id)}` : a.name, price: Number(a.price || 0) * qtyOf(a.id) })),
       transport_price: transportPrice,
       discount_type: v.discount_type,
       discount_value: discountValueNum,
@@ -296,20 +306,41 @@ export function ReservationForm({
             )}
             <div className="px-5 pb-5">
               <div className="mb-2 text-[12.5px] font-semibold text-ink-2">Dodatki {addonsTotal > 0 && <span className="text-ink">· {fmtPLN(addonsTotal)}</span>}</div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2">
                 {addons.map((a) => {
                   const on = v.addon_ids.includes(a.id);
+                  const qty = qtyOf(a.id);
+                  const over = on && a.available != null && qty > a.available;
                   return (
-                    <button
-                      type="button"
-                      key={a.id}
-                      onClick={() => toggleAddon(a.id)}
-                      className={`rounded-[10px] border px-3 py-2 text-[12.5px] font-semibold transition ${on ? "border-[#3a2a55] bg-[#271b3f] text-[#e0c8ff]" : "border-border bg-surface text-ink-2"}`}
-                    >
-                      {a.name}{a.price > 0 ? ` · ${fmtPLN(a.price)}` : ""}
-                    </button>
+                    <div key={a.id} className={`flex items-center gap-3 rounded-[11px] border px-3 py-2 ${on ? "border-[#3a2a55] bg-[#1c1530]" : "border-border bg-surface"}`}>
+                      {a.photo_url && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={a.photo_url} alt="" className="h-9 w-9 flex-none rounded-[8px] object-cover" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px] font-semibold text-ink">{a.name}</div>
+                        <div className="text-[11px] text-ink-2">
+                          {a.price > 0 ? fmtPLN(a.price) : "gratis"}{a.available != null ? ` · dostępne: ${a.available}` : ""}
+                          {over && <span className="font-bold text-warn"> · przekracza stan</span>}
+                        </div>
+                      </div>
+                      {on ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center rounded-[9px] border border-border">
+                            <button type="button" onClick={() => setAddonQty(a.id, qty - 1)} className="px-2.5 py-1 text-[15px] font-bold text-ink-2">−</button>
+                            <input inputMode="numeric" value={String(qty)} onChange={(e) => setAddonQty(a.id, Number(e.target.value.replace(/[^0-9]/g, "")) || 1)} className="w-9 bg-transparent text-center text-[13px] font-bold text-ink outline-none" aria-label={`Ilość: ${a.name}`} />
+                            <button type="button" onClick={() => setAddonQty(a.id, qty + 1)} className="px-2.5 py-1 text-[15px] font-bold text-ink-2">+</button>
+                          </div>
+                          <span className="w-14 text-right text-[12.5px] font-bold text-ink">{fmtPLN(a.price * qty)}</span>
+                          <button type="button" onClick={() => toggleAddon(a.id)} className="text-[11px] font-semibold text-bad">Usuń</button>
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => toggleAddon(a.id)} className="rounded-[9px] border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-accent-soft">Dodaj</button>
+                      )}
+                    </div>
                   );
                 })}
+                {addons.length === 0 && <p className="text-[12px] text-ink-2">Brak dodatków. Oznacz pozycje magazynowe jako „widoczne jako dodatek”.</p>}
               </div>
             </div>
           </SectionCard>

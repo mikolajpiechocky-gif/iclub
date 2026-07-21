@@ -91,6 +91,7 @@ export interface ReservationInput {
   overbooking_reason?: string | null;
   package_id: string | null;
   addon_ids: string[];
+  addon_qty?: Record<string, number>; // §12.2 ilość per dodatek
   rental_items?: string | null;
   delivery_time?: string | null;
   payment_upfront?: boolean;

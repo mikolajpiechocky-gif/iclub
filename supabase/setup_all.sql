@@ -1329,3 +1329,7 @@ alter table public.reservations add column if not exists pricing_snapshot jsonb;
 -- ================= 0039: zdjęcia pozycji magazynowych (§17) =================
 alter table public.equipment add column if not exists photo_url text;
 
+-- ================= 0040: ilości dodatków w rezerwacji (§12.2) =================
+-- Mapa { addon_id: ilość }. addon_ids nadal trzyma listę wybranych dodatków.
+alter table public.reservations add column if not exists addon_qty jsonb not null default '{}'::jsonb;
+

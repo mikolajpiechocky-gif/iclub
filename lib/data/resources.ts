@@ -2,7 +2,7 @@
 // Odczyt przez Supabase; w TRYBIE DEMO zwraca dane przykładowe.
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import type { TentRecord, PackageRecord, AddonRecord } from "./types";
+import type { TentRecord, PackageRecord, AddonRecord, ReservationAddon } from "./types";
 import { DEMO_TENT_RECORDS, DEMO_PACKAGE_RECORDS, DEMO_ADDON_RECORDS } from "./demo-resources";
 import { listAddonInventory } from "./inventory";
 
@@ -50,18 +50,21 @@ export async function listAddons(): Promise<AddonRecord[]> {
 // §12 Katalog dodatków rezerwacji = pozycje magazynowe oznaczone „widoczna jako dodatek"
 // (główne źródło), uzupełnione o legacy `addons` dla zgodności wstecznej istniejących
 // rezerwacji. Cena dodatku = cena wynajmu pozycji magazynowej.
-export async function listReservationAddons(): Promise<AddonRecord[]> {
+export async function listReservationAddons(): Promise<ReservationAddon[]> {
   const [legacy, warehouse] = await Promise.all([listAddons(), listAddonInventory()]);
-  const fromWarehouse: AddonRecord[] = warehouse.map((e, i) => ({
+  const fromWarehouse: ReservationAddon[] = warehouse.map((e) => ({
     id: e.id,
     code: e.code,
     name: e.name,
     price: e.rental_price ?? 0,
-    active: true,
-    sort: i,
+    photo_url: e.photo_url,
+    available: e.quantity,
   }));
   const seen = new Set(fromWarehouse.map((a) => a.id));
-  return [...fromWarehouse, ...legacy.filter((a) => !seen.has(a.id))];
+  const fromLegacy: ReservationAddon[] = legacy
+    .filter((a) => !seen.has(a.id))
+    .map((a) => ({ id: a.id, code: a.code, name: a.name, price: a.price, photo_url: null, available: null }));
+  return [...fromWarehouse, ...fromLegacy];
 }
 
 // --- Cennik (§51): edycja cen pakietów i dodatków. Zapis tylko OWNER (RLS). ---

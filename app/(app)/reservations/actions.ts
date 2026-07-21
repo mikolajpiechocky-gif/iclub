@@ -31,6 +31,7 @@ export interface ReservationFormValues {
   overbooking_reason: string;
   package_id: string;
   addon_ids: string[];
+  addon_qty: Record<string, number>; // §12.2 ilość per dodatek
   rental_items: string;
   delivery_time: string;
   payment_upfront: boolean;
@@ -133,6 +134,8 @@ function toInput(v: ReservationFormValues): ReservationInput {
     overbooking_reason: v.overbooking_override ? clean(v.overbooking_reason) : null,
     package_id: v.package_id.trim() ? v.package_id.trim() : null,
     addon_ids: v.addon_ids,
+    // §12.2 zapisz ilości tylko dla wybranych dodatków (≥ 1).
+    addon_qty: Object.fromEntries(v.addon_ids.map((id) => [id, Math.max(1, Math.round(v.addon_qty?.[id] ?? 1))])),
     rental_items: clean(v.rental_items),
     delivery_time: clean(v.delivery_time),
     payment_upfront: v.payment_upfront,

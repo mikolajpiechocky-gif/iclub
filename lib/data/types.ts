@@ -140,6 +140,16 @@ export interface AddonRecord {
   sort: number;
 }
 
+// §12 Dodatek w rezerwacji — wzbogacony o dane z magazynu (zdjęcie, dostępność).
+export interface ReservationAddon {
+  id: string;
+  code: string;
+  name: string;
+  price: number;
+  photo_url: string | null; // z magazynu (jeśli pozycja magazynowa)
+  available: number | null; // ilość na stanie (jeśli z magazynu)
+}
+
 // §11.2 Snapshot wyceny rezerwacji — kopia z chwili zapisu (odporna na zmiany cennika).
 export interface PricingSnapshot {
   package: { name: string; price: number } | null;
@@ -172,6 +182,7 @@ export interface ReservationRecord {
   overbooking_reason: string | null;
   package_id: string | null;
   addon_ids: string[];
+  addon_qty: Record<string, number> | null; // §12.2 ilość per dodatek (domyślnie 1)
   rental_items: string | null;
   delivery_time: string | null;
   payment_upfront: boolean;
