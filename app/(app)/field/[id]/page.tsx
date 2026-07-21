@@ -88,7 +88,11 @@ export default async function FieldRealizationPage({ params }: { params: Promise
       <div className="px-4 pt-4">
         {/* Skrót danych */}
         <div className="mb-3.5 flex flex-wrap gap-2">
-          {[r?.tent?.name, r?.package?.name, r?.guests != null ? `${r.guests} os.` : null].filter(Boolean).map((c) => (
+          {[
+            r?.assembly_time ? `Montaż ${r.assembly_time}` : null,
+            r?.event_start_time ? `Start ${r.event_start_time}` : null,
+            r?.tent?.name, r?.package?.name, r?.guests != null ? `${r.guests} os.` : null,
+          ].filter(Boolean).map((c) => (
             <span key={c as string} className="rounded-[10px] border border-border bg-surface px-2.5 py-2 text-[12px] font-semibold text-ink">{c}</span>
           ))}
         </div>

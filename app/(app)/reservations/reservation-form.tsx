@@ -10,7 +10,10 @@ import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LAB
 import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
 import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
 import { computeOrderPrice, suggestedDeposit } from "@/lib/domain/order-pricing";
+import { computeSetupTimes, fmtDuration, type AssemblyConfig } from "@/lib/domain/assembly";
 import { AddressAutocomplete } from "./address-autocomplete";
+
+const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = { bufferMinutes: 30, addonMinutes: 10, gastroMinutes: 60 };
 
 type CustomerOption = { id: string; name: string };
 
@@ -32,12 +35,14 @@ export function ReservationForm({
   tents,
   packages,
   addons,
+  assemblyConfig = DEFAULT_ASSEMBLY_CONFIG,
 }: {
   initial?: ReservationRecord;
   customers: CustomerOption[];
   tents: TentRecord[];
   packages: PackageRecord[];
   addons: AddonRecord[];
+  assemblyConfig?: AssemblyConfig;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -73,6 +78,8 @@ export function ReservationForm({
     discount_amount: initial?.discount != null ? String(initial.discount) : "",
     transport_price: initial?.transport_price != null ? String(initial.transport_price) : "",
     deposit: initial?.deposit != null ? String(initial.deposit) : "",
+    event_start_time: initial?.event_start_time ?? "",
+    assembly_time: initial?.assembly_time ?? "",
     is_invoice: initial?.is_invoice ?? false,
     source: initial?.source ?? "",
     status: initial?.status ?? "TEMPORARY",
@@ -127,7 +134,10 @@ export function ReservationForm({
     .reduce((sum, a) => sum + Number(a.price || 0), 0);
 
   // §13 Kalkulacja na żywo: pakiet + dodatki + transport − rabat = razem; zadatek; pozostało.
-  const packagePrice = Number(packages.find((p) => p.id === v.package_id)?.base_price ?? 0);
+  const selectedPackage = packages.find((p) => p.id === v.package_id);
+  const packagePrice = Number(selectedPackage?.base_price ?? 0);
+  // §9 Sugerowane godziny montażu (start imprezy − pakiet − dodatki − gastro − bufor).
+  const setupTimes = computeSetupTimes(v.event_start_time, selectedPackage?.assembly_minutes ?? 0, v.addon_ids.length, v.tent_extra === "GASTRO", assemblyConfig);
   const transportPrice = Number(v.transport_price.replace(",", ".")) || 0;
   const discountValueNum = Number(v.discount_value.replace(",", ".")) || 0;
   const order = computeOrderPrice({ packagePrice, addonsTotal, transportPrice, discountType: v.discount_type, discountValue: discountValueNum });
@@ -306,6 +316,29 @@ export function ReservationForm({
                 <option value="UP">Opłacone z góry</option>
               </SelectField>
             </div>
+          </SectionCard>
+        )}
+
+        {v.business_line === "ICLUB" && (
+          <SectionCard title="Ustalenia czasowe" className="p-5">
+            <div className="grid grid-cols-1 gap-4 px-5 pb-3 sm:grid-cols-2">
+              <TextField label="Godzina rozpoczęcia imprezy" type="time" value={v.event_start_time} onChange={(e) => set("event_start_time", e.target.value)} hint="Od niej liczymy sugerowany montaż" />
+              <div>
+                <TextField label="Ustalona godzina montażu (opcjonalnie)" type="time" value={v.assembly_time} onChange={(e) => set("assembly_time", e.target.value)} />
+                {setupTimes.suggested && (
+                  <button type="button" onClick={() => set("assembly_time", setupTimes.suggested!)} className="mt-1.5 text-[12px] font-semibold text-accent-soft">Użyj sugerowanej {setupTimes.suggested} →</button>
+                )}
+              </div>
+            </div>
+            {v.event_start_time && setupTimes.suggested ? (
+              <div className="flex flex-col gap-1 px-5 pb-5 text-[12.5px] text-ink-2">
+                <div>Montaż wg pakietu: <span className="font-bold text-ink">{setupTimes.byPackage}</span></div>
+                <div>Sugerowany montaż (po dodatkach): <span className="font-bold text-ink">{setupTimes.suggested}</span>{setupTimes.prevDay ? " (dzień wcześniej)" : ""} · przygotowanie {fmtDuration(setupTimes.totalMinutes)}</div>
+                {v.assembly_time && v.assembly_time !== setupTimes.suggested && <div>Ustalono ręcznie: <span className="font-bold text-warn">{v.assembly_time}</span></div>}
+              </div>
+            ) : (
+              <p className="px-5 pb-5 text-[12px] text-ink-2">Podaj godzinę rozpoczęcia imprezy{!selectedPackage ? " i wybierz pakiet" : ""}, aby zobaczyć sugerowaną godzinę montażu.</p>
+            )}
           </SectionCard>
         )}
 

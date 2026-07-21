@@ -8,9 +8,9 @@ export const DEMO_TENT_RECORDS: TentRecord[] = [
 ];
 
 export const DEMO_PACKAGE_RECORDS: PackageRecord[] = [
-  { id: "demo-p1", code: "STANDARD", name: "Standard", description: "Namiot iClub, montaż, oświetlenie LED, laser, dym, serwis, nagłośnienie.", base_price: 0, active: true, sort: 1 },
-  { id: "demo-p2", code: "PREMIUM", name: "Premium", description: "Standard + parkiet ze sztucznej trawy, laser animacyjny, 50 pałeczek fluo.", base_price: 0, active: true, sort: 2 },
-  { id: "demo-p3", code: "VIP", name: "VIP", description: "Premium + 100 pałeczek fluo, oświetlenie UV, strefa VIP, karaoke.", base_price: 0, active: true, sort: 3 },
+  { id: "demo-p1", code: "STANDARD", name: "Standard", description: "Namiot iClub, montaż, oświetlenie LED, laser, dym, serwis, nagłośnienie.", base_price: 0, active: true, sort: 1, assembly_minutes: 180 },
+  { id: "demo-p2", code: "PREMIUM", name: "Premium", description: "Standard + parkiet ze sztucznej trawy, laser animacyjny, 50 pałeczek fluo.", base_price: 0, active: true, sort: 2, assembly_minutes: 210 },
+  { id: "demo-p3", code: "VIP", name: "VIP", description: "Premium + 100 pałeczek fluo, oświetlenie UV, strefa VIP, karaoke.", base_price: 0, active: true, sort: 3, assembly_minutes: 240 },
 ];
 
 export const DEMO_ADDON_RECORDS: AddonRecord[] = [

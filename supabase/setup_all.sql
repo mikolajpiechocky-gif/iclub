@@ -1313,3 +1313,13 @@ alter table public.reservations add column if not exists transport_price numeric
 -- ================= 0036: avatary zespołu =================
 alter table public.profiles add column if not exists avatar_url text;
 
+-- ================= 0037: godziny montażu (§9) =================
+alter table public.packages add column if not exists assembly_minutes integer not null default 180;
+alter table public.app_settings add column if not exists assembly_buffer_minutes integer not null default 30;
+alter table public.app_settings add column if not exists assembly_addon_minutes integer not null default 10;
+alter table public.app_settings add column if not exists assembly_gastro_minutes integer not null default 60;
+alter table public.reservations add column if not exists event_start_time time;
+alter table public.reservations add column if not exists assembly_time time;
+alter table public.reservations add column if not exists assembly_time_by uuid references public.profiles(id) on delete set null;
+alter table public.reservations add column if not exists assembly_time_at timestamptz;
+

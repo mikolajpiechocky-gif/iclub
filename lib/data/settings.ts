@@ -15,6 +15,10 @@ export interface AppSettings {
   iclub_hourly_rate: number;    // stawka „czasu wolnego" (zł/h), np. 32,40
   iclub_month_threshold: number; // liczba pierwszych realizacji w miesiącu = czas wolny
   iclub_flat_rate: number;      // ryczałt za realizację powyżej progu (zł), np. 500
+  // §9.3 Bufory do sugerowanej godziny montażu (minuty)
+  assembly_buffer_minutes: number;  // bufor bezpieczeństwa
+  assembly_addon_minutes: number;   // dodatkowy czas na każdy dodatek
+  assembly_gastro_minutes: number;  // dodatkowy czas na namiot gastronomiczny
 }
 
 // Wartości startowe (seed migracji 0017/0019/0033). Jedyne miejsce z domyślnymi liczbami.
@@ -29,6 +33,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   iclub_hourly_rate: 32.4,
   iclub_month_threshold: 4,
   iclub_flat_rate: 500,
+  assembly_buffer_minutes: 30,
+  assembly_addon_minutes: 10,
+  assembly_gastro_minutes: 60,
 };
 
 const num = (v: unknown, fallback: number) => {
@@ -41,7 +48,7 @@ export async function getSettings(): Promise<AppSettings> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("app_settings")
-    .select("base_address, fuel_price_petrol, fuel_price_diesel, fuel_price_lpg, amortization_per_km, iclub_hours, vat_rate, iclub_hourly_rate, iclub_month_threshold, iclub_flat_rate")
+    .select("base_address, fuel_price_petrol, fuel_price_diesel, fuel_price_lpg, amortization_per_km, iclub_hours, vat_rate, iclub_hourly_rate, iclub_month_threshold, iclub_flat_rate, assembly_buffer_minutes, assembly_addon_minutes, assembly_gastro_minutes")
     .eq("id", true)
     .maybeSingle();
   if (error || !data) return DEFAULT_SETTINGS;
@@ -56,6 +63,9 @@ export async function getSettings(): Promise<AppSettings> {
     iclub_hourly_rate: num(data.iclub_hourly_rate, DEFAULT_SETTINGS.iclub_hourly_rate),
     iclub_month_threshold: num(data.iclub_month_threshold, DEFAULT_SETTINGS.iclub_month_threshold),
     iclub_flat_rate: num(data.iclub_flat_rate, DEFAULT_SETTINGS.iclub_flat_rate),
+    assembly_buffer_minutes: num(data.assembly_buffer_minutes, DEFAULT_SETTINGS.assembly_buffer_minutes),
+    assembly_addon_minutes: num(data.assembly_addon_minutes, DEFAULT_SETTINGS.assembly_addon_minutes),
+    assembly_gastro_minutes: num(data.assembly_gastro_minutes, DEFAULT_SETTINGS.assembly_gastro_minutes),
   };
 }
 

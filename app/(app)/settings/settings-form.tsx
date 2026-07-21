@@ -24,6 +24,9 @@ export function SettingsForm({ initial, disabled }: { initial: AppSettings; disa
     iclub_hourly_rate: str(initial.iclub_hourly_rate),
     iclub_month_threshold: str(initial.iclub_month_threshold),
     iclub_flat_rate: str(initial.iclub_flat_rate),
+    assembly_buffer_minutes: str(initial.assembly_buffer_minutes),
+    assembly_addon_minutes: str(initial.assembly_addon_minutes),
+    assembly_gastro_minutes: str(initial.assembly_gastro_minutes),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -89,6 +92,15 @@ export function SettingsForm({ initial, disabled }: { initial: AppSettings; disa
         <p className="px-5 pb-5 text-[12px] text-ink-2">
           Każda z pierwszych realizacji w miesiącu = {v.iclub_hours || "8"} h czasu wolnego (wartość {v.iclub_hours || "8"} h × {v.iclub_hourly_rate || "32,40"} zł). Piąta i kolejne = ryczałt {v.iclub_flat_rate || "500"} zł + premie. Premie (daleki wyjazd, gastro, opinia, rolka) ustawiasz per pracownik w „Pracownicy”.
         </p>
+      </SectionCard>
+
+      <SectionCard title="Czas montażu (sugerowana godzina)" className="mt-4 p-5">
+        <div className="grid grid-cols-1 gap-4 px-5 pb-2 sm:grid-cols-3">
+          <TextField label="Bufor bezpieczeństwa (min)" inputMode="numeric" value={v.assembly_buffer_minutes} onChange={(e) => set("assembly_buffer_minutes", e.target.value)} error={errors.assembly_buffer_minutes} hint="np. 30" />
+          <TextField label="Na każdy dodatek (min)" inputMode="numeric" value={v.assembly_addon_minutes} onChange={(e) => set("assembly_addon_minutes", e.target.value)} error={errors.assembly_addon_minutes} hint="np. 10" />
+          <TextField label="Namiot gastronomiczny (min)" inputMode="numeric" value={v.assembly_gastro_minutes} onChange={(e) => set("assembly_gastro_minutes", e.target.value)} error={errors.assembly_gastro_minutes} hint="np. 60" />
+        </div>
+        <p className="px-5 pb-5 text-[12px] text-ink-2">Sugerowana godzina montażu = start imprezy − (czas montażu pakietu + dodatki + gastro + bufor). Czas montażu pakietu ustawiasz w „Oferta i cennik”.</p>
       </SectionCard>
 
       <div className="mt-4 flex justify-end">

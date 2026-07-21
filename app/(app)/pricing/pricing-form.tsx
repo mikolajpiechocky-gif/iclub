@@ -6,7 +6,7 @@ import { SectionCard, PrimaryButton, Alert } from "@/components/ui";
 import type { PackageRecord, AddonRecord } from "@/lib/data/types";
 import { updatePricingAction } from "./actions";
 
-type Row = { id: string; name: string; description?: string | null; price: string };
+type Row = { id: string; name: string; description?: string | null; price: string; assembly?: string };
 
 export function PricingForm({
   packages,
@@ -24,7 +24,7 @@ export function PricingForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [pkg, setPkg] = useState<Row[]>(
-    packages.map((p) => ({ id: p.id, name: p.name, description: p.description, price: String(p.base_price ?? 0) })),
+    packages.map((p) => ({ id: p.id, name: p.name, description: p.description, price: String(p.base_price ?? 0), assembly: String(p.assembly_minutes ?? 180) })),
   );
   const [add, setAdd] = useState<Row[]>(
     addons.map((a) => ({ id: a.id, name: a.name, price: String(a.price ?? 0) })),
@@ -37,13 +37,18 @@ export function PricingForm({
     else setAdd(upd);
   };
 
+  const setPkgAssembly = (id: string, assembly: string) => {
+    setSaved(false);
+    setPkg((rows) => rows.map((r) => (r.id === id ? { ...r, assembly } : r)));
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
     setFormError(null);
     startTransition(async () => {
       const res = await updatePricingAction({
-        packages: pkg.map(({ id, price }) => ({ id, price })),
+        packages: pkg.map(({ id, price, assembly }) => ({ id, price, assembly })),
         addons: add.map(({ id, price }) => ({ id, price })),
       });
       if (res.ok) { setSaved(true); router.refresh(); return; }
@@ -72,11 +77,21 @@ export function PricingForm({
       <SectionCard title="Pakiety" className="p-5">
         <div className="flex flex-col divide-y divide-border-soft px-5 pb-2">
           {pkg.map((r) => (
-            <div key={r.id} className="flex items-center justify-between gap-3 py-3">
-              <div className="min-w-0">
+            <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div className="min-w-0 flex-1">
                 <div className="text-[14px] font-bold text-ink">{r.name}</div>
                 {r.description && <div className="truncate text-[12px] text-ink-2">{r.description}</div>}
                 {errors[r.id] && <div className="text-[11px] font-semibold text-bad">{errors[r.id]}</div>}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  inputMode="numeric"
+                  value={r.assembly ?? ""}
+                  onChange={(e) => setPkgAssembly(r.id, e.target.value)}
+                  className="w-20 rounded-[10px] border border-border bg-surface px-3 py-2 text-right text-[14px] font-semibold text-ink outline-none focus:border-brand"
+                  aria-label="Czas montażu (minuty)"
+                />
+                <span className="text-[12px] font-semibold text-ink-2">min montażu</span>
               </div>
               {priceInput("pkg", r)}
             </div>

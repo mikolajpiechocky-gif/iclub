@@ -60,7 +60,7 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
   const cards: { h: string; rows: [string, string][] }[] = [
     { h: "Klient", rows: [["Klient", (r as { customer?: { name?: string } }).customer?.name ?? "—"], ["Źródło", reservation.source ?? "—"]] },
     { h: "Wydarzenie", rows: [["Typ", reservation.event_type ?? "—"], ["Goście", reservation.guests != null ? `${reservation.guests} osób` : "—"], ["Data", fmtDate(reservation.event_date)]] },
-    { h: "Terminy", rows: [["Montaż", fmtDate(reservation.setup_date)], ["Demontaż", fmtDate(reservation.teardown_date)], ["Lokalizacja", reservation.location ?? "—"]] },
+    { h: "Terminy", rows: [["Montaż", fmtDate(reservation.setup_date)], ["Demontaż", fmtDate(reservation.teardown_date)], ["Start imprezy", reservation.event_start_time ?? "—"], ["Godz. montażu", reservation.assembly_time ?? "—"], ["Lokalizacja", reservation.location ?? "—"]] },
     { h: "Namiot i pakiet", rows: [["Namiot", (r as { tent?: { name?: string } }).tent?.name ?? "—"], ["Pakiet", (r as { package?: { name?: string } }).package?.name ?? "—"]] },
   ];
   // Rozliczenie (Wartość/Rabat/Zadatek) — tylko szef; pracownika to nie dotyczy.

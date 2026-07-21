@@ -128,6 +128,7 @@ export interface PackageRecord {
   base_price: number;
   active: boolean;
   sort: number;
+  assembly_minutes: number; // §9.2 standardowy czas montażu pakietu (minuty)
 }
 
 export interface AddonRecord {
@@ -167,6 +168,11 @@ export interface ReservationRecord {
   discount_value: number | null; // wartość wprowadzona (% lub zł)
   transport_price: number | null; // §13.3 cena transportu dla klienta
   deposit: number;
+  // §9 Godziny montażu
+  event_start_time: string | null;  // godzina rozpoczęcia imprezy (HH:MM)
+  assembly_time: string | null;     // ustalona (ręcznie) godzina montażu
+  assembly_time_by: string | null;  // kto ustalił ręcznie
+  assembly_time_at: string | null;  // kiedy ustalono ręcznie
   is_invoice: boolean;
   source: string | null;
   status: ReservationStatus;

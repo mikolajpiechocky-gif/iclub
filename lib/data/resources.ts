@@ -54,6 +54,13 @@ export async function updatePackagePrice(id: string, base_price: number): Promis
   if (error) throw new Error(error.message);
 }
 
+// §9.2 Standardowy czas montażu pakietu (minuty).
+export async function updatePackageAssembly(id: string, assembly_minutes: number): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("packages").update({ assembly_minutes }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function updateAddonPrice(id: string, price: number): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("addons").update({ price }).eq("id", id);

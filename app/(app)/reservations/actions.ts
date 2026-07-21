@@ -41,6 +41,8 @@ export interface ReservationFormValues {
   discount_amount: string;
   transport_price: string; // §13.3 cena transportu dla klienta
   deposit: string;
+  event_start_time: string; // §9.1 godzina rozpoczęcia imprezy
+  assembly_time: string;    // §9.3 ustalona godzina montażu (opcjonalnie)
   is_invoice: boolean;
   source: string;
   status: ReservationStatus;
@@ -132,6 +134,8 @@ function toInput(v: ReservationFormValues): ReservationInput {
     discount_value: toNumber(v.discount_value),
     transport_price: toNumber(v.transport_price),
     deposit: toNumber(v.deposit) ?? 0,
+    event_start_time: clean(v.event_start_time),
+    assembly_time: clean(v.assembly_time),
     is_invoice: v.is_invoice,
     source: clean(v.source),
     status: v.status,

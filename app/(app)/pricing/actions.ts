@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { updatePackagePrice, updateAddonPrice } from "@/lib/data/resources";
+import { updatePackagePrice, updatePackageAssembly, updateAddonPrice } from "@/lib/data/resources";
 
 export interface PriceRow {
   id: string;
   price: string;
+  assembly?: string; // §9.2 czas montażu (minuty) — tylko pakiety
 }
 export interface PricingFormValues {
   packages: PriceRow[];
@@ -36,23 +37,29 @@ export async function updatePricingAction(v: PricingFormValues): Promise<ActionR
 
   // Walidacja wszystkich kwot przed jakimkolwiek zapisem.
   const fieldErrors: Record<string, string> = {};
-  const parsed: { id: string; price: number; kind: "pkg" | "add" }[] = [];
+  const parsed: { id: string; price: number; assembly: number | null; kind: "pkg" | "add" }[] = [];
   for (const row of v.packages) {
     const n = num(row.price);
+    const a = row.assembly != null ? num(row.assembly) : null;
     if (n == null || n < 0) fieldErrors[row.id] = "Podaj kwotę ≥ 0.";
-    else parsed.push({ id: row.id, price: n, kind: "pkg" });
+    else if (a != null && (a < 0 || !Number.isInteger(a))) fieldErrors[row.id] = "Czas montażu: liczba całkowita minut ≥ 0.";
+    else parsed.push({ id: row.id, price: n, assembly: a, kind: "pkg" });
   }
   for (const row of v.addons) {
     const n = num(row.price);
     if (n == null || n < 0) fieldErrors[row.id] = "Podaj kwotę ≥ 0.";
-    else parsed.push({ id: row.id, price: n, kind: "add" });
+    else parsed.push({ id: row.id, price: n, assembly: null, kind: "add" });
   }
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
 
   try {
     for (const row of parsed) {
-      if (row.kind === "pkg") await updatePackagePrice(row.id, row.price);
-      else await updateAddonPrice(row.id, row.price);
+      if (row.kind === "pkg") {
+        await updatePackagePrice(row.id, row.price);
+        if (row.assembly != null) await updatePackageAssembly(row.id, row.assembly);
+      } else {
+        await updateAddonPrice(row.id, row.price);
+      }
     }
     revalidatePath("/pricing");
     revalidatePath("/reservations/new");

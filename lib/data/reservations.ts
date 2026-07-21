@@ -100,6 +100,8 @@ export interface ReservationInput {
   discount_value?: number | null; // wartość wprowadzona (% lub zł)
   transport_price?: number | null; // §13.3 cena transportu dla klienta
   deposit?: number;
+  event_start_time?: string | null; // §9.1 godzina rozpoczęcia imprezy
+  assembly_time?: string | null;    // §9.3 ustalona (ręcznie) godzina montażu
   is_invoice?: boolean;
   source?: string | null;
   status: ReservationStatus;
@@ -126,6 +128,26 @@ export async function getReservation(id: string): Promise<ReservationRecord | nu
   return data as ReservationRecord;
 }
 
+// §9.3 Stempel autora/daty ręcznego ustalenia godziny montażu. Zwraca pola do zapisu
+// albo null, gdy pola nie przekazano (wtedy nie ruszamy). Zachowuje autora, gdy godzina
+// się nie zmieniła; czyści, gdy usunięto ręczne ustalenie.
+async function assemblyStampFor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string | null,
+  input: ReservationInput,
+): Promise<{ assembly_time_by: string | null; assembly_time_at: string | null } | null> {
+  if (input.assembly_time === undefined) return null;
+  const newVal = input.assembly_time || null;
+  if (!newVal) return { assembly_time_by: null, assembly_time_at: null };
+  if (id) {
+    const { data } = await supabase.from("reservations").select("assembly_time, assembly_time_by, assembly_time_at").eq("id", id).maybeSingle();
+    const prev = data as { assembly_time: string | null; assembly_time_by: string | null; assembly_time_at: string | null } | null;
+    if (prev && prev.assembly_time === newVal) return { assembly_time_by: prev.assembly_time_by, assembly_time_at: prev.assembly_time_at };
+  }
+  const { data: { user } } = await supabase.auth.getUser();
+  return { assembly_time_by: user?.id ?? null, assembly_time_at: new Date().toISOString() };
+}
+
 // Tworzy rezerwację + automatyczne zlecenie + etapy.
 export async function createReservation(input: ReservationInput): Promise<{ id: string; jobId: string }> {
   const supabase = await createClient();
@@ -134,9 +156,10 @@ export async function createReservation(input: ReservationInput): Promise<{ id: 
   } = await supabase.auth.getUser();
 
   const resolved = input.tent_main !== undefined ? await resolveFromChoices(input) : {};
+  const stamp = await assemblyStampFor(supabase, null, input);
   const { data: reservation, error: rErr } = await supabase
     .from("reservations")
-    .insert({ ...input, ...resolved, created_by: user?.id ?? null })
+    .insert({ ...input, ...resolved, ...(stamp ?? {}), created_by: user?.id ?? null })
     .select("id, business_line, event_type, event_date")
     .single();
   if (rErr) throw new Error(rErr.message);
@@ -169,7 +192,8 @@ export async function createReservation(input: ReservationInput): Promise<{ id: 
 export async function updateReservation(id: string, input: ReservationInput): Promise<void> {
   const supabase = await createClient();
   const resolved = input.tent_main !== undefined ? await resolveFromChoices(input) : {};
-  const { error } = await supabase.from("reservations").update({ ...input, ...resolved }).eq("id", id);
+  const stamp = await assemblyStampFor(supabase, id, input);
+  const { error } = await supabase.from("reservations").update({ ...input, ...resolved, ...(stamp ?? {}) }).eq("id", id);
   if (error) throw new Error(error.message);
 }
 

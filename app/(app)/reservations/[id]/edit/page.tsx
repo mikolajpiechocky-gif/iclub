@@ -3,18 +3,21 @@ import { notFound } from "next/navigation";
 import { getReservation } from "@/lib/data/reservations";
 import { listCustomers } from "@/lib/data/customers";
 import { listTents, listPackages, listReservationAddons } from "@/lib/data/resources";
+import { getSettings } from "@/lib/data/settings";
+import { assemblyConfigFromSettings } from "@/lib/domain/assembly";
 import { ReservationForm } from "../../reservation-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditReservationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [reservation, customers, tents, packages, addons] = await Promise.all([
+  const [reservation, customers, tents, packages, addons, settings] = await Promise.all([
     getReservation(id),
     listCustomers(),
     listTents(),
     listPackages(),
     listReservationAddons(),
+    getSettings(),
   ]);
   if (!reservation) notFound();
   return (
@@ -24,6 +27,7 @@ export default async function EditReservationPage({ params }: { params: Promise<
       tents={tents}
       packages={packages}
       addons={addons}
+      assemblyConfig={assemblyConfigFromSettings(settings)}
     />
   );
 }
