@@ -1186,3 +1186,23 @@ drop policy if exists job_assignments_delete on public.job_assignments;
 create policy job_assignments_delete on public.job_assignments for delete to authenticated
   using (public.is_owner() or (profile_id = auth.uid() and status = 'REQUESTED'));
 
+-- ================= 0028: integracja OLX (tokeny + dedup leadów) =================
+create table if not exists public.olx_integration (
+  id boolean primary key default true,
+  refresh_token text,
+  access_token text,
+  access_expires_at timestamptz,
+  olx_user_id text,
+  connected_at timestamptz,
+  last_sync_at timestamptz,
+  constraint olx_singleton check (id)
+);
+alter table public.olx_integration enable row level security;
+drop policy if exists olx_integration_owner on public.olx_integration;
+create policy olx_integration_owner on public.olx_integration for all to authenticated
+  using (public.is_owner()) with check (public.is_owner());
+
+alter table public.inquiries add column if not exists olx_thread_id text;
+alter table public.inquiries add column if not exists olx_last_message_at timestamptz;
+create unique index if not exists uq_inquiries_olx_thread on public.inquiries (olx_thread_id) where olx_thread_id is not null;
+
