@@ -2,7 +2,7 @@
 import { notFound } from "next/navigation";
 import { getReservation } from "@/lib/data/reservations";
 import { listCustomers } from "@/lib/data/customers";
-import { listTents, listPackages, listAddons } from "@/lib/data/resources";
+import { listTents, listPackages, listReservationAddons } from "@/lib/data/resources";
 import { ReservationForm } from "../../reservation-form";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export default async function EditReservationPage({ params }: { params: Promise<
     listCustomers(),
     listTents(),
     listPackages(),
-    listAddons(),
+    listReservationAddons(),
   ]);
   if (!reservation) notFound();
   return (

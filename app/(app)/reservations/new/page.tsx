@@ -1,7 +1,7 @@
 // app/(app)/reservations/new/page.tsx — nowa rezerwacja iClub.
 import { ReservationForm } from "../reservation-form";
 import { listCustomers } from "@/lib/data/customers";
-import { listTents, listPackages, listAddons } from "@/lib/data/resources";
+import { listTents, listPackages, listReservationAddons } from "@/lib/data/resources";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ export default async function NewReservationPage() {
     listCustomers(),
     listTents(),
     listPackages(),
-    listAddons(),
+    listReservationAddons(),
   ]);
   return (
     <ReservationForm

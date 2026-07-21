@@ -18,7 +18,7 @@ Legenda: ✅ zrobione · 🟡 częściowo · ⬜ do zrobienia.
 11. ✅ Duże namioty jako pula dwóch egzemplarzy (§10).
 12. ✅ Duży z tylnymi drzwiami jako konkretny zasób z tej samej puli (§10).
 13. ✅ Dodatkowy namiot jako osobna sekcja (+ gastronomiczny) (§10.2).
-14. ⬜ Dodatki korzystają z magazynu (§12).
+14. ✅ Dodatki korzystają z magazynu — katalog dodatków w rezerwacji pochodzi z pozycji magazynowych oznaczonych „widoczna jako dodatek" (`listReservationAddons` = magazyn `is_addon`/aktywne/nie‑wewnętrzne, cena = cena wynajmu), uzupełniony o legacy `addons` dla zgodności wstecznej. Pełne sterowanie ilością +/- (§12.2) — do dodania osobno (§12).
 15. ✅ Pakiet ma własną cenę niezależną od sumy pozycji — `PackageRecord.base_price` to samodzielne pole edytowane w „Oferta i cennik"; rezerwacja bierze cenę pakietu wprost (nie liczy jej z pozycji). Pełny skład pakietu + snapshot (§11.2) zależą od modułu magazynu (§17) — do zrobienia osobno.
 16. ⬜ Boczne podsumowanie przelicza cenę na żywo (§13).
 17. ⬜ Rabat % lub kwotowy, obejmuje całe zamówienie (§13.4).
