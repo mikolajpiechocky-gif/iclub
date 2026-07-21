@@ -2,7 +2,7 @@
 // Odczyt przez Supabase; w TRYBIE DEMO zwraca dane przykładowe.
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import type { TentRecord, PackageRecord, AddonRecord, ReservationAddon } from "./types";
+import type { TentRecord, PackageRecord, AddonRecord, ReservationAddon, PackageItemRecord } from "./types";
 import { DEMO_TENT_RECORDS, DEMO_PACKAGE_RECORDS, DEMO_ADDON_RECORDS } from "./demo-resources";
 import { listAddonInventory } from "./inventory";
 
@@ -86,6 +86,41 @@ export async function updatePackageActive(id: string, active: boolean): Promise<
   const supabase = await createClient();
   const { error } = await supabase.from("packages").update({ active }).eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+// §11.1 Skład pakietu (pozycje magazynowe zawarte w pakiecie).
+export async function listPackageItems(packageId: string): Promise<PackageItemRecord[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("package_items")
+    .select("*, equipment:equipment(id, name, unit)")
+    .eq("package_id", packageId)
+    .order("sort");
+  if (error) return [];
+  return (data ?? []) as unknown as PackageItemRecord[];
+}
+
+export async function listAllPackageItems(): Promise<PackageItemRecord[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("package_items")
+    .select("*, equipment:equipment(id, name, unit)")
+    .order("sort");
+  if (error) return [];
+  return (data ?? []) as unknown as PackageItemRecord[];
+}
+
+// Zastępuje cały skład pakietu (usuwa dotychczasowy, wstawia nowy). Zapis tylko Szef (RLS).
+export async function replacePackageItems(packageId: string, items: { equipment_id: string; quantity: number }[]): Promise<void> {
+  const supabase = await createClient();
+  const { error: delErr } = await supabase.from("package_items").delete().eq("package_id", packageId);
+  if (delErr) throw new Error(delErr.message);
+  if (!items.length) return;
+  const rows = items.map((it, i) => ({ package_id: packageId, equipment_id: it.equipment_id, quantity: Math.max(1, Math.round(it.quantity) || 1), sort: i }));
+  const { error: insErr } = await supabase.from("package_items").insert(rows);
+  if (insErr) throw new Error(insErr.message);
 }
 
 export async function updateAddonPrice(id: string, price: number): Promise<void> {

@@ -1333,3 +1333,21 @@ alter table public.equipment add column if not exists photo_url text;
 -- Mapa { addon_id: ilość }. addon_ids nadal trzyma listę wybranych dodatków.
 alter table public.reservations add column if not exists addon_qty jsonb not null default '{}'::jsonb;
 
+-- ================= 0041: skład pakietu (§11.1) =================
+create table if not exists public.package_items (
+  id uuid primary key default gen_random_uuid(),
+  package_id uuid not null references public.packages(id) on delete cascade,
+  equipment_id uuid not null references public.equipment(id) on delete cascade,
+  quantity integer not null default 1,
+  sort integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (package_id, equipment_id)
+);
+create index if not exists idx_package_items_pkg on public.package_items (package_id);
+alter table public.package_items enable row level security;
+drop policy if exists package_items_select on public.package_items;
+create policy package_items_select on public.package_items for select to authenticated using (true);
+drop policy if exists package_items_write on public.package_items;
+create policy package_items_write on public.package_items for all to authenticated
+  using (public.is_owner()) with check (public.is_owner());
+

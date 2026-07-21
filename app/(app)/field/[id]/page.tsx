@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { Pill } from "@/components/ui";
 import { getJob, getJobStages } from "@/lib/data/jobs";
 import { getCustomer } from "@/lib/data/customers";
-import { listReservationAddons } from "@/lib/data/resources";
+import { listReservationAddons, listPackageItems } from "@/lib/data/resources";
 import { listChecklistItems } from "@/lib/data/checklist";
 import { listPayments } from "@/lib/data/payments";
 import { getSignature } from "@/lib/data/signatures";
@@ -26,13 +26,14 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   if (!job) notFound();
 
   const r = job.reservation;
-  const [customer, checklist, payments, signature, photos, addonList] = await Promise.all([
+  const [customer, checklist, payments, signature, photos, addonList, packageItems] = await Promise.all([
     r?.customer_id ? getCustomer(r.customer_id) : Promise.resolve(null),
     listChecklistItems(job.id),
     listPayments(),
     getSignature(job.id),
     listJobPhotos(job.id),
     listReservationAddons(),
+    r?.package_id ? listPackageItems(r.package_id) : Promise.resolve([]),
   ]);
   const m = JOB_STATUS_META[job.status];
 
@@ -102,6 +103,18 @@ export default async function FieldRealizationPage({ params }: { params: Promise
           <div className="mb-3.5 rounded-[13px] border border-[#3d3216] bg-[#241e10] px-3.5 py-3 text-[12.5px] text-warn">
             <div className="font-bold">⚠ Realizacja zawiera dodatkowy sprzęt ({addonNames.length})</div>
             <div className="mt-0.5 text-[12px] text-warn">Uwzględnij większy czas pakowania i montażu. Dodatki: {addonNames.join(", ")}.</div>
+          </div>
+        )}
+
+        {/* §11.1 Zawartość pakietu — do spakowania. */}
+        {packageItems.length > 0 && (
+          <div className="mb-3.5 rounded-[13px] border border-border bg-surface px-3.5 py-3">
+            <div className="mb-1.5 text-[12.5px] font-bold text-ink">Zawartość pakietu{r?.package?.name ? ` · ${r.package.name}` : ""}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {packageItems.map((it) => (
+                <span key={it.id} className="rounded-[8px] border border-border bg-surface-2 px-2 py-1 text-[11.5px] font-semibold text-ink-2">{it.equipment?.name ?? "—"} × {it.quantity}</span>
+              ))}
+            </div>
           </div>
         )}
 

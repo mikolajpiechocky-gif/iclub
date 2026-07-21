@@ -140,6 +140,16 @@ export interface AddonRecord {
   sort: number;
 }
 
+// §11.1 Pozycja składu pakietu (ile czego zawiera pakiet).
+export interface PackageItemRecord {
+  id: string;
+  package_id: string;
+  equipment_id: string;
+  quantity: number;
+  sort: number;
+  equipment: { id: string; name: string; unit: string | null } | null;
+}
+
 // §12 Dodatek w rezerwacji — wzbogacony o dane z magazynu (zdjęcie, dostępność).
 export interface ReservationAddon {
   id: string;
