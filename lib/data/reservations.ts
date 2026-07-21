@@ -173,6 +173,14 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
   if (error) throw new Error(error.message);
 }
 
+// Usunięcie rezerwacji. Kaskada bazy usuwa powiązane zlecenie i jego dane operacyjne
+// (etapy, przypisania, checklistę, płatności); koszty pozostają (job_id → null).
+export async function deleteReservation(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("reservations").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // Ustala tent_id/tent_id_2 na podstawie wybranych typów (do wyświetlania).
 async function resolveFromChoices(input: ReservationInput): Promise<{ tent_id: string | null; tent_id_2: string | null }> {
   const tents = await listTents();

@@ -23,6 +23,7 @@ import { getSettings } from "@/lib/data/settings";
 import { ClientConfirmToggle } from "../confirm-toggle";
 import { InvoiceStatus } from "../invoice-status";
 import { RealizationDoneButton } from "../realization-done";
+import { DeleteReservationButton } from "../delete-reservation";
 import { JobTeam, type AssignmentView } from "../../jobs/job-team";
 import { JobVehicles, type JobVehicleView } from "../../jobs/job-vehicles";
 import { JobTransport } from "../../jobs/job-transport";
@@ -141,6 +142,13 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
         <SectionCard title="Realizacja" className="mt-4 p-5">
           <p className="px-5 pb-5 text-[13px] text-ink-2">Brak powiązanego zlecenia. Zapisz ponownie rezerwację, aby wygenerować etapy realizacji.</p>
         </SectionCard>
+      )}
+
+      {isOwner && (
+        <div className="mt-6 border-t border-border-soft pt-4">
+          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.6px] text-ink-2">Strefa niebezpieczna</div>
+          <DeleteReservationButton id={reservation.id} />
+        </div>
       )}
     </div>
   );

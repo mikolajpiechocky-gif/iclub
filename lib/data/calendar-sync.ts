@@ -48,6 +48,15 @@ interface ResRow {
 // allowCreate=true tylko przy ZAKŁADANIU rezerwacji w apce — wtedy wolno utworzyć
 // nowe wydarzenie. Przy edycji/anulowaniu allowCreate=false: aktualizujemy tylko
 // istniejące wydarzenie, a starych/zaimportowanych (bez gcal_event_id) nie ruszamy.
+// Usunięcie wydarzenia kalendarza powiązanego z rezerwacją (przed skasowaniem rezerwacji).
+export async function removeReservationFromCalendar(reservationId: string): Promise<void> {
+  if (!isSupabaseConfigured() || !isGoogleCalendarConfigured()) return;
+  const supabase = await createClient();
+  const { data } = await supabase.from("reservations").select("gcal_event_id").eq("id", reservationId).maybeSingle();
+  const gid = (data as { gcal_event_id?: string | null } | null)?.gcal_event_id;
+  if (gid) await deleteCalendarEvent(gid);
+}
+
 export async function syncReservationToCalendar(reservationId: string, opts: { allowCreate?: boolean } = {}): Promise<void> {
   const allowCreate = opts.allowCreate ?? false;
   if (!isSupabaseConfigured() || !isGoogleCalendarConfigured()) return;

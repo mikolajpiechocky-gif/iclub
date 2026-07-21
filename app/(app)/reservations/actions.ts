@@ -3,11 +3,11 @@
 // rezerwacji automatycznie generuje zlecenie i etapy (warstwa danych).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createReservation, updateReservation, setReservationConfirmed, setInvoiceIssued, checkTentOverbooking, type ReservationInput } from "@/lib/data/reservations";
+import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setInvoiceIssued, checkTentOverbooking, type ReservationInput } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
 import { markJobPlannedPaid } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { syncReservationToCalendar } from "@/lib/data/calendar-sync";
+import { syncReservationToCalendar, removeReservationFromCalendar } from "@/lib/data/calendar-sync";
 import { sumSlots, type TentChoice } from "@/lib/domain/tents";
 import type { DiscountType } from "@/lib/domain/order-pricing";
 import { clientTransportPrice, tripClass } from "@/lib/domain/transport";
@@ -229,6 +229,24 @@ export async function createReservationAction(values: ReservationFormValues): Pr
     return { ok: true, id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać rezerwacji." };
+  }
+}
+
+// Usunięcie rezerwacji (nieodwracalne) — tylko Szef. Usuwa też powiązane zlecenie
+// (kaskada) i wydarzenie kalendarza. Wymaga potwierdzenia w interfejsie.
+export async function deleteReservationAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko szef może usuwać rezerwacje." };
+  try {
+    try { await removeReservationFromCalendar(id); } catch {}
+    await deleteReservation(id);
+    revalidatePath("/reservations");
+    revalidatePath("/dashboard");
+    revalidatePath("/calendar");
+    return { ok: true, id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się usunąć rezerwacji." };
   }
 }
 
