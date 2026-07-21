@@ -5,18 +5,12 @@ import { PageHeader } from "@/components/layout";
 import { Icon } from "@/components/icons";
 import { EmptyState, Pill } from "@/components/ui";
 import { searchEverything } from "@/lib/data/search";
-import { RESERVATION_STATUS_META } from "@/lib/data/types";
+import { RESERVATION_STATUS_META, EQUIPMENT_STATUS_META } from "@/lib/data/types";
 
 export const dynamic = "force-dynamic";
 
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-
-const EQ_STATUS: Record<string, { label: string; fg: string; bg: string }> = {
-  AVAILABLE: { label: "Dostępny", fg: "#5fd68b", bg: "#16301f" },
-  SERVICE: { label: "Serwis", fg: "#ebb05a", bg: "#332814" },
-  DAMAGED: { label: "Uszkodzony", fg: "#f58585", bg: "#341a1d" },
-};
 
 function GroupHeader({ label, count }: { label: string; count: number }) {
   return (
@@ -118,9 +112,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               <GroupHeader label="Sprzęt" count={results.equipment.length} />
               <div className="overflow-hidden rounded-card border border-border bg-surface">
                 {results.equipment.map((e, i) => {
-                  const em = EQ_STATUS[e.status];
+                  const em = EQUIPMENT_STATUS_META[e.status];
                   return (
-                    <Link key={e.id} href="/inventory" className={`flex items-center gap-3 px-4 py-3 transition hover:bg-surface-2 ${i > 0 ? "border-t border-border-soft" : ""}`}>
+                    <Link key={e.id} href={`/inventory/${e.id}/edit`} className={`flex items-center gap-3 px-4 py-3 transition hover:bg-surface-2 ${i > 0 ? "border-t border-border-soft" : ""}`}>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-[13.5px] font-bold text-ink">{e.name}</div>
                         <div className="truncate text-[12px] text-ink-2">{[e.code, e.category, `${e.quantity} szt.`].filter(Boolean).join(" · ")}</div>

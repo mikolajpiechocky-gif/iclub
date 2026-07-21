@@ -45,7 +45,7 @@ export async function searchAction(query: string): Promise<SearchSuggestion[]> {
   }
   for (const e of r.equipment.slice(0, PER_GROUP)) {
     out.push({
-      href: "/inventory",
+      href: `/inventory/${e.id}/edit`,
       title: e.name,
       subtitle: [e.code, e.category, `${e.quantity} szt.`].filter(Boolean).join(" · "),
       group: "Magazyn",
