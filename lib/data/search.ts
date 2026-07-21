@@ -4,7 +4,8 @@
 import { listReservations } from "./reservations";
 import { listCustomers } from "./customers";
 import { listEquipment } from "./equipment";
-import type { ReservationWithRefs, CustomerRecord, EquipmentRecord } from "./types";
+import { listTents } from "./resources";
+import type { ReservationWithRefs, CustomerRecord, EquipmentRecord, TentRecord } from "./types";
 
 const LIMIT = 8;
 
@@ -78,30 +79,34 @@ function rank<T>(items: T[], query: string, fields: (item: T) => (string | null 
 export interface SearchResults {
   reservations: ReservationWithRefs[];
   customers: CustomerRecord[];
+  tents: TentRecord[];
   equipment: EquipmentRecord[];
   total: number;
 }
 
-const EMPTY: SearchResults = { reservations: [], customers: [], equipment: [], total: 0 };
+const EMPTY: SearchResults = { reservations: [], customers: [], tents: [], equipment: [], total: 0 };
 
 export async function searchEverything(query: string): Promise<SearchResults> {
   const q = query.trim();
   if (q.length < 2) return EMPTY;
 
-  const [reservations, customers, equipment] = await Promise.all([
+  const [reservations, customers, tents, equipment] = await Promise.all([
     listReservations(),
     listCustomers(),
+    listTents(),
     listEquipment(),
   ]);
 
   const reservationHits = rank(reservations, q, (r) => [r.customer?.name, r.location, r.event_type, r.notes, r.rental_items]);
   const customerHits = rank(customers, q, (c) => [c.name, c.phone, c.email, c.city, c.tax_id]);
+  const tentHits = rank(tents, q, (t) => [t.name, t.size, t.set_color, t.code]);
   const equipmentHits = rank(equipment, q, (e) => [e.name, e.code, e.category]);
 
   return {
     reservations: reservationHits,
     customers: customerHits,
+    tents: tentHits,
     equipment: equipmentHits,
-    total: reservationHits.length + customerHits.length + equipmentHits.length,
+    total: reservationHits.length + customerHits.length + tentHits.length + equipmentHits.length,
   };
 }

@@ -96,9 +96,26 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             </section>
           )}
 
+          {results.tents.length > 0 && (
+            <section>
+              <GroupHeader label="Namioty" count={results.tents.length} />
+              <div className="overflow-hidden rounded-card border border-border bg-surface">
+                {results.tents.map((t, i) => (
+                  <Link key={t.id} href="/inventory" className={`flex items-center gap-3 px-4 py-3 transition hover:bg-surface-2 ${i > 0 ? "border-t border-border-soft" : ""}`}>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13.5px] font-bold text-ink">{t.name}</div>
+                      <div className="truncate text-[12px] text-ink-2">{[t.size, t.set_color, t.code].filter(Boolean).join(" · ") || "—"}</div>
+                    </div>
+                    <Icon name="chevron-right" className="h-4 w-4 flex-none text-ink-2" />
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
           {results.equipment.length > 0 && (
             <section>
-              <GroupHeader label="Magazyn" count={results.equipment.length} />
+              <GroupHeader label="Sprzęt" count={results.equipment.length} />
               <div className="overflow-hidden rounded-card border border-border bg-surface">
                 {results.equipment.map((e, i) => {
                   const em = EQ_STATUS[e.status];

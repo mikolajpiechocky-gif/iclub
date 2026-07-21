@@ -35,6 +35,14 @@ export async function searchAction(query: string): Promise<SearchSuggestion[]> {
       group: "Klient",
     });
   }
+  for (const t of r.tents.slice(0, PER_GROUP)) {
+    out.push({
+      href: "/inventory",
+      title: t.name,
+      subtitle: [t.size, t.set_color, t.code].filter(Boolean).join(" · "),
+      group: "Namiot",
+    });
+  }
   for (const e of r.equipment.slice(0, PER_GROUP)) {
     out.push({
       href: "/inventory",
