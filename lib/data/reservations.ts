@@ -101,7 +101,12 @@ export async function checkAddonOverbooking(
   const usageFor = (aIds: string[] | null, aQty: Record<string, number> | null, pkgId: string | null): Map<string, number> => {
     const use = new Map<string, number>();
     if (pkgId && compByPkg.has(pkgId)) for (const [eq, q] of compByPkg.get(pkgId)!) use.set(eq, q);
-    for (const eq of aIds ?? []) use.set(eq, Math.max(1, Math.round(aQty?.[eq] ?? 1)));
+    // Dodatek może tylko ZWIĘKSZYĆ zapotrzebowanie ponad ilość z pakietu (nadwyżka),
+    // nigdy zejść poniżej — inaczej zaniżylibyśmy fizyczną zajętość pozycji z pakietu.
+    for (const eq of aIds ?? []) {
+      const q = Math.max(1, Math.round(aQty?.[eq] ?? 1));
+      use.set(eq, Math.max(use.get(eq) ?? 0, q));
+    }
     return use;
   };
 

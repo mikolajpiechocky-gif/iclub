@@ -112,15 +112,21 @@ export async function listAllPackageItems(): Promise<PackageItemRecord[]> {
   return (data ?? []) as unknown as PackageItemRecord[];
 }
 
-// Zastępuje cały skład pakietu (usuwa dotychczasowy, wstawia nowy). Zapis tylko Szef (RLS).
+// Zastępuje skład pakietu. Najpierw upsert nowych pozycji, potem usunięcie tych spoza
+// nowego zestawu — dzięki temu awaria w połowie NIE zostawia pustego składu (co zaburzyłoby
+// rozliczanie nadwyżki i dostępność). Zapis tylko Szef (RLS).
 export async function replacePackageItems(packageId: string, items: { equipment_id: string; quantity: number }[]): Promise<void> {
   const supabase = await createClient();
-  const { error: delErr } = await supabase.from("package_items").delete().eq("package_id", packageId);
-  if (delErr) throw new Error(delErr.message);
-  if (!items.length) return;
   const rows = items.map((it, i) => ({ package_id: packageId, equipment_id: it.equipment_id, quantity: Math.max(1, Math.round(it.quantity) || 1), sort: i }));
-  const { error: insErr } = await supabase.from("package_items").insert(rows);
-  if (insErr) throw new Error(insErr.message);
+  if (rows.length) {
+    const { error: upErr } = await supabase.from("package_items").upsert(rows, { onConflict: "package_id,equipment_id" });
+    if (upErr) throw new Error(upErr.message);
+  }
+  const keep = rows.map((r) => r.equipment_id);
+  let del = supabase.from("package_items").delete().eq("package_id", packageId);
+  if (keep.length) del = del.not("equipment_id", "in", `(${keep.join(",")})`);
+  const { error: delErr } = await del;
+  if (delErr) throw new Error(delErr.message);
 }
 
 export async function updateAddonPrice(id: string, price: number): Promise<void> {
