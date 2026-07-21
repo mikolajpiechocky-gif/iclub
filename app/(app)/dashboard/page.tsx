@@ -53,12 +53,13 @@ export default async function DashboardPage() {
   );
   const plannedJobs = jobs.filter((j) => j.status === "PLANNED").length;
 
+  // §4.2 Każdy kafelek prowadzi do przefiltrowanej listy rekordów, których dotyczy liczba.
   const kpis = [
-    { label: "Najbliższe (7 dni)", value: String(near7), sub: toConfirm.length ? `${toConfirm.length} do potwierdzenia` : `${upcoming.length} nadchodzących`, tone: (toConfirm.length ? "warn" : "neutral") as "warn" | "neutral" },
-    { label: "Nowe zapytania", value: String(newInquiries), sub: `${inquiries.length} łącznie`, tone: "neutral" as const },
-    { label: "Rezerwacje bez zadatku", value: String(noDeposit.length), sub: noDeposit.length ? "wymaga uwagi" : "brak", tone: (noDeposit.length ? "warn" : "neutral") as "warn" | "neutral" },
-    { label: "Zlecenia zaplanowane", value: String(plannedJobs), sub: `${jobs.length} zleceń`, tone: "neutral" as const },
-    { label: "Klienci", value: String(customers.length), sub: "w bazie", tone: "neutral" as const },
+    { label: "Najbliższe (7 dni)", value: String(near7), sub: toConfirm.length ? `${toConfirm.length} do potwierdzenia` : `${upcoming.length} nadchodzących`, tone: (toConfirm.length ? "warn" : "neutral") as "warn" | "neutral", href: toConfirm.length ? "/reservations?filter=to-confirm" : "/reservations?filter=upcoming7" },
+    { label: "Nowe zapytania", value: String(newInquiries), sub: `${inquiries.length} łącznie`, tone: "neutral" as const, href: "/inquiries?status=NEW" },
+    { label: "Rezerwacje bez zadatku", value: String(noDeposit.length), sub: noDeposit.length ? "wymaga uwagi" : "brak", tone: (noDeposit.length ? "warn" : "neutral") as "warn" | "neutral", href: "/reservations?filter=no-deposit" },
+    { label: "Zlecenia zaplanowane", value: String(plannedJobs), sub: `${jobs.length} zleceń`, tone: "neutral" as const, href: "/reservations?filter=upcoming" },
+    { label: "Klienci", value: String(customers.length), sub: "w bazie", tone: "neutral" as const, href: "/customers" },
   ];
 
   const attention: { tone: "bad" | "warn"; title: string; desc: string; href: string }[] = [];
@@ -101,7 +102,7 @@ export default async function DashboardPage() {
 
       <div className="mb-5 grid grid-cols-2 gap-3.5 sm:grid-cols-3 xl:grid-cols-5">
         {kpis.map((k) => (
-          <MetricCard key={k.label} label={k.label} value={k.value} sub={k.sub} tone={k.tone} />
+          <MetricCard key={k.label} label={k.label} value={k.value} sub={k.sub} tone={k.tone} href={k.href} />
         ))}
       </div>
 

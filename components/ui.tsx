@@ -8,6 +8,7 @@
 // =====================================================================
 
 import { useEffect, type ReactNode } from "react";
+import Link from "next/link";
 import { Icon, type IconName } from "./icons";
 import { STATUS_META } from "@/lib/demo-data";
 import type { StatusKey, SyncState } from "@/lib/types";
@@ -43,14 +44,25 @@ export function Pill({ label, fg, bg, className = "" }: { label: string; fg: str
 
 /* ---------------------- MetricCard ------------------------------------ */
 const TONE_FG: Record<string, string> = { neutral: "var(--color-ink)", warn: "var(--color-warn)", bad: "var(--color-bad)", ok: "var(--color-ok)" };
-export function MetricCard({ label, value, sub, tone = "neutral" }: { label: string; value: string; sub?: string; tone?: "neutral" | "warn" | "bad" | "ok" }) {
-  return (
-    <div className="rounded-card border border-border bg-surface p-4">
-      <div className="h-8 text-[11.5px] font-semibold leading-tight text-ink-2">{label}</div>
+export function MetricCard({ label, value, sub, tone = "neutral", href }: { label: string; value: string; sub?: string; tone?: "neutral" | "warn" | "bad" | "ok"; href?: string }) {
+  const inner = (
+    <>
+      <div className="flex items-start gap-1">
+        <div className="h-8 flex-1 text-[11.5px] font-semibold leading-tight text-ink-2">{label}</div>
+        {href && <Icon name="chevron-right" className="mt-0.5 h-3.5 w-3.5 flex-none text-muted transition group-hover:text-ink-2" />}
+      </div>
       <div className="font-display text-[22px] font-bold whitespace-nowrap" style={{ color: TONE_FG[tone], marginTop: 6 }}>{value}</div>
       {sub && <div className="text-[11px] font-semibold" style={{ color: tone === "neutral" ? "var(--color-ink-2)" : TONE_FG[tone] }}>{sub}</div>}
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className="group rounded-card border border-border bg-surface p-4 transition hover:border-accent hover:bg-surface-2">
+        {inner}
+      </Link>
+    );
+  }
+  return <div className="rounded-card border border-border bg-surface p-4">{inner}</div>;
 }
 
 /* ---------------------- SectionCard ----------------------------------- */

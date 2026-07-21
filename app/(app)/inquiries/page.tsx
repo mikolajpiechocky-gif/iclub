@@ -5,7 +5,7 @@ import { PrimaryButton, EmptyState, Pill } from "@/components/ui";
 import { listInquiries } from "@/lib/data/inquiries";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { INQUIRY_STATUS_META, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
+import { INQUIRY_STATUS_META, INQUIRY_STATUS_LABELS, INQUIRY_SOURCE_LABELS, type InquiryStatus } from "@/lib/data/types";
 import { AutoCloseButton } from "./lead-buttons";
 
 export const dynamic = "force-dynamic";
@@ -13,16 +13,20 @@ export const dynamic = "force-dynamic";
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : "—";
 
-export default async function InquiriesPage() {
-  const [inquiries, profile] = await Promise.all([listInquiries(), getCurrentProfile()]);
+export default async function InquiriesPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  const [all, profile, sp] = await Promise.all([listInquiries(), getCurrentProfile(), searchParams]);
   const demo = !isSupabaseConfigured();
   const isOwner = profile?.role === "OWNER";
+
+  // §4.2 Filtr statusu z kafelka pulpitu (np. ?status=NEW).
+  const activeStatus = sp.status && sp.status in INQUIRY_STATUS_LABELS ? (sp.status as InquiryStatus) : null;
+  const inquiries = activeStatus ? all.filter((q) => q.status === activeStatus) : all;
 
   return (
     <div className="mx-auto max-w-[1280px] px-5 py-6 md:px-8">
       <PageHeader
         title="Zapytania"
-        subtitle={`${inquiries.length} ${inquiries.length === 1 ? "zapytanie" : "zapytań"}`}
+        subtitle={`${inquiries.length} ${inquiries.length === 1 ? "zapytanie" : "zapytań"}${activeStatus ? ` · ${INQUIRY_STATUS_LABELS[activeStatus]}` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {isOwner && <AutoCloseButton />}
@@ -32,6 +36,13 @@ export default async function InquiriesPage() {
           </div>
         }
       />
+
+      {activeStatus && (
+        <div className="mb-4 flex items-center gap-2 rounded-card border border-border bg-surface-2 px-4 py-2.5 text-[12.5px]">
+          <span className="font-semibold text-ink">Status: {INQUIRY_STATUS_LABELS[activeStatus]}</span>
+          <Link href="/inquiries" className="ml-auto font-semibold text-accent-soft">Wyczyść ✕</Link>
+        </div>
+      )}
 
       {demo && (
         <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
