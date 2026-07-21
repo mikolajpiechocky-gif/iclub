@@ -12,6 +12,7 @@ import type { AddonShortage } from "@/lib/data/reservations";
 import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
 import { computeOrderPrice, suggestedDeposit } from "@/lib/domain/order-pricing";
 import { computeSetupTimes, fmtDuration, type AssemblyConfig } from "@/lib/domain/assembly";
+import type { PackageComposition } from "@/lib/domain/package-composition";
 import { AddressAutocomplete } from "./address-autocomplete";
 
 const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = { bufferMinutes: 30, addonMinutes: 10, gastroMinutes: 60 };
@@ -37,6 +38,7 @@ export function ReservationForm({
   packages,
   addons,
   assemblyConfig = DEFAULT_ASSEMBLY_CONFIG,
+  packageComposition = {},
 }: {
   initial?: ReservationRecord;
   customers: CustomerOption[];
@@ -44,6 +46,7 @@ export function ReservationForm({
   packages: PackageRecord[];
   addons: ReservationAddon[];
   assemblyConfig?: AssemblyConfig;
+  packageComposition?: PackageComposition;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -159,9 +162,12 @@ export function ReservationForm({
     setV((s) => ({ ...s, addon_qty: { ...s.addon_qty, [id]: Math.max(1, Math.round(qty) || 1) } }));
 
   const qtyOf = (id: string) => Math.max(1, Math.round(v.addon_qty[id] ?? 1));
+  // §11.1 Ilość dodatku zawarta w wybranym pakiecie (płatna jest tylko nadwyżka).
+  const includedOf = (id: string) => packageComposition[v.package_id]?.[id] ?? 0;
+  const billableOf = (id: string) => Math.max(0, qtyOf(id) - includedOf(id));
   const addonsTotal = addons
     .filter((a) => v.addon_ids.includes(a.id))
-    .reduce((sum, a) => sum + Number(a.price || 0) * qtyOf(a.id), 0);
+    .reduce((sum, a) => sum + Number(a.price || 0) * billableOf(a.id), 0);
 
   // §13 Kalkulacja na żywo: pakiet + dodatki + transport − rabat = razem; zadatek; pozostało.
   const selectedPackage = packages.find((p) => p.id === v.package_id);
@@ -202,7 +208,7 @@ export function ReservationForm({
     // §11.2 Snapshot wyceny z chwili zapisu (odporny na późniejsze zmiany cennika).
     const snapshot: PricingSnapshot = {
       package: selectedPackage ? { name: selectedPackage.name, price: packagePrice } : null,
-      addons: addons.filter((a) => v.addon_ids.includes(a.id)).map((a) => ({ name: qtyOf(a.id) > 1 ? `${a.name} ×${qtyOf(a.id)}` : a.name, price: Number(a.price || 0) * qtyOf(a.id) })),
+      addons: addons.filter((a) => v.addon_ids.includes(a.id)).map((a) => ({ name: qtyOf(a.id) > 1 ? `${a.name} ×${qtyOf(a.id)}${includedOf(a.id) ? ` (w pakiecie ${includedOf(a.id)})` : ""}` : a.name, price: Number(a.price || 0) * billableOf(a.id) })),
       transport_price: transportPrice,
       discount_type: v.discount_type,
       discount_value: discountValueNum,
@@ -347,6 +353,7 @@ export function ReservationForm({
                         <div className="truncate text-[13px] font-semibold text-ink">{a.name}</div>
                         <div className="text-[11px] text-ink-2">
                           {a.price > 0 ? fmtPLN(a.price) : "gratis"}{a.available != null ? ` · dostępne: ${a.available}` : ""}
+                          {on && includedOf(a.id) > 0 && <span className="text-ok"> · w pakiecie: {includedOf(a.id)}</span>}
                           {over && <span className="font-bold text-warn"> · przekracza stan</span>}
                         </div>
                       </div>
@@ -357,7 +364,7 @@ export function ReservationForm({
                             <input inputMode="numeric" value={String(qty)} onChange={(e) => setAddonQty(a.id, Number(e.target.value.replace(/[^0-9]/g, "")) || 1)} className="w-9 bg-transparent text-center text-[13px] font-bold text-ink outline-none" aria-label={`Ilość: ${a.name}`} />
                             <button type="button" onClick={() => setAddonQty(a.id, qty + 1)} className="px-2.5 py-1 text-[15px] font-bold text-ink-2">+</button>
                           </div>
-                          <span className="w-14 text-right text-[12.5px] font-bold text-ink">{fmtPLN(a.price * qty)}</span>
+                          <span className="w-14 text-right text-[12.5px] font-bold text-ink">{billableOf(a.id) > 0 ? fmtPLN(a.price * billableOf(a.id)) : "gratis"}</span>
                           <button type="button" onClick={() => toggleAddon(a.id)} className="text-[11px] font-semibold text-bad">Usuń</button>
                         </div>
                       ) : (

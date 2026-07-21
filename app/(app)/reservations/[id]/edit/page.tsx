@@ -2,22 +2,24 @@
 import { notFound } from "next/navigation";
 import { getReservation } from "@/lib/data/reservations";
 import { listCustomers } from "@/lib/data/customers";
-import { listTents, listPackages, listReservationAddons, getPackage } from "@/lib/data/resources";
+import { listTents, listPackages, listReservationAddons, getPackage, listAllPackageItems } from "@/lib/data/resources";
 import { getSettings } from "@/lib/data/settings";
 import { assemblyConfigFromSettings } from "@/lib/domain/assembly";
+import { buildPackageComposition } from "@/lib/domain/package-composition";
 import { ReservationForm } from "../../reservation-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditReservationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [reservation, customers, tents, packages, addons, settings] = await Promise.all([
+  const [reservation, customers, tents, packages, addons, settings, packageItems] = await Promise.all([
     getReservation(id),
     listCustomers(),
     listTents(),
     listPackages(),
     listReservationAddons(),
     getSettings(),
+    listAllPackageItems(),
   ]);
   if (!reservation) notFound();
   // §11/#5: dołącz pakiet rezerwacji nawet gdy nieaktywny — inaczej cena/rabat liczyłyby się od 0.
@@ -34,6 +36,7 @@ export default async function EditReservationPage({ params }: { params: Promise<
       packages={allPackages}
       addons={addons}
       assemblyConfig={assemblyConfigFromSettings(settings)}
+      packageComposition={buildPackageComposition(packageItems)}
     />
   );
 }
