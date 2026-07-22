@@ -1,0 +1,32 @@
+name: OLX auto-sync
+
+# Dociąga nowe wiadomości OLX do aplikacji co 15 minut (plan Vercel Hobby nie ma
+# tak częstego crona, więc robi to darmowy scheduler GitHub Actions). Endpoint jest
+# chroniony sekretem OLX_CRON_SECRET (ten sam po stronie Vercel).
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+# Bez uprawnień do repo — job tylko woła zewnętrzny endpoint.
+permissions: {}
+
+concurrency:
+  group: olx-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping OLX sync endpoint
+        env:
+          CRON_SECRET: ${{ secrets.OLX_CRON_SECRET }}
+        run: |
+          code=$(curl -sS -o response.json -w "%{http_code}" -X GET \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            https://app.iclubevents.pl/api/olx/sync)
+          echo "HTTP ${code}"
+          cat response.json || true
+          echo ""
+          test "${code}" = "200"
