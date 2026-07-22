@@ -34,6 +34,7 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
   let imported = 0;
   let updated = 0;
   let offset = 0;
+  let firstError: string | null = null; // pierwszy błąd zapisu (np. brak migracji) — zgłaszamy zamiast cicho pomijać
 
   // Własne id konta OLX — do rozpoznania kierunku wiadomości (moja vs klienta).
   let myId: string | null = null;
@@ -157,10 +158,10 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
             patch.reactivation_count = (ex.reactivation_count ?? 0) + 1;
             patch.reactivated_at = new Date().toISOString();
           }
-          await s.from("inquiries").update(patch).eq("id", ex.id);
-          updated++;
+          const { error } = await s.from("inquiries").update(patch).eq("id", ex.id);
+          if (error) { if (!firstError) firstError = error.message; } else updated++;
         } else {
-          await s.from("inquiries").insert({
+          const { error } = await s.from("inquiries").insert({
             source: "OLX",
             status: "NEW",
             event_type: advert || null,
@@ -169,7 +170,7 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
             olx_thread_id: threadId,
             ...olxData,
           });
-          imported++;
+          if (error) { if (!firstError) firstError = error.message; } else imported++;
         }
       }
 
@@ -178,6 +179,7 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
     }
 
     await markOlxSynced();
+    if (firstError) return { ok: false, imported, updated, error: firstError };
     return { ok: true, imported, updated };
   } catch (e) {
     return { ok: false, imported, updated, error: e instanceof Error ? e.message : "Błąd synchronizacji OLX." };
