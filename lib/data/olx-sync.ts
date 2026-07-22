@@ -3,7 +3,7 @@
 // pierwszym imporcie na realnych danych).
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getValidAccessToken, markOlxSynced } from "./olx";
-import { getThreads, getMessages } from "@/lib/integrations/olx";
+import { getThreads, getMessages, getAdverts } from "@/lib/integrations/olx";
 import { analyzeContractSignals, extractEmail } from "@/lib/domain/lead-analysis";
 
 export interface OlxSyncResult {
@@ -30,6 +30,35 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
   let imported = 0;
   let updated = 0;
   let offset = 0;
+
+  // Lokalizacja leada = miasto ogłoszenia. Wątki OLX zwykle nie niosą pełnej lokalizacji,
+  // więc budujemy mapę advert_id → { title, location } z listy ogłoszeń (best-effort).
+  const locOf = (a: Record<string, unknown>): string | null =>
+    (String(
+      pick(a, "location", "city", "name") ??
+        pick(a, "location", "city_name") ??
+        pick(a, "location", "name") ??
+        pick(a, "city", "name") ??
+        pick(a, "city") ??
+        "",
+    ).trim() || null);
+  const advInfo = new Map<string, { title: string | null; location: string | null }>();
+  try {
+    let aoff = 0;
+    for (let ap = 0; ap < 20; ap++) {
+      const ar = (await getAdverts(token, aoff, 100)) as Record<string, unknown>;
+      const arr = ((ar?.data as unknown[]) ?? []) as Record<string, unknown>[];
+      if (!arr.length) break;
+      for (const a of arr) {
+        const aid = String(pick(a, "id") ?? "");
+        if (aid) advInfo.set(aid, { title: (pick(a, "title") as string) ?? null, location: locOf(a) });
+      }
+      if (arr.length < 100) break;
+      aoff += arr.length;
+    }
+  } catch {
+    /* brak dostępu do ogłoszeń — lokalizacja tylko z wątku (jeśli ją niesie) */
+  }
 
   try {
     for (let page = 0; page < 50; page++) {
@@ -65,7 +94,10 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
         msgs.sort((a, b) => ((a.at ?? "") < (b.at ?? "") ? -1 : 1));
 
         const name = String(pick(th, "interlocutor", "name") ?? pick(th, "user", "name") ?? "Klient OLX");
-        const advert = String(pick(th, "advert", "title") ?? pick(th, "advert_title") ?? "");
+        const advertId = String(pick(th, "advert", "id") ?? pick(th, "advert_id") ?? "");
+        const advMap = advertId ? advInfo.get(advertId) : undefined;
+        const advert = String(pick(th, "advert", "title") ?? pick(th, "advert_title") ?? advMap?.title ?? "");
+        const advLoc = advMap?.location ?? locOf((pick(th, "advert") as Record<string, unknown>) ?? {});
         const lastAt = (pick(th, "updated_at") ?? pick(th, "last_message", "created_at") ?? null) as string | null;
         const convo = msgs.map((m) => m.text).join("\n");
         const email = String(pick(th, "interlocutor", "email") ?? pick(th, "user", "email") ?? extractEmail(convo) ?? "") || null;
@@ -73,8 +105,8 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
         const contractSignal = analyzeContractSignals(`${name}\n${advert}\n${convo}`).signal;
         const notes = [`OLX: ${name}`, advert && `Ogłoszenie: ${advert}`, lastMsg && `„${lastMsg}”`].filter(Boolean).join("\n");
 
-        const { data: existing } = await s.from("inquiries").select("id, status, reactivation_count").eq("olx_thread_id", threadId).maybeSingle();
-        const ex = existing as { id: string; status: string; reactivation_count: number } | null;
+        const { data: existing } = await s.from("inquiries").select("id, status, reactivation_count, location").eq("olx_thread_id", threadId).maybeSingle();
+        const ex = existing as { id: string; status: string; reactivation_count: number; location: string | null } | null;
 
         // Dane z OLX (nick, mail, historia, sygnał) aktualizujemy zawsze — to nie są ręczne
         // dane CRM (status, klient, notatki), które pozostają nietknięte.
@@ -90,6 +122,8 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
 
         if (ex) {
           const patch = { ...olxData };
+          // Lokalizację uzupełniamy tylko gdy pusta — nie kasujemy ręcznej edycji CRM.
+          if (advLoc && !ex.location) patch.location = advLoc;
           if (ex.status === "LOST") {
             patch.status = "REHEATED";
             patch.previous_status = "LOST";
@@ -103,6 +137,7 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
             source: "OLX",
             status: "NEW",
             event_type: advert || null,
+            location: advLoc,
             notes,
             olx_thread_id: threadId,
             ...olxData,
