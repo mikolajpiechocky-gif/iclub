@@ -13,6 +13,8 @@ export const dynamic = "force-dynamic";
 
 const pct = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(1)}%`);
 const delta = (d: number | null) => (d == null || d === 0 ? "" : d > 0 ? ` (+${d})` : ` (${d})`);
+const medal = (rank: number) => (rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`);
+const scoreColor = (s: number) => (s >= 66 ? "#5fd68b" : s >= 33 ? "#ebb05a" : "#f58585");
 
 function expiryPill(days: number | null, expired: boolean) {
   if (expired) return <Pill label="Wygasło" fg="#f58585" bg="#341a1d" />;
@@ -35,7 +37,8 @@ export default async function AdvertsPage() {
   const [adverts, integration] = await Promise.all([listOlxAdverts(), getOlxIntegration()]);
   const connected = Boolean(integration?.refresh_token);
   const { insights, summary } = analyzeFleet(adverts);
-  const toReact = insights.filter((i) => i.expired || i.expiringSoon);
+  const toReact = insights.filter((i) => i.expired || i.expiringSoon).sort((a, b) => b.priority - a.priority);
+  const podium = insights.filter((i) => i.advert.views > 0 || i.advert.phones > 0).slice(0, 3);
 
   return (
     <div className="mx-auto max-w-[1200px] px-5 py-6 md:px-8">
@@ -85,19 +88,51 @@ export default async function AdvertsPage() {
             </div>
           )}
 
-          {/* Analiza — wszystkie ogłoszenia */}
-          <h2 className="mb-3 font-display text-[15px] font-bold text-white">Analiza wyników</h2>
+          {/* Podium — najlepsze ogłoszenia */}
+          {podium.length > 0 && (
+            <>
+              <h2 className="mb-3 font-display text-[15px] font-bold text-white">Ranking skuteczności</h2>
+              <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {podium.map((i) => (
+                  <div key={i.advert.olx_id} className="rounded-card-lg border border-border bg-surface p-4">
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span className="text-[22px] leading-none">{medal(i.rank)}</span>
+                      <div className="min-w-0 flex-1 truncate text-[13.5px] font-bold text-ink">{i.advert.title ?? "Ogłoszenie"}</div>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-display text-[22px] font-bold" style={{ color: scoreColor(i.score) }}>{i.score}</span>
+                      <span className="text-[11px] text-ink-2">/ 100 pkt</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+                      <div className="h-full rounded-full" style={{ width: `${i.score}%`, background: scoreColor(i.score) }} />
+                    </div>
+                    <div className="mt-2 text-[12px] text-ink-2">👁 {i.advert.views.toLocaleString("pl-PL")} · 📞 {i.advert.phones.toLocaleString("pl-PL")} · {pct(i.conversion)}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Pełny ranking — wszystkie ogłoszenia */}
+          <h2 className="mb-3 font-display text-[15px] font-bold text-white">Wszystkie ogłoszenia</h2>
           <div className="overflow-x-auto rounded-card border border-border bg-surface">
             <table className="w-full text-left">
               <thead className="border-b border-border bg-[#12131a] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">
-                <tr>{["Ogłoszenie", "Wyświetlenia", "Telefony", "Skuteczność", "Wygasa", "Zalecenia"].map((h) => <th key={h} className="px-4 py-3 font-bold">{h}</th>)}</tr>
+                <tr>{["#", "Ogłoszenie", "Skuteczność (pkt)", "Wyświetlenia", "Telefony", "Konwersja", "Wygasa", "Zalecenia"].map((h) => <th key={h} className="px-4 py-3 font-bold">{h}</th>)}</tr>
               </thead>
               <tbody>
                 {insights.map((i) => (
                   <tr key={i.advert.olx_id} className="border-b border-border-soft align-top last:border-0">
+                    <td className="px-4 py-3 text-[15px]">{medal(i.rank)}</td>
                     <td className="px-4 py-3">
                       <div className="max-w-[240px] truncate text-[13px] font-bold text-ink">{i.advert.title ?? "Ogłoszenie"}</div>
                       {i.advert.url && <a href={i.advert.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-ink-2 underline">otwórz →</a>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-7 text-[13px] font-bold" style={{ color: scoreColor(i.score) }}>{i.score}</span>
+                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${i.score}%`, background: scoreColor(i.score) }} /></div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-[13px] text-ink">{i.advert.views.toLocaleString("pl-PL")}<span className="text-[11px] text-ink-2">{delta(i.deltaViews)}</span></td>
                     <td className="px-4 py-3 text-[13px] text-ink">{i.advert.phones.toLocaleString("pl-PL")}<span className="text-[11px] text-ink-2">{delta(i.deltaPhones)}</span></td>
@@ -113,7 +148,7 @@ export default async function AdvertsPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-[11.5px] text-ink-2">Skuteczność = odsłony numeru / wyświetlenia. Progi zaleceń są heurystyczne — dostroimy po zebraniu danych z kilku synchronizacji.</p>
+          <p className="mt-3 text-[11.5px] text-ink-2">Punkty (0–100) = ranking względem najlepszego ogłoszenia: 55% liczba telefonów (realne leady), 30% konwersja, 15% wyświetlenia. Konwersja = odsłony numeru / wyświetlenia. Progi heurystyczne — dostroimy po kilku synchronizacjach.</p>
         </>
       )}
     </div>

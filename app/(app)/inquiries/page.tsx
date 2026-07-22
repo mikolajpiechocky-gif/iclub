@@ -41,7 +41,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
 
       {(activeStatus || signalOnly) && (
         <div className="mb-4 flex items-center gap-2 rounded-card border border-border bg-surface-2 px-4 py-2.5 text-[12.5px]">
-          <span className="font-semibold text-ink">{signalOnly ? "Padły dane do umowy" : `Status: ${INQUIRY_STATUS_LABELS[activeStatus!]}`}</span>
+          <span className="font-semibold text-ink">{signalOnly ? "Wygląda na domknięte" : `Status: ${INQUIRY_STATUS_LABELS[activeStatus!]}`}</span>
           <Link href="/inquiries" className="ml-auto font-semibold text-accent-soft">Wyczyść ✕</Link>
         </div>
       )}
@@ -49,7 +49,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
       {!signalOnly && !activeStatus && signalCount > 0 && (
         <div className="mb-4">
           <Link href="/inquiries?signal=1" className="inline-flex items-center gap-2 rounded-card border border-[#1e4a2c] bg-[#16301f] px-4 py-2.5 text-[12.5px] font-semibold text-ok">
-            {signalCount} {signalCount === 1 ? "lead z danymi do umowy" : "leadów z danymi do umowy"} → pokaż
+            {signalCount} {signalCount === 1 ? "lead wygląda na domknięty" : "leadów wygląda na domknięte"} → pokaż
           </Link>
         </div>
       )}
@@ -87,7 +87,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
                   const m = INQUIRY_STATUS_META[q.status];
                   return (
                     <tr key={q.id} className="border-b border-border-soft last:border-0 hover:bg-surface-2">
-                      <td className="px-4 py-3"><Link href={`/inquiries/${q.id}/edit`} className="text-[13.5px] font-bold text-ink">{inquiryDisplayName(q)}</Link>{q.contract_signal && <span className="ml-2 rounded-[6px] bg-[#16301f] px-1.5 py-0.5 text-[10px] font-bold text-ok">dane do umowy</span>}</td>
+                      <td className="px-4 py-3"><Link href={`/inquiries/${q.id}/edit`} className="text-[13.5px] font-bold text-ink">{inquiryDisplayName(q)}</Link>{q.contract_signal && <span className="ml-2 rounded-[6px] bg-[#16301f] px-1.5 py-0.5 text-[10px] font-bold text-ok">domknięte</span>}</td>
                       <td className="px-4 py-3 text-[13px] text-ink-2">{q.event_type || "—"}</td>
                       <td className="px-4 py-3 text-[13px] text-ink">{fmtDate(q.event_date)}</td>
                       <td className="px-4 py-3 text-[13px] text-ink-2">{q.location || "—"}</td>
@@ -109,7 +109,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
               return (
                 <Link key={q.id} href={`/inquiries/${q.id}/edit`} className="rounded-card border border-border bg-surface p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-[14.5px] font-bold text-ink">{inquiryDisplayName(q)}{q.contract_signal && <span className="ml-2 rounded-[6px] bg-[#16301f] px-1.5 py-0.5 text-[10px] font-bold text-ok align-middle">dane do umowy</span>}</div>
+                    <div className="text-[14.5px] font-bold text-ink">{inquiryDisplayName(q)}{q.contract_signal && <span className="ml-2 rounded-[6px] bg-[#16301f] px-1.5 py-0.5 text-[10px] font-bold text-ok align-middle">domknięte</span>}</div>
                     <Pill label={m.label} fg={m.fg} bg={m.bg} />
                   </div>
                   <div className="mt-1 text-[12.5px] font-medium text-ink-2">{[q.event_type, q.tent_interest, q.package_interest].filter(Boolean).join(" · ") || "—"}</div>

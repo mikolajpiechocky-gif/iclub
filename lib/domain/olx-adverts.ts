@@ -12,6 +12,8 @@ export interface AdvertInsight {
   deltaPhones: number | null;
   recommendations: string[];
   priority: number; // do sortowania „do reakcji"
+  score: number; // 0–100 — ranking skuteczności (leady > wyświetlenia)
+  rank: number; // pozycja w rankingu (1 = najlepsze)
 }
 
 export interface FleetSummary {
@@ -86,12 +88,34 @@ export function analyzeAdvert(a: OlxAdvert, fleet: FleetSummary, now = Date.now(
 
   if (!rec.length) rec.push("OK — bez działań.");
 
-  return { advert: a, daysToExpiry, expired, expiringSoon, conversion, deltaViews, deltaPhones, recommendations: rec, priority };
+  // score/rank uzupełniane w analyzeFleet (potrzebują całej floty do normalizacji).
+  return { advert: a, daysToExpiry, expired, expiringSoon, conversion, deltaViews, deltaPhones, recommendations: rec, priority, score: 0, rank: 0 };
+}
+
+// Ranking skuteczności: leady (odsłony numeru) ważą najwięcej, potem skuteczność, potem
+// zasięg (wyświetlenia). Normalizacja do najlepszego w danej flocie → 0–100.
+function scoreAdvert(i: AdvertInsight, max: { phones: number; views: number; conv: number }): number {
+  const phonesN = max.phones > 0 ? i.advert.phones / max.phones : 0;
+  const viewsN = max.views > 0 ? i.advert.views / max.views : 0;
+  const convN = max.conv > 0 && i.advert.views >= MIN_VIEWS_FOR_CONV && i.conversion != null ? i.conversion / max.conv : 0;
+  const raw = 0.55 * phonesN + 0.3 * convN + 0.15 * viewsN;
+  return Math.round(raw * 100);
 }
 
 export function analyzeFleet(adverts: OlxAdvert[], now = Date.now()): { insights: AdvertInsight[]; summary: FleetSummary } {
   const summary = summarize(adverts);
-  const insights = adverts.map((a) => analyzeAdvert(a, summary, now)).sort((x, y) => y.priority - x.priority || (y.advert.views - x.advert.views));
+  const insights = adverts.map((a) => analyzeAdvert(a, summary, now));
+
+  // Ranking: normalizacja do najlepszego w flocie, potem sort malejąco po score.
+  const max = {
+    phones: Math.max(0, ...insights.map((i) => i.advert.phones)),
+    views: Math.max(0, ...insights.map((i) => i.advert.views)),
+    conv: Math.max(0, ...insights.filter((i) => i.advert.views >= MIN_VIEWS_FOR_CONV).map((i) => i.conversion ?? 0)),
+  };
+  for (const i of insights) i.score = scoreAdvert(i, max);
+  insights.sort((x, y) => y.score - x.score || y.advert.phones - x.advert.phones || y.advert.views - x.advert.views);
+  insights.forEach((i, idx) => (i.rank = idx + 1));
+
   summary.toReact = insights.filter((i) => i.expired || i.expiringSoon).length;
   return { insights, summary };
 }

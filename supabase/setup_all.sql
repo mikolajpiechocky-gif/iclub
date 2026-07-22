@@ -1398,3 +1398,7 @@ alter table public.inquiries add column if not exists contact_email text;
 alter table public.inquiries add column if not exists olx_messages jsonb;
 alter table public.inquiries add column if not exists contract_signal boolean not null default false;
 
+-- ================= 0046: surowy sample z OLX (diagnostyka mapowania pól) =================
+-- Przechowuje surowy wątek + kilka wiadomości, żeby dostroić wydobywanie nicku/lokalizacji.
+alter table public.inquiries add column if not exists olx_raw jsonb;
+

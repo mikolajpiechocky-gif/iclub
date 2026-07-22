@@ -1,10 +1,23 @@
 // Synchronizacja rozmów OLX → zapytania (leady). Idempotentna: dedup po olx_thread_id.
-// Jeden wątek = jedno zapytanie. Mapowanie defensywne (nazwy pól OLX potwierdzimy po
-// pierwszym imporcie na realnych danych).
+// Jeden wątek = jedno zapytanie. Wydobywanie pól ODPORNE (lib/integrations/olx/extract),
+// bo realny JSON OLX bywa inny niż zakładany. Zapisujemy też surowy sample (olx_raw)
+// do diagnostyki, gdyby nick/lokalizacja mimo to były puste.
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getValidAccessToken, markOlxSynced } from "./olx";
-import { getThreads, getMessages, getAdverts } from "@/lib/integrations/olx";
-import { analyzeContractSignals, extractEmail } from "@/lib/domain/lead-analysis";
+import { getValidAccessToken, markOlxSynced, getOlxIntegration } from "./olx";
+import { getThreads, getMessages, getAdverts, getMe } from "@/lib/integrations/olx";
+import { analyzeConversation, extractEmail } from "@/lib/domain/lead-analysis";
+import {
+  pick,
+  extractName,
+  extractEmailField,
+  extractAdvertId,
+  extractAdvertTitle,
+  extractLocation,
+  extractMessageText,
+  extractMessageTime,
+  extractMessageAuthorId,
+  messageTypeIsMine,
+} from "@/lib/integrations/olx/extract";
 
 export interface OlxSyncResult {
   ok: boolean;
@@ -12,15 +25,6 @@ export interface OlxSyncResult {
   updated: number;
   error?: string;
 }
-
-const pick = (obj: unknown, ...keys: string[]): unknown => {
-  let cur: unknown = obj;
-  for (const k of keys) {
-    if (cur && typeof cur === "object" && k in (cur as Record<string, unknown>)) cur = (cur as Record<string, unknown>)[k];
-    else return undefined;
-  }
-  return cur;
-};
 
 export async function syncOlxThreads(): Promise<OlxSyncResult> {
   const token = await getValidAccessToken();
@@ -31,17 +35,21 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
   let updated = 0;
   let offset = 0;
 
-  // Lokalizacja leada = miasto ogłoszenia. Wątki OLX zwykle nie niosą pełnej lokalizacji,
-  // więc budujemy mapę advert_id → { title, location } z listy ogłoszeń (best-effort).
-  const locOf = (a: Record<string, unknown>): string | null =>
-    (String(
-      pick(a, "location", "city", "name") ??
-        pick(a, "location", "city_name") ??
-        pick(a, "location", "name") ??
-        pick(a, "city", "name") ??
-        pick(a, "city") ??
-        "",
-    ).trim() || null);
+  // Własne id konta OLX — do rozpoznania kierunku wiadomości (moja vs klienta).
+  let myId: string | null = null;
+  try {
+    const me = (await getMe(token)) as Record<string, unknown>;
+    const id = pick(me, "data", "id") ?? pick(me, "id");
+    myId = id != null ? String(id) : null;
+  } catch {
+    /* pobierzemy z zapisanej integracji */
+  }
+  if (!myId) {
+    const it = await getOlxIntegration();
+    myId = it?.olx_user_id ?? null;
+  }
+
+  // Mapa ogłoszeń: id → { title, location } z listy ogłoszeń (nić do lokalizacji leada).
   const advInfo = new Map<string, { title: string | null; location: string | null }>();
   try {
     let aoff = 0;
@@ -51,7 +59,7 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
       if (!arr.length) break;
       for (const a of arr) {
         const aid = String(pick(a, "id") ?? "");
-        if (aid) advInfo.set(aid, { title: (pick(a, "title") as string) ?? null, location: locOf(a) });
+        if (aid) advInfo.set(aid, { title: extractAdvertTitle(a) ?? (pick(a, "title") as string) ?? null, location: extractLocation(a) });
       }
       if (arr.length < 100) break;
       aoff += arr.length;
@@ -71,39 +79,57 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
         if (!threadId) continue;
 
         // Pełna historia wiadomości wątku (do 5 stron po 100 — best-effort).
-        const msgs: { text: string; at: string | null; mine: boolean }[] = [];
+        const rawMsgs: Record<string, unknown>[] = [];
         try {
           let moff = 0;
           for (let mp = 0; mp < 5; mp++) {
             const mresp = (await getMessages(token, threadId, moff, 100)) as Record<string, unknown>;
             const arr = ((mresp?.data as unknown[]) ?? []) as Record<string, unknown>[];
             if (!arr.length) break;
-            for (const m of arr) {
-              const text = String(pick(m, "text") ?? pick(m, "message") ?? "").trim();
-              const at = (pick(m, "created_at") ?? pick(m, "posted_at") ?? null) as string | null;
-              const typ = String(pick(m, "type") ?? pick(m, "author_type") ?? "").toLowerCase();
-              const mine = typ.includes("sent") || typ.includes("own") || typ.includes("outgoing") || Boolean(pick(m, "is_own"));
-              if (text) msgs.push({ text, at, mine });
-            }
+            rawMsgs.push(...arr);
             if (arr.length < 100) break;
             moff += arr.length;
           }
         } catch {
           /* wątek bez dostępnych wiadomości — pomijamy historię */
         }
+
+        const msgs: { text: string; at: string | null; mine: boolean }[] = [];
+        for (const m of rawMsgs) {
+          const text = extractMessageText(m);
+          if (!text) continue;
+          const at = extractMessageTime(m);
+          // Kierunek: najpierw po id autora vs własne id, potem po polu type.
+          const authorId = extractMessageAuthorId(m);
+          let mine: boolean;
+          if (myId && authorId) mine = authorId === myId;
+          else {
+            const byType = messageTypeIsMine(m);
+            mine = byType ?? false;
+          }
+          msgs.push({ text, at, mine });
+        }
         msgs.sort((a, b) => ((a.at ?? "") < (b.at ?? "") ? -1 : 1));
 
-        const name = String(pick(th, "interlocutor", "name") ?? pick(th, "user", "name") ?? "Klient OLX");
-        const advertId = String(pick(th, "advert", "id") ?? pick(th, "advert_id") ?? "");
+        // Nick / mail rozmówcy (odporne wydobycie; mail też z treści klienta).
+        const clientText = msgs.filter((m) => !m.mine).map((m) => m.text).join("\n");
+        const name = extractName(th) ?? "Klient OLX";
+        const email = extractEmailField(th) ?? extractEmail(clientText);
+
+        // Ogłoszenie + lokalizacja (z mapy ogłoszeń, fallback z wątku).
+        const advertId = extractAdvertId(th);
         const advMap = advertId ? advInfo.get(advertId) : undefined;
-        const advert = String(pick(th, "advert", "title") ?? pick(th, "advert_title") ?? advMap?.title ?? "");
-        const advLoc = advMap?.location ?? locOf((pick(th, "advert") as Record<string, unknown>) ?? {});
-        const lastAt = (pick(th, "updated_at") ?? pick(th, "last_message", "created_at") ?? null) as string | null;
-        const convo = msgs.map((m) => m.text).join("\n");
-        const email = String(pick(th, "interlocutor", "email") ?? pick(th, "user", "email") ?? extractEmail(convo) ?? "") || null;
+        const advert = extractAdvertTitle(th) ?? advMap?.title ?? "";
+        const advLoc = advMap?.location ?? extractLocation(th);
+
+        // Analiza całej rozmowy — czy oferta faktycznie domknięta.
+        const analysis = analyzeConversation(msgs, `${name}\n${advert}`);
         const lastMsg = msgs.length ? msgs[msgs.length - 1].text : null;
-        const contractSignal = analyzeContractSignals(`${name}\n${advert}\n${convo}`).signal;
-        const notes = [`OLX: ${name}`, advert && `Ogłoszenie: ${advert}`, lastMsg && `„${lastMsg}”`].filter(Boolean).join("\n");
+        const lastAt = msgs.length ? msgs[msgs.length - 1].at : (pick(th, "updated_at") ?? null) as string | null;
+        const notes = [`OLX: ${name}`, advert && `Ogłoszenie: ${advert}`, advLoc && `Lokalizacja: ${advLoc}`, lastMsg && `„${lastMsg}”`].filter(Boolean).join("\n");
+
+        // Sample surowych danych do diagnostyki mapowania (ograniczony rozmiar).
+        const olxRaw = { thread: th, messages: rawMsgs.slice(0, 4), me_id: myId };
 
         const { data: existing } = await s.from("inquiries").select("id, status, reactivation_count, location").eq("olx_thread_id", threadId).maybeSingle();
         const ex = existing as { id: string; status: string; reactivation_count: number; location: string | null } | null;
@@ -114,9 +140,10 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
           contact_name: name,
           contact_email: email,
           olx_messages: msgs,
-          contract_signal: contractSignal,
+          contract_signal: analysis.signal,
           olx_last_message: lastMsg,
           olx_last_message_at: lastAt,
+          olx_raw: olxRaw,
           last_activity_at: new Date().toISOString(),
         };
 

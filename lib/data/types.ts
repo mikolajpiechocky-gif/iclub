@@ -55,6 +55,7 @@ export interface InquiryRecord {
   contact_email: string | null;
   olx_messages: OlxMessage[] | null;
   contract_signal: boolean;
+  olx_raw: unknown | null; // surowy sample z OLX (diagnostyka mapowania pól)
   created_at: string;
   updated_at: string;
 }
