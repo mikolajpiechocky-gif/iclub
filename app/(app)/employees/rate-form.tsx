@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { PageHeader } from "@/components/layout";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
 import type { EmployeeWithRate } from "@/lib/data/types";
-import { RATE_MODEL_ORDER, RATE_MODEL_LABELS, ICLUB_SETTLEMENT_MODE_LABELS, type IclubSettlementMode } from "@/lib/data/types";
+import { ICLUB_SETTLEMENT_MODE_LABELS, type IclubSettlementMode } from "@/lib/data/types";
 import { saveEmployeeRateAction, type RateFormValues } from "./actions";
 
 const str = (v: number | null | undefined) => (v == null ? "" : String(v));
@@ -25,6 +25,7 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
     reel_bonus: str(r?.reel_bonus),
     upsell_percent: r?.upsell_percent != null ? String(r.upsell_percent) : "15",
     iclub_settlement_mode: r?.iclub_settlement_mode ?? "FLAT",
+    iclub_threshold: str(r?.iclub_threshold),
     notes: r?.notes ?? "",
   });
   const [formError, setFormError] = useState<string | null>(null);
@@ -64,15 +65,15 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
             <SelectField label="Rozliczenie iClub" value={v.iclub_settlement_mode} onChange={(e) => set("iclub_settlement_mode", e.target.value as IclubSettlementMode)}>
               {(Object.keys(ICLUB_SETTLEMENT_MODE_LABELS) as IclubSettlementMode[]).map((m) => <option key={m} value={m}>{ICLUB_SETTLEMENT_MODE_LABELS[m]}</option>)}
             </SelectField>
-            <TextField label="Ryczałt za realizację iClub (zł)" inputMode="numeric" placeholder="500" value={v.iclub_flat} onChange={(e) => set("iclub_flat", e.target.value)} hint="Kwota za realizację (w trybie ryczałtu i po progu). Puste = globalny ryczałt z Ustawień." />
-            <SelectField label="Model (inne linie)" value={v.rate_model} onChange={(e) => set("rate_model", e.target.value as RateFormValues["rate_model"])}>
-              {RATE_MODEL_ORDER.map((m) => <option key={m} value={m}>{RATE_MODEL_LABELS[m]}</option>)}
-            </SelectField>
-            <TextField label="Stawka godzinowa (zł/h)" inputMode="numeric" placeholder="40" value={v.hourly_rate} onChange={(e) => set("hourly_rate", e.target.value)} />
+            {v.iclub_settlement_mode === "THRESHOLD" && (
+              <TextField label="Realizacje na czas wolny (umowa)" inputMode="numeric" placeholder="4" value={v.iclub_threshold} onChange={(e) => set("iclub_threshold", e.target.value)} hint="Ile pierwszych realizacji w miesiącu = dzień wolny. Puste = próg z Ustawień." />
+            )}
+            <TextField label="Ryczałt za realizację iClub (zł)" inputMode="numeric" placeholder="500" value={v.iclub_flat} onChange={(e) => set("iclub_flat", e.target.value)} hint="Kwota za realizację (ryczałt / po progu). Puste = globalny z Ustawień." />
+            <TextField label="Stawka godzinowa — wypożyczalnia (zł/h)" inputMode="numeric" placeholder="40" value={v.hourly_rate} onChange={(e) => set("hourly_rate", e.target.value)} hint="Domyślne rozliczenie wypożyczalni. Ryczałt na konkretne zlecenie ustawiasz w rezerwacji." />
             <TextField label="Premia za dosprzedaż (%)" inputMode="numeric" placeholder="15" value={v.upsell_percent} onChange={(e) => set("upsell_percent", e.target.value)} />
           </div>
           <p className="px-5 pb-5 text-[12px] text-ink-2">
-            „Czas wolny za pierwsze N” (Bartek): pierwsze N realizacji w miesiącu = dzień wolny (8 h × stawka z Ustawień), potem ryczałt + premie. „Ryczałt od pierwszej”: każda realizacja = ryczałt + premie. Próg (N) i stawkę czasu wolnego ustawiasz globalnie w Ustawieniach → „Rozliczenia iClub”.
+            „Czas wolny za pierwsze N” (Bartek): pierwsze N realizacji iClub w miesiącu = dzień wolny (8 h × stawka z Ustawień), potem ryczałt + premie. „Ryczałt od pierwszej”: każda realizacja iClub = ryczałt + premie. Stawkę czasu wolnego ustawiasz globalnie w Ustawieniach → „Rozliczenia iClub”.
           </p>
         </SectionCard>
 

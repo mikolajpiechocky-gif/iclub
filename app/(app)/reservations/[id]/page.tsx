@@ -232,9 +232,16 @@ async function ReservationOps({
   const monthPrefix = (job.event_date ?? "").slice(0, 7);
   const farTrip = transportCalcs.some((c) => (c.one_way_km ?? 0) > 100);
   const hasGastro = job.reservation?.tent_extra === "GASTRO";
+  // §18 Ryczałt wypożyczalni per zlecenie (numeric z PG bywa stringiem) — nadpisuje godzinówkę.
+  const rentalFlat = job.reservation?.rental_settlement_flat != null ? Number(job.reservation.rental_settlement_flat) : null;
   const buildEarnings = async (rate: EmployeeRate | null, profileId: string): Promise<EarningsBreakdown | null> => {
+    if (!iclub) {
+      if (rentalFlat != null) {
+        return { base: rentalFlat, baseLabel: "Ryczałt za zlecenie", ownerBonus, total: Math.round((rentalFlat + ownerBonus) * 100) / 100, possibleBonuses: [] };
+      }
+      return rate ? predictedEarnings(rate, job.business_line, ownerBonus, settings.iclub_hours) : null;
+    }
     if (!rate) return null;
-    if (!iclub) return predictedEarnings(rate, job.business_line, ownerBonus, settings.iclub_hours);
     const priorCount = monthPrefix ? await countDoneIclubRealizations(profileId, monthPrefix) : 0;
     const s = settlementForRealization(rules, priorCount, { farTrip, hasGastro, rate });
     const guaranteed = s.guaranteed.map((b) => b.label).join(" + ");

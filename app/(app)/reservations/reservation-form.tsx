@@ -76,6 +76,8 @@ export function ReservationForm({
     rental_items: initial?.rental_items ?? "",
     delivery_time: initial?.delivery_time ?? "",
     payment_upfront: initial?.payment_upfront ?? false,
+    rental_hourly: initial?.rental_settlement_flat == null, // domyślnie godzinowo
+    rental_flat: initial?.rental_settlement_flat != null ? String(initial.rental_settlement_flat) : "",
     price: initial?.price != null ? String(initial.price) : "",
     discount_type: initial?.discount_type === "PERCENT" ? "PERCENT" : "AMOUNT",
     // Legacy (sprzed kolumny discount_value): pokaż zapisaną kwotę rabatu, by nie wyzerować jej przy edycji.
@@ -393,6 +395,18 @@ export function ReservationForm({
                 <option value="PICKUP">Przy odbiorze</option>
                 <option value="UP">Opłacone z góry</option>
               </SelectField>
+              {/* §18 Forma rozliczenia pracownika: godzinowa domyślnie, ryczałt per zlecenie nadpisuje. */}
+              <div className="sm:col-span-2">
+                <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-ink">
+                  <input type="checkbox" checked={v.rental_hourly} onChange={(e) => set("rental_hourly", e.target.checked)} className="h-4 w-4 accent-accent" />
+                  Rozliczenie pracownika godzinowe (domyślne)
+                </label>
+                {!v.rental_hourly && (
+                  <div className="mt-2">
+                    <TextField label="Ryczałt za to zlecenie (zł)" inputMode="numeric" placeholder="np. 400" value={v.rental_flat} onChange={(e) => set("rental_flat", e.target.value)} error={errors.rental_flat} hint="Nadpisuje stawkę godzinową — pracownik dostaje tę kwotę za to zlecenie." />
+                  </div>
+                )}
+              </div>
             </div>
           </SectionCard>
         )}

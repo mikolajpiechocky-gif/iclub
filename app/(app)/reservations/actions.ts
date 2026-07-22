@@ -35,6 +35,9 @@ export interface ReservationFormValues {
   rental_items: string;
   delivery_time: string;
   payment_upfront: boolean;
+  // §18 Rozliczenie pracownika (wypożyczalnia): godzinowe domyślnie; ryczałt per zlecenie nadpisuje.
+  rental_hourly: boolean;
+  rental_flat: string;
   price: string;
   // §13.4 Rabat: typ + wartość wprowadzona; discount_amount to wyliczona kwota (zł) z formularza.
   discount_type: DiscountType;
@@ -70,7 +73,7 @@ function num(s: string): string | undefined {
 function validate(v: ReservationFormValues): Record<string, string> {
   const e: Record<string, string> = {};
   if (!STATUSES.includes(v.status)) e.status = "Wybierz status.";
-  for (const [k, label] of [["guests", "Liczba osób"], ["price", "Cena"], ["discount_value", "Rabat"], ["transport_price", "Transport"], ["deposit", "Zadatek"]] as const) {
+  for (const [k, label] of [["guests", "Liczba osób"], ["price", "Cena"], ["discount_value", "Rabat"], ["transport_price", "Transport"], ["deposit", "Zadatek"], ["rental_flat", "Ryczałt"]] as const) {
     const val = num(v[k]);
     if (val && isNaN(Number(val.replace(",", ".")))) e[k] = `${label} musi być liczbą.`;
   }
@@ -150,6 +153,8 @@ function toInput(v: ReservationFormValues): ReservationInput {
     event_start_time: clean(v.event_start_time),
     assembly_time: clean(v.assembly_time),
     pricing_snapshot: parseSnapshot(v.pricing_snapshot),
+    // §18 ryczałt wypożyczalni: tylko dla linii wypożyczalni i gdy odznaczono „godzinowe".
+    rental_settlement_flat: !isIclub && !v.rental_hourly ? toNumber(v.rental_flat) : null,
     is_invoice: v.is_invoice,
     source: clean(v.source),
     status: v.status,

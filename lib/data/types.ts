@@ -201,6 +201,7 @@ export interface ReservationRecord {
   discount_type: string;       // §13.4 AMOUNT | PERCENT
   discount_value: number | null; // wartość wprowadzona (% lub zł)
   transport_price: number | null; // §13.3 cena transportu dla klienta
+  rental_settlement_flat: number | null; // §18 ryczałt wypożyczalni per zlecenie (null = godzinowo)
   deposit: number;
   // §9 Godziny montażu
   event_start_time: string | null;  // godzina rozpoczęcia imprezy (HH:MM)
@@ -320,6 +321,7 @@ export interface EmployeeRate {
   upsell_percent: number | null;
   notes: string | null;
   iclub_settlement_mode: IclubSettlementMode;
+  iclub_threshold: number | null; // liczba realizacji na czas wolny „w ramach umowy" (null = globalny próg)
 }
 
 export interface EmployeeWithRate extends ProfileRecord {

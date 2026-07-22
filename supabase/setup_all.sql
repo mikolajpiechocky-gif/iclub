@@ -1383,4 +1383,10 @@ create policy equipment_instances_delete on public.equipment_instances for delet
 -- THRESHOLD = czas wolny za pierwsze N realizacji, potem ryczałt (model „Bartek").
 -- FLAT = ryczałt od pierwszej realizacji. Domyślnie FLAT (nie każdy ma umowne dni wolne).
 alter table public.employee_rates add column if not exists iclub_settlement_mode text not null default 'FLAT';
+-- Liczba realizacji na czas wolny „w ramach umowy" per pracownik (null = próg globalny z Ustawień).
+alter table public.employee_rates add column if not exists iclub_threshold integer;
+
+-- ================= 0044: rozliczenie wypożyczalni per rezerwacja (§18) =================
+-- Domyślnie godzinowo (null). Gdy ustawione — ryczałt za to zlecenie NADPISUJE godzinówkę.
+alter table public.reservations add column if not exists rental_settlement_flat numeric(10,2);
 

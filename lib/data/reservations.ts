@@ -178,6 +178,7 @@ export interface ReservationInput {
   event_start_time?: string | null; // §9.1 godzina rozpoczęcia imprezy
   assembly_time?: string | null;    // §9.3 ustalona (ręcznie) godzina montażu
   pricing_snapshot?: PricingSnapshot | null; // §11.2 kopia wyceny
+  rental_settlement_flat?: number | null; // §18 ryczałt wypożyczalni per zlecenie
   is_invoice?: boolean;
   source?: string | null;
   status: ReservationStatus;

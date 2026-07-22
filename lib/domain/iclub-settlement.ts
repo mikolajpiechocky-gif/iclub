@@ -58,13 +58,14 @@ export function settlementForRealization(
   const rate = opts.rate ?? null;
   const mode: IclubSettlementMode = opts.mode ?? rate?.iclub_settlement_mode ?? "FLAT";
   const flatRate = rate?.iclub_flat ?? rules.flatRate; // ryczałt pracownika albo globalny
+  const threshold = rate?.iclub_threshold ?? rules.monthlyThreshold; // próg „w ramach umowy" per pracownik
 
   let form: "free_time" | "flat";
   let baseValue: number;
   let baseLabel: string;
   let freeHours: number | null;
 
-  if (mode === "THRESHOLD" && index <= rules.monthlyThreshold) {
+  if (mode === "THRESHOLD" && index <= threshold) {
     form = "free_time";
     freeHours = rules.freeHours;
     baseValue = round2(rules.freeHours * rules.hourlyRate);
