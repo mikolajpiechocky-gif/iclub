@@ -90,7 +90,7 @@ export function SettingsForm({ initial, disabled }: { initial: AppSettings; disa
           <TextField label="Ryczałt od kolejnej (zł)" inputMode="decimal" value={v.iclub_flat_rate} onChange={(e) => set("iclub_flat_rate", e.target.value)} error={errors.iclub_flat_rate} hint="np. 500" />
         </div>
         <p className="px-5 pb-5 text-[12px] text-ink-2">
-          Każda z pierwszych realizacji w miesiącu = {v.iclub_hours || "8"} h czasu wolnego (wartość {v.iclub_hours || "8"} h × {v.iclub_hourly_rate || "32,40"} zł). Piąta i kolejne = ryczałt {v.iclub_flat_rate || "500"} zł + premie. Premie (daleki wyjazd, gastro, opinia, rolka) ustawiasz per pracownik w „Pracownicy”.
+          To parametry dla pracowników w trybie „czas wolny za pierwsze N” (np. Bartek): pierwsze {v.iclub_month_threshold || "4"} realizacji w miesiącu = {v.iclub_hours || "8"} h czasu wolnego (wartość {v.iclub_hours || "8"} h × {v.iclub_hourly_rate || "32,40"} zł), potem ryczałt {v.iclub_flat_rate || "500"} zł + premie. <b>Tryb rozliczenia (czas wolny / ryczałt od pierwszej) oraz premie ustawiasz per pracownik w „Pracownicy”.</b>
         </p>
       </SectionCard>
 

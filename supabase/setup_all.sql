@@ -1379,3 +1379,8 @@ create policy equipment_instances_update on public.equipment_instances for updat
 drop policy if exists equipment_instances_delete on public.equipment_instances;
 create policy equipment_instances_delete on public.equipment_instances for delete to authenticated using (public.is_owner());
 
+-- ================= 0043: tryb rozliczenia iClub per pracownik (§18/§19) =================
+-- THRESHOLD = czas wolny za pierwsze N realizacji, potem ryczałt (model „Bartek").
+-- FLAT = ryczałt od pierwszej realizacji. Domyślnie FLAT (nie każdy ma umowne dni wolne).
+alter table public.employee_rates add column if not exists iclub_settlement_mode text not null default 'FLAT';
+

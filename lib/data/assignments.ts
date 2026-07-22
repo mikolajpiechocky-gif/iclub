@@ -16,8 +16,8 @@ export interface JobAssignment {
   rate: EmployeeRate | null;
 }
 
-const DEMO_RATE_MAREK: EmployeeRate = { profile_id: "demo-emp1", rate_model: "FLAT_PLUS_BONUS", hourly_rate: null, iclub_flat: 250, far_bonus: 100, gastro_bonus: 80, review_bonus: 30, reel_bonus: 30, upsell_percent: 15, notes: null };
-const DEMO_RATE_KUBA: EmployeeRate = { profile_id: "demo-emp2", rate_model: "HOURLY", hourly_rate: 40, iclub_flat: null, far_bonus: null, gastro_bonus: null, review_bonus: null, reel_bonus: null, upsell_percent: 15, notes: null };
+const DEMO_RATE_MAREK: EmployeeRate = { profile_id: "demo-emp1", rate_model: "FLAT_PLUS_BONUS", hourly_rate: null, iclub_flat: 250, far_bonus: 100, gastro_bonus: 80, review_bonus: 30, reel_bonus: 30, upsell_percent: 15, notes: null, iclub_settlement_mode: "THRESHOLD" };
+const DEMO_RATE_KUBA: EmployeeRate = { profile_id: "demo-emp2", rate_model: "HOURLY", hourly_rate: 40, iclub_flat: null, far_bonus: null, gastro_bonus: null, review_bonus: null, reel_bonus: null, upsell_percent: 15, notes: null, iclub_settlement_mode: "FLAT" };
 
 const DEMO_ASSIGNMENTS: Record<string, JobAssignment[]> = {
   "demo-job-1": [

@@ -301,6 +301,13 @@ export const RATE_MODEL_ORDER: RateModel[] = [
   "FLAT", "HOURLY", "FLAT_PLUS_BONUS", "HOURLY_PLUS_BONUS", "MIXED",
 ];
 
+// §18/§19 Tryb rozliczenia iClub per pracownik.
+export type IclubSettlementMode = "THRESHOLD" | "FLAT";
+export const ICLUB_SETTLEMENT_MODE_LABELS: Record<IclubSettlementMode, string> = {
+  THRESHOLD: "Czas wolny za pierwsze N, potem ryczałt (Bartek)",
+  FLAT: "Ryczałt od pierwszej realizacji",
+};
+
 export interface EmployeeRate {
   profile_id: string;
   rate_model: RateModel;
@@ -312,6 +319,7 @@ export interface EmployeeRate {
   reel_bonus: number | null;
   upsell_percent: number | null;
   notes: string | null;
+  iclub_settlement_mode: IclubSettlementMode;
 }
 
 export interface EmployeeWithRate extends ProfileRecord {

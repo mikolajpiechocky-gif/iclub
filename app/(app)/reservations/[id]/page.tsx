@@ -8,11 +8,13 @@ import { SectionCard, Pill } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import { getReservation } from "@/lib/data/reservations";
 import { getCustomer } from "@/lib/data/customers";
-import { getJobByReservation, getJobStages } from "@/lib/data/jobs";
+import { getJobByReservation, getJobStages, countDoneIclubRealizations } from "@/lib/data/jobs";
 import { listJobAssignments } from "@/lib/data/assignments";
 import { listEmployees } from "@/lib/data/employees";
 import { getCurrentProfile, getProfileName } from "@/lib/data/profiles";
-import { predictedEarnings } from "@/lib/domain/earnings";
+import { predictedEarnings, type EarningsBreakdown } from "@/lib/domain/earnings";
+import { settlementForRealization, rulesFromSettings } from "@/lib/domain/iclub-settlement";
+import type { EmployeeRate } from "@/lib/data/types";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
 import { listJobPhotos } from "@/lib/data/photos";
@@ -213,28 +215,51 @@ async function ReservationOps({
   isOwner,
   profile,
 }: OpsProps) {
-  const [stages, assignments, employees, settings] = await Promise.all([
+  const [stages, assignments, employees, settings, transportCalcs] = await Promise.all([
     getJobStages(job.id),
     listJobAssignments(job.id),
     listEmployees(),
     getSettings(),
+    listTransportCalcs(job.id),
   ]);
   const done = stages.filter((s) => s.status === "DONE").length;
   const ownerBonus = job.owner_bonus ?? 0;
 
-  const assignmentViews: AssignmentView[] = assignments.map((a) => ({
+  // §18/§19 Wynagrodzenie: dla iClub — rozliczenie §19 (tryb per pracownik: czas wolny/ryczałt),
+  // spójne z widokiem pracownika. Dla wypożyczalni — model stawki (predictedEarnings).
+  const iclub = job.business_line === "ICLUB";
+  const rules = rulesFromSettings(settings);
+  const monthPrefix = (job.event_date ?? "").slice(0, 7);
+  const farTrip = transportCalcs.some((c) => (c.one_way_km ?? 0) > 100);
+  const hasGastro = job.reservation?.tent_extra === "GASTRO";
+  const buildEarnings = async (rate: EmployeeRate | null, profileId: string): Promise<EarningsBreakdown | null> => {
+    if (!rate) return null;
+    if (!iclub) return predictedEarnings(rate, job.business_line, ownerBonus, settings.iclub_hours);
+    const priorCount = monthPrefix ? await countDoneIclubRealizations(profileId, monthPrefix) : 0;
+    const s = settlementForRealization(rules, priorCount, { farTrip, hasGastro, rate });
+    const guaranteed = s.guaranteed.map((b) => b.label).join(" + ");
+    return {
+      base: s.baseValue,
+      baseLabel: guaranteed ? `${s.baseLabel} + ${guaranteed}` : s.baseLabel,
+      ownerBonus,
+      total: Math.round((s.total + ownerBonus) * 100) / 100,
+      possibleBonuses: s.possible,
+    };
+  };
+
+  const assignmentViews: AssignmentView[] = await Promise.all(assignments.map(async (a) => ({
     id: a.id,
     profile_id: a.profile_id,
     full_name: a.employee?.full_name ?? "—",
     avatar_url: a.employee?.avatar_url ?? null,
     is_lead: a.is_lead,
     status: a.status,
-    earnings: a.rate ? predictedEarnings(a.rate, job.business_line, ownerBonus, settings.iclub_hours) : null,
-  }));
+    earnings: await buildEarnings(a.rate, a.profile_id),
+  })));
   const assignedIds = new Set(assignments.map((a) => a.profile_id));
   const availableEmployees = employees.filter((e) => !assignedIds.has(e.id)).map((e) => ({ id: e.id, full_name: e.full_name || "—" }));
   const myRate = employees.find((e) => e.id === profile?.id)?.rate ?? null;
-  const myEarnings = myRate ? predictedEarnings(myRate, job.business_line, ownerBonus, settings.iclub_hours) : null;
+  const myEarnings = profile ? await buildEarnings(myRate, profile.id) : null;
   const amIAssigned = profile ? assignments.some((a) => a.profile_id === profile.id && a.status === "APPROVED") : false;
   const amIRequested = profile ? assignments.some((a) => a.profile_id === profile.id && a.status === "REQUESTED") : false;
   const unavailableIds = await getUnavailableProfileIds(job.event_date);
@@ -246,7 +271,6 @@ async function ReservationOps({
   const conflictArrays = await Promise.all(jobVehicles.map((jv) => findVehicleConflicts(jv.vehicle_id, job.event_date, job.id)));
   const vehicleConflicts = [...new Set(conflictArrays.flat())];
 
-  const transportCalcs = await listTransportCalcs(job.id);
   const vehiclesForTransport = vehicles.map((v) => ({ id: v.id, name: v.name, consumption: v.consumption, fuel_type: v.fuel_type }));
   const fuelPrices = { petrol: settings.fuel_price_petrol, diesel: settings.fuel_price_diesel, lpg: settings.fuel_price_lpg };
 

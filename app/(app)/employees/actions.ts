@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { upsertEmployeeRate } from "@/lib/data/employees";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import type { RateModel } from "@/lib/data/types";
+import type { RateModel, IclubSettlementMode } from "@/lib/data/types";
 
 export interface RateFormValues {
   rate_model: RateModel;
@@ -15,6 +15,7 @@ export interface RateFormValues {
   review_bonus: string;
   reel_bonus: string;
   upsell_percent: string;
+  iclub_settlement_mode: IclubSettlementMode;
   notes: string;
 }
 
@@ -47,6 +48,7 @@ export async function saveEmployeeRateAction(profileId: string, v: RateFormValue
       review_bonus: toNum(v.review_bonus),
       reel_bonus: toNum(v.reel_bonus),
       upsell_percent: toNum(v.upsell_percent),
+      iclub_settlement_mode: v.iclub_settlement_mode === "THRESHOLD" ? "THRESHOLD" : "FLAT",
       notes: v.notes.trim() || null,
     });
     revalidatePath("/employees");

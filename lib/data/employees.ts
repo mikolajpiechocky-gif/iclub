@@ -1,18 +1,18 @@
 // Warstwa danych: pracownicy (profile) + ich stawki/premie (poufne, tylko OWNER).
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import type { EmployeeWithRate, EmployeeRate, ProfileRecord } from "./types";
+import type { EmployeeWithRate, EmployeeRate, ProfileRecord, IclubSettlementMode } from "./types";
 import { DEMO_PROFILE } from "./profiles";
 
 const DEMO_EMPLOYEES: EmployeeWithRate[] = [
   { ...DEMO_PROFILE, full_name: "Mikołaj", role: "OWNER", rate: null },
   {
     id: "demo-emp1", full_name: "Marek W.", role: "EMPLOYEE",
-    rate: { profile_id: "demo-emp1", rate_model: "FLAT_PLUS_BONUS", hourly_rate: null, iclub_flat: 250, far_bonus: 100, gastro_bonus: 80, review_bonus: 30, reel_bonus: 30, upsell_percent: 15, notes: null },
+    rate: { profile_id: "demo-emp1", rate_model: "FLAT_PLUS_BONUS", hourly_rate: null, iclub_flat: 250, far_bonus: 100, gastro_bonus: 80, review_bonus: 30, reel_bonus: 30, upsell_percent: 15, notes: null, iclub_settlement_mode: "THRESHOLD" },
   },
   {
     id: "demo-emp2", full_name: "Kuba L.", role: "EMPLOYEE",
-    rate: { profile_id: "demo-emp2", rate_model: "HOURLY", hourly_rate: 40, iclub_flat: null, far_bonus: null, gastro_bonus: null, review_bonus: null, reel_bonus: null, upsell_percent: 15, notes: null },
+    rate: { profile_id: "demo-emp2", rate_model: "HOURLY", hourly_rate: 40, iclub_flat: null, far_bonus: null, gastro_bonus: null, review_bonus: null, reel_bonus: null, upsell_percent: 15, notes: null, iclub_settlement_mode: "FLAT" },
   },
 ];
 
@@ -26,6 +26,7 @@ export interface EmployeeRateInput {
   reel_bonus: number | null;
   upsell_percent: number | null;
   notes: string | null;
+  iclub_settlement_mode: IclubSettlementMode;
 }
 
 export async function listEmployees(): Promise<EmployeeWithRate[]> {

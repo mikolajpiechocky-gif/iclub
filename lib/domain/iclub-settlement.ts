@@ -1,7 +1,7 @@
 // §19 Reguły rozliczenia realizacji iClub (konfigurowalne, „Bartek" jako seed).
 // Pierwsze N realizacji w miesiącu = czas wolny (wartość rozliczeniowa = godziny ×
 // stawka). Kolejne = ryczałt + premie. Mnożnik przejazdu NIE zmienia wynagrodzenia.
-import type { EmployeeRate } from "@/lib/data/types";
+import type { EmployeeRate, IclubSettlementMode } from "@/lib/data/types";
 
 // Domyślne premie (§19.3) — nadpisywane wartościami ze stawki pracownika, jeśli są.
 export const DEFAULT_BONUSES = { far: 150, gastro: 150, review: 20, reel: 50 } as const;
@@ -47,20 +47,24 @@ export function rulesFromSettings(s: { iclub_hours: number; iclub_hourly_rate: n
 
 // Rozliczenie pojedynczej realizacji. priorCompletedThisMonth = ile realizacji
 // pracownik już zaliczył w tym miesiącu (ta będzie kolejna).
+// Tryb per pracownik: THRESHOLD = czas wolny za pierwsze N, potem ryczałt (Bartek);
+// FLAT = ryczałt od pierwszej realizacji. Ryczałt = stawka pracownika (iclub_flat) albo globalny.
 export function settlementForRealization(
   rules: IclubSettlementRules,
   priorCompletedThisMonth: number,
-  opts: { farTrip?: boolean; hasGastro?: boolean; rate?: EmployeeRate | null } = {},
+  opts: { farTrip?: boolean; hasGastro?: boolean; rate?: EmployeeRate | null; mode?: IclubSettlementMode } = {},
 ): RealizationSettlement {
   const index = priorCompletedThisMonth + 1;
   const rate = opts.rate ?? null;
+  const mode: IclubSettlementMode = opts.mode ?? rate?.iclub_settlement_mode ?? "FLAT";
+  const flatRate = rate?.iclub_flat ?? rules.flatRate; // ryczałt pracownika albo globalny
 
   let form: "free_time" | "flat";
   let baseValue: number;
   let baseLabel: string;
   let freeHours: number | null;
 
-  if (index <= rules.monthlyThreshold) {
+  if (mode === "THRESHOLD" && index <= rules.monthlyThreshold) {
     form = "free_time";
     freeHours = rules.freeHours;
     baseValue = round2(rules.freeHours * rules.hourlyRate);
@@ -68,7 +72,7 @@ export function settlementForRealization(
   } else {
     form = "flat";
     freeHours = null;
-    baseValue = rules.flatRate;
+    baseValue = flatRate;
     baseLabel = "Ryczałt za realizację";
   }
 
