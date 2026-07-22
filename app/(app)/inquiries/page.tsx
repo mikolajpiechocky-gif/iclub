@@ -5,7 +5,7 @@ import { PrimaryButton, EmptyState, Pill } from "@/components/ui";
 import { listInquiries } from "@/lib/data/inquiries";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { INQUIRY_STATUS_META, INQUIRY_STATUS_LABELS, INQUIRY_SOURCE_LABELS, type InquiryStatus } from "@/lib/data/types";
+import { INQUIRY_STATUS_META, INQUIRY_STATUS_LABELS, INQUIRY_SOURCE_LABELS, inquiryDisplayName, type InquiryStatus } from "@/lib/data/types";
 import { AutoCloseButton } from "./lead-buttons";
 
 export const dynamic = "force-dynamic";
@@ -13,14 +13,16 @@ export const dynamic = "force-dynamic";
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : "—";
 
-export default async function InquiriesPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+export default async function InquiriesPage({ searchParams }: { searchParams: Promise<{ status?: string; signal?: string }> }) {
   const [all, profile, sp] = await Promise.all([listInquiries(), getCurrentProfile(), searchParams]);
   const demo = !isSupabaseConfigured();
   const isOwner = profile?.role === "OWNER";
 
-  // §4.2 Filtr statusu z kafelka pulpitu (np. ?status=NEW).
+  // §4.2 Filtr statusu z kafelka pulpitu (np. ?status=NEW). §6 Filtr „padły dane do umowy".
   const activeStatus = sp.status && sp.status in INQUIRY_STATUS_LABELS ? (sp.status as InquiryStatus) : null;
-  const inquiries = activeStatus ? all.filter((q) => q.status === activeStatus) : all;
+  const signalOnly = sp.signal === "1";
+  const signalCount = all.filter((q) => q.contract_signal).length;
+  const inquiries = all.filter((q) => (activeStatus ? q.status === activeStatus : true) && (signalOnly ? q.contract_signal : true));
 
   return (
     <div className="mx-auto max-w-[1280px] px-5 py-6 md:px-8">
@@ -37,10 +39,18 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      {activeStatus && (
+      {(activeStatus || signalOnly) && (
         <div className="mb-4 flex items-center gap-2 rounded-card border border-border bg-surface-2 px-4 py-2.5 text-[12.5px]">
-          <span className="font-semibold text-ink">Status: {INQUIRY_STATUS_LABELS[activeStatus]}</span>
+          <span className="font-semibold text-ink">{signalOnly ? "Padły dane do umowy" : `Status: ${INQUIRY_STATUS_LABELS[activeStatus!]}`}</span>
           <Link href="/inquiries" className="ml-auto font-semibold text-accent-soft">Wyczyść ✕</Link>
+        </div>
+      )}
+
+      {!signalOnly && !activeStatus && signalCount > 0 && (
+        <div className="mb-4">
+          <Link href="/inquiries?signal=1" className="inline-flex items-center gap-2 rounded-card border border-[#1e4a2c] bg-[#16301f] px-4 py-2.5 text-[12.5px] font-semibold text-ok">
+            {signalCount} {signalCount === 1 ? "lead z danymi do umowy" : "leadów z danymi do umowy"} → pokaż
+          </Link>
         </div>
       )}
 
@@ -77,7 +87,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
                   const m = INQUIRY_STATUS_META[q.status];
                   return (
                     <tr key={q.id} className="border-b border-border-soft last:border-0 hover:bg-surface-2">
-                      <td className="px-4 py-3"><Link href={`/inquiries/${q.id}/edit`} className="text-[13.5px] font-bold text-ink">{q.customer?.name ?? "— bez klienta —"}</Link></td>
+                      <td className="px-4 py-3"><Link href={`/inquiries/${q.id}/edit`} className="text-[13.5px] font-bold text-ink">{inquiryDisplayName(q)}</Link>{q.contract_signal && <span className="ml-2 rounded-[6px] bg-[#16301f] px-1.5 py-0.5 text-[10px] font-bold text-ok">dane do umowy</span>}</td>
                       <td className="px-4 py-3 text-[13px] text-ink-2">{q.event_type || "—"}</td>
                       <td className="px-4 py-3 text-[13px] text-ink">{fmtDate(q.event_date)}</td>
                       <td className="px-4 py-3 text-[13px] text-ink-2">{q.location || "—"}</td>
@@ -99,7 +109,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
               return (
                 <Link key={q.id} href={`/inquiries/${q.id}/edit`} className="rounded-card border border-border bg-surface p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-[14.5px] font-bold text-ink">{q.customer?.name ?? "— bez klienta —"}</div>
+                    <div className="text-[14.5px] font-bold text-ink">{inquiryDisplayName(q)}{q.contract_signal && <span className="ml-2 rounded-[6px] bg-[#16301f] px-1.5 py-0.5 text-[10px] font-bold text-ok align-middle">dane do umowy</span>}</div>
                     <Pill label={m.label} fg={m.fg} bg={m.bg} />
                   </div>
                   <div className="mt-1 text-[12.5px] font-medium text-ink-2">{[q.event_type, q.tent_interest, q.package_interest].filter(Boolean).join(" · ") || "—"}</div>

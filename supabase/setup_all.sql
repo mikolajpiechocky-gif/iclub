@@ -1390,3 +1390,11 @@ alter table public.employee_rates add column if not exists iclub_threshold integ
 -- Domyślnie godzinowo (null). Gdy ustawione — ryczałt za to zlecenie NADPISUJE godzinówkę.
 alter table public.reservations add column if not exists rental_settlement_flat numeric(10,2);
 
+-- ================= 0045: nazwa/kontakt + historia rozmowy zapytania (§6) =================
+-- Dla leadów bez klienta (np. z OLX) pokazujemy nick/mail zamiast „bez klienta".
+alter table public.inquiries add column if not exists contact_name text;
+alter table public.inquiries add column if not exists contact_email text;
+-- Pełna historia rozmowy OLX: [{ text, at, mine }]. Analiza „padły dane do umowy".
+alter table public.inquiries add column if not exists olx_messages jsonb;
+alter table public.inquiries add column if not exists contract_signal boolean not null default false;
+

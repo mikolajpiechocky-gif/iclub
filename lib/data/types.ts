@@ -50,13 +50,30 @@ export interface InquiryRecord {
   reactivated_at: string | null;
   previous_status: string | null;
   olx_last_message: string | null;
+  // §6 Kontakt (dla leadów bez klienta — nick/mail z OLX) + historia rozmowy + analiza.
+  contact_name: string | null;
+  contact_email: string | null;
+  olx_messages: OlxMessage[] | null;
+  contract_signal: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// Wiadomość w historii rozmowy OLX.
+export interface OlxMessage {
+  text: string;
+  at: string | null;
+  mine: boolean; // true = wiadomość wychodząca (my), false = od klienta
 }
 
 // Zapytanie z dołączoną nazwą klienta (do list).
 export interface InquiryWithCustomer extends InquiryRecord {
   customer: { id: string; name: string } | null;
+}
+
+// Nazwa do wyświetlenia dla leada: klient → nick OLX → mail → „bez klienta".
+export function inquiryDisplayName(q: { customer?: { name?: string | null } | null; contact_name?: string | null; contact_email?: string | null }): string {
+  return q.customer?.name || q.contact_name || q.contact_email || "— bez klienta —";
 }
 
 // --- Etykiety PL ---

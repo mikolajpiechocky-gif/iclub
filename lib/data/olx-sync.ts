@@ -4,6 +4,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getValidAccessToken, markOlxSynced } from "./olx";
 import { getThreads, getMessages } from "@/lib/integrations/olx";
+import { analyzeContractSignals, extractEmail } from "@/lib/domain/lead-analysis";
 
 export interface OlxSyncResult {
   ok: boolean;
@@ -40,33 +41,55 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
         const threadId = String(pick(th, "id") ?? "");
         if (!threadId) continue;
 
-        // Najnowsza wiadomość jako treść leada (best-effort).
-        let msgText = "";
+        // Pełna historia wiadomości wątku (do 5 stron po 100 — best-effort).
+        const msgs: { text: string; at: string | null; mine: boolean }[] = [];
         try {
-          const mresp = (await getMessages(token, threadId, 0, 1)) as Record<string, unknown>;
-          const first = ((mresp?.data as unknown[]) ?? [])[0];
-          msgText = String(pick(first, "text") ?? pick(first, "message") ?? "");
+          let moff = 0;
+          for (let mp = 0; mp < 5; mp++) {
+            const mresp = (await getMessages(token, threadId, moff, 100)) as Record<string, unknown>;
+            const arr = ((mresp?.data as unknown[]) ?? []) as Record<string, unknown>[];
+            if (!arr.length) break;
+            for (const m of arr) {
+              const text = String(pick(m, "text") ?? pick(m, "message") ?? "").trim();
+              const at = (pick(m, "created_at") ?? pick(m, "posted_at") ?? null) as string | null;
+              const typ = String(pick(m, "type") ?? pick(m, "author_type") ?? "").toLowerCase();
+              const mine = typ.includes("sent") || typ.includes("own") || typ.includes("outgoing") || Boolean(pick(m, "is_own"));
+              if (text) msgs.push({ text, at, mine });
+            }
+            if (arr.length < 100) break;
+            moff += arr.length;
+          }
         } catch {
-          /* pojedynczy wątek bez wiadomości — pomijamy treść */
+          /* wątek bez dostępnych wiadomości — pomijamy historię */
         }
+        msgs.sort((a, b) => ((a.at ?? "") < (b.at ?? "") ? -1 : 1));
 
         const name = String(pick(th, "interlocutor", "name") ?? pick(th, "user", "name") ?? "Klient OLX");
         const advert = String(pick(th, "advert", "title") ?? pick(th, "advert_title") ?? "");
         const lastAt = (pick(th, "updated_at") ?? pick(th, "last_message", "created_at") ?? null) as string | null;
-        const notes = [`OLX: ${name}`, advert && `Ogłoszenie: ${advert}`, msgText && `„${msgText}”`].filter(Boolean).join("\n");
+        const convo = msgs.map((m) => m.text).join("\n");
+        const email = String(pick(th, "interlocutor", "email") ?? pick(th, "user", "email") ?? extractEmail(convo) ?? "") || null;
+        const lastMsg = msgs.length ? msgs[msgs.length - 1].text : null;
+        const contractSignal = analyzeContractSignals(`${name}\n${advert}\n${convo}`).signal;
+        const notes = [`OLX: ${name}`, advert && `Ogłoszenie: ${advert}`, lastMsg && `„${lastMsg}”`].filter(Boolean).join("\n");
 
         const { data: existing } = await s.from("inquiries").select("id, status, reactivation_count").eq("olx_thread_id", threadId).maybeSingle();
         const ex = existing as { id: string; status: string; reactivation_count: number } | null;
-        const olxMsg = msgText || null;
+
+        // Dane z OLX (nick, mail, historia, sygnał) aktualizujemy zawsze — to nie są ręczne
+        // dane CRM (status, klient, notatki), które pozostają nietknięte.
+        const olxData: Record<string, unknown> = {
+          contact_name: name,
+          contact_email: email,
+          olx_messages: msgs,
+          contract_signal: contractSignal,
+          olx_last_message: lastMsg,
+          olx_last_message_at: lastAt,
+          last_activity_at: new Date().toISOString(),
+        };
 
         if (ex) {
-          // Aktualizujemy TYLKO treść z OLX + znacznik aktywności — ręczne dane CRM
-          // (status, klient, notatki) zostają nietknięte. Przegrany lead „odgrzewa się".
-          const patch: Record<string, unknown> = {
-            olx_last_message: olxMsg,
-            olx_last_message_at: lastAt,
-            last_activity_at: new Date().toISOString(),
-          };
+          const patch = { ...olxData };
           if (ex.status === "LOST") {
             patch.status = "REHEATED";
             patch.previous_status = "LOST";
@@ -82,9 +105,7 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
             event_type: advert || null,
             notes,
             olx_thread_id: threadId,
-            olx_last_message: olxMsg,
-            olx_last_message_at: lastAt,
-            last_activity_at: new Date().toISOString(),
+            ...olxData,
           });
           imported++;
         }

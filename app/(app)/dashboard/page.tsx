@@ -13,7 +13,7 @@ import { fuelReminderDue } from "@/lib/data/settings";
 import { listOlxAdverts } from "@/lib/data/olx-adverts";
 import { analyzeFleet } from "@/lib/domain/olx-adverts";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { RESERVATION_STATUS_META } from "@/lib/data/types";
+import { RESERVATION_STATUS_META, inquiryDisplayName } from "@/lib/data/types";
 
 export const dynamic = "force-dynamic";
 
@@ -151,7 +151,7 @@ export default async function DashboardPage() {
             recentInquiries.map((q) => (
               <Link key={q.id} href={`/inquiries/${q.id}/edit`} className="flex items-center gap-3 rounded-[13px] px-3.5 py-2.5 transition hover:bg-surface-2">
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13.5px] font-bold text-ink">{q.customer?.name ?? "— bez klienta —"}</div>
+                  <div className="truncate text-[13.5px] font-bold text-ink">{inquiryDisplayName(q)}</div>
                   <div className="truncate text-[12px] text-ink-2">{[q.event_type, q.location].filter(Boolean).join(" · ") || "—"}</div>
                 </div>
                 <div className="text-[12px] font-semibold text-ink-2">{fmtDate(q.event_date)}</div>
