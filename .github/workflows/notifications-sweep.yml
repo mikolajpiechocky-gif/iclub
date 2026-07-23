@@ -1,0 +1,31 @@
+name: Powiadomienia (cykliczne)
+
+# Raz dziennie ~08:00 czasu PL (06:00 UTC) wysyła cykliczne powiadomienia push:
+# paliwo, wygasające ogłoszenia OLX, pogoda na jutro, „spakuj się dzień przed",
+# realizacje bez zespołu. Endpoint chroniony sekretem OLX_CRON_SECRET.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: notifications-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping sweep endpoint
+        env:
+          CRON_SECRET: ${{ secrets.OLX_CRON_SECRET }}
+        run: |
+          code=$(curl -sS -o response.json -w "%{http_code}" -X GET \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            https://app.iclubevents.pl/api/notifications/sweep)
+          echo "HTTP ${code}"
+          cat response.json || true
+          echo ""
+          test "${code}" = "200"

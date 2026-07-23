@@ -15,6 +15,7 @@ import { getSettings } from "@/lib/data/settings";
 import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
 import { listTransportCalcs } from "@/lib/data/transport";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
+import { sendPushToEmployees, sendPushToUsers } from "@/lib/integrations/push";
 import { geocode, routeLeg } from "@/lib/integrations/google-maps";
 import { isGoogleMapsConfigured } from "@/lib/integrations/google-maps/config";
 import type { ReservationStatus, BusinessLine, PricingSnapshot } from "@/lib/data/types";
@@ -290,6 +291,10 @@ export async function createReservationAction(values: ReservationFormValues): Pr
     const { id } = await createReservation(toInput(values));
     // Nowa rezerwacja z apki → wolno utworzyć wydarzenie w kalendarzu.
     try { await syncReservationToCalendar(id, { allowCreate: true }); } catch {}
+    // Nowe zlecenie iClub „do zgarnięcia" → push do pracowników.
+    if (values.business_line === "ICLUB") {
+      await sendPushToEmployees({ title: "Nowe zlecenie do zgarnięcia", body: [values.event_type || "Realizacja iClub", values.event_date, values.location].filter(Boolean).join(" · "), url: "/me", tag: "claimable" }).catch(() => {});
+    }
     revalidatePath("/reservations");
     return { ok: true, id };
   } catch (e) {
@@ -390,6 +395,14 @@ export async function updateReservationAction(id: string, values: ReservationFor
   try {
     await updateReservation(id, toInput(values));
     try { await syncReservationToCalendar(id); } catch {}
+    // Zmiana szczegółów → push do przypisanych (APPROVED) pracowników.
+    try {
+      const job = await getJobByReservation(id);
+      if (job) {
+        const assigned = (await listJobAssignments(job.id)).filter((a) => a.status === "APPROVED").map((a) => a.profile_id);
+        if (assigned.length) await sendPushToUsers(assigned, { title: "Zmiana szczegółów realizacji", body: [values.event_type, values.event_date, values.location].filter(Boolean).join(" · "), url: `/field/${job.id}`, tag: `job-${job.id}` });
+      }
+    } catch { /* push opcjonalny */ }
     revalidatePath("/reservations");
     revalidatePath(`/reservations/${id}/edit`);
     return { ok: true, id };
