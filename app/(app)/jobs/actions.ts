@@ -7,6 +7,7 @@ import { assignEmployee, approveAssignment, removeAssignment, setAssignmentLead,
 import { getJob } from "@/lib/data/jobs";
 import { listOwnerIds } from "@/lib/data/profiles";
 import { createNotification } from "@/lib/data/notifications";
+import { sendPushToUsers } from "@/lib/integrations/push";
 
 function jobLabel(job: Awaited<ReturnType<typeof getJob>>): string {
   return job?.reservation?.customer?.name ?? job?.title ?? "zlecenie";
@@ -34,6 +35,7 @@ export async function assignEmployeeAction(jobId: string, profileId: string): Pr
     const job = await getJob(jobId);
     const label = job?.reservation?.customer?.name ?? job?.title ?? "zlecenie";
     await createNotification(profileId, "Przypisano Cię do realizacji", `Zlecenie: ${label}${job?.event_date ? " · " + job.event_date : ""}`, "ASSIGNMENT", jobId);
+    await sendPushToUsers([profileId], { title: "Przypisano Cię do realizacji", body: `${label}${job?.event_date ? " · " + job.event_date : ""}`, url: `/field/${jobId}`, tag: `job-${jobId}` }).catch(() => {});
     revalidatePath(`/jobs/${jobId}`);
     return { ok: true };
   } catch (e) {
@@ -82,6 +84,7 @@ export async function selfClaimAction(jobId: string): Promise<ActionResult> {
         createNotification(oid, "Prośba o przypisanie", `${who} prosi o przypisanie: ${jobLabel(job)}${job?.event_date ? " · " + job.event_date : ""}`, "ASSIGNMENT_REQUEST", jobId),
       ),
     );
+    await sendPushToUsers(owners, { title: "Prośba o przypisanie", body: `${who}: ${jobLabel(job)}${job?.event_date ? " · " + job.event_date : ""}`, url: `/reservations/${job?.reservation_id ?? ""}`, tag: `req-${jobId}` }).catch(() => {});
     revalidatePath(`/jobs/${jobId}`);
     return { ok: true };
   } catch (e) {
@@ -99,6 +102,7 @@ export async function approveAssignmentAction(id: string, jobId: string, profile
     if (approved) {
       const job = await getJob(jobId);
       await createNotification(profileId, "Przypisanie zaakceptowane", `Szef zaakceptował Twoje przypisanie: ${jobLabel(job)}${job?.event_date ? " · " + job.event_date : ""}`, "ASSIGNMENT", jobId);
+      await sendPushToUsers([profileId], { title: "Przypisanie zaakceptowane", body: `${jobLabel(job)}${job?.event_date ? " · " + job.event_date : ""}`, url: `/field/${jobId}`, tag: `job-${jobId}` }).catch(() => {});
     }
     revalidatePath(`/jobs/${jobId}`);
     return { ok: true };

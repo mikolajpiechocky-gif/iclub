@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getValidAccessToken, markOlxSynced, getOlxIntegration } from "./olx";
 import { getThreads, getMessages, getAdverts, getMe } from "@/lib/integrations/olx";
 import { analyzeConversation, extractEmail } from "@/lib/domain/lead-analysis";
+import { sendPushToOwners } from "@/lib/integrations/push";
 import {
   pick,
   extractName,
@@ -35,6 +36,8 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
   let updated = 0;
   let offset = 0;
   let firstError: string | null = null; // pierwszy błąd zapisu (np. brak migracji) — zgłaszamy zamiast cicho pomijać
+  const newNames: string[] = [];    // nowe zapytania → push do szefów
+  const closedNames: string[] = []; // leady, które właśnie wyglądają na domknięte → push
 
   // Własne id konta OLX — do rozpoznania kierunku wiadomości (moja vs klienta).
   let myId: string | null = null;
@@ -132,8 +135,8 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
         // Sample surowych danych do diagnostyki mapowania (ograniczony rozmiar).
         const olxRaw = { thread: th, messages: rawMsgs.slice(0, 4), me_id: myId };
 
-        const { data: existing } = await s.from("inquiries").select("id, status, reactivation_count, location").eq("olx_thread_id", threadId).maybeSingle();
-        const ex = existing as { id: string; status: string; reactivation_count: number; location: string | null } | null;
+        const { data: existing } = await s.from("inquiries").select("id, status, reactivation_count, location, contract_signal").eq("olx_thread_id", threadId).maybeSingle();
+        const ex = existing as { id: string; status: string; reactivation_count: number; location: string | null; contract_signal: boolean } | null;
 
         // Dane z OLX (nick, mail, historia, sygnał) aktualizujemy zawsze — to nie są ręczne
         // dane CRM (status, klient, notatki), które pozostają nietknięte.
@@ -159,7 +162,8 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
             patch.reactivated_at = new Date().toISOString();
           }
           const { error } = await s.from("inquiries").update(patch).eq("id", ex.id);
-          if (error) { if (!firstError) firstError = error.message; } else updated++;
+          if (error) { if (!firstError) firstError = error.message; }
+          else { updated++; if (analysis.signal && !ex.contract_signal) closedNames.push(name); }
         } else {
           const { error } = await s.from("inquiries").insert({
             source: "OLX",
@@ -170,7 +174,8 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
             olx_thread_id: threadId,
             ...olxData,
           });
-          if (error) { if (!firstError) firstError = error.message; } else imported++;
+          if (error) { if (!firstError) firstError = error.message; }
+          else { imported++; newNames.push(name); if (analysis.signal) closedNames.push(name); }
         }
       }
 
@@ -179,6 +184,15 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
     }
 
     await markOlxSynced();
+    // Powiadomienia push dla szefów (nie blokują wyniku synchronizacji).
+    try {
+      if (newNames.length) {
+        await sendPushToOwners({ title: newNames.length === 1 ? "Nowe zapytanie OLX" : `${newNames.length} nowych zapytań OLX`, body: newNames.slice(0, 3).join(", "), url: "/inquiries", tag: "olx-new" });
+      }
+      if (closedNames.length) {
+        await sendPushToOwners({ title: "Lead wygląda na domknięty", body: closedNames.slice(0, 3).join(", "), url: "/inquiries?signal=1", tag: "olx-closed" });
+      }
+    } catch { /* push opcjonalny */ }
     if (firstError) return { ok: false, imported, updated, error: firstError };
     return { ok: true, imported, updated };
   } catch (e) {

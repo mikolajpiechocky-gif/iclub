@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createIncident, setIncidentStatus } from "@/lib/data/incidents";
+import { sendPushToOwners } from "@/lib/integrations/push";
 import type { IncidentPriority, IncidentStatus } from "@/lib/data/types";
 
 export interface IncidentFormValues {
@@ -32,6 +33,12 @@ export async function createIncidentAction(v: IncidentFormValues): Promise<Actio
       equipment: v.equipment.trim() || null,
       priority: v.priority,
     });
+    await sendPushToOwners({
+      title: v.priority === "HIGH" ? "🚨 Pilne zgłoszenie z terenu" : "Zgłoszenie z terenu",
+      body: [v.category, v.equipment.trim() || v.description.trim().slice(0, 60)].filter(Boolean).join(" · "),
+      url: "/media",
+      tag: "incident",
+    }).catch(() => {});
     revalidatePath("/media");
     return { ok: true };
   } catch (e) {
