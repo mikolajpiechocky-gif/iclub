@@ -3,8 +3,8 @@
 // prognozy zwraca null — karta pogody się po prostu nie pokazuje.
 import { geocode } from "@/lib/integrations/google-maps";
 
-// Rodzaj ostrzeżenia → mapowany na ikonę w UI (wind/sun/droplet).
-export type WeatherWarningKind = "wind" | "heat" | "rain";
+// Rodzaj ostrzeżenia → mapowany na ikonę w UI (wind/sun/droplet/cold).
+export type WeatherWarningKind = "wind" | "heat" | "rain" | "cold";
 
 export interface WeatherWarning {
   kind: WeatherWarningKind;
@@ -13,10 +13,11 @@ export interface WeatherWarning {
 
 // Kolory ikon pogodowych (§5.4): upał — żółty, deszcz — niebieski, silny wiatr —
 // pomarańczowy; bezpieczne warunki — zielone. (Burza/mróz/IMGW — do dodania później.)
-export const WEATHER_KIND_STYLE: Record<WeatherWarningKind, { icon: "wind" | "sun" | "droplet"; color: string }> = {
+export const WEATHER_KIND_STYLE: Record<WeatherWarningKind, { icon: "wind" | "sun" | "droplet" | "flame"; color: string }> = {
   wind: { icon: "wind", color: "#f97316" },
   heat: { icon: "sun", color: "#fbbf24" },
   rain: { icon: "droplet", color: "#38bdf8" },
+  cold: { icon: "flame", color: "#fb923c" },
 };
 export const WEATHER_OK_COLOR = "#5fd68b";
 
@@ -79,6 +80,8 @@ export async function getEventWeather(location: string, date: string): Promise<E
     const warnings: WeatherWarning[] = [];
     if (windMax != null && windMax > 25) warnings.push({ kind: "wind", text: `Dodatkowe mocowania (wiatr ${Math.round(windMax)} km/h)` });
     if (tempMax != null && tempMax > 23) warnings.push({ kind: "heat", text: `Weź wentylator (${Math.round(tempMax)}°C)` });
+    // Zimna noc → podpowiedź ogrzewania (temp. minimalna dobowa = noc).
+    if (tempMin != null && tempMin < 12) warnings.push({ kind: "cold", text: `Zimna noc (${Math.round(tempMin)}°C) — rozważ ogrzewanie` });
     if (rainy) warnings.push({ kind: "rain", text: "Weź osłonę na dmuchawę" });
 
     return { date, label: weatherLabel(code), tempMax, tempMin, windMax, precip, warnings };
