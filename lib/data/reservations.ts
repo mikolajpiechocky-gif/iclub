@@ -308,6 +308,21 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
   const stamp = await assemblyStampFor(supabase, id, input);
   const { error } = await supabase.from("reservations").update({ ...input, ...resolved, ...(stamp ?? {}) }).eq("id", id);
   if (error) throw new Error(error.message);
+
+  // Zabezpieczenie: rezerwacja bez zlecenia (np. starsza albo utworzona zanim generowaliśmy
+  // zlecenia) nie miała sekcji zespołu → nie dało się przypisać pracownika. Dogeneruj zlecenie.
+  const { data: existingJob } = await supabase.from("jobs").select("id").eq("reservation_id", id).maybeSingle();
+  if (!existingJob) {
+    const { data: job } = await supabase
+      .from("jobs")
+      .insert({ reservation_id: id, business_line: input.business_line, title: input.event_type ?? "Zlecenie", event_date: input.event_date ?? null, status: "PLANNED" })
+      .select("id")
+      .single();
+    if (job) {
+      const stages = stagesForBusinessLine(input.business_line).map((s, i) => ({ job_id: (job as { id: string }).id, stage_key: s.key, title: s.title, sort: i }));
+      await supabase.from("job_stages").insert(stages);
+    }
+  }
 }
 
 // Usunięcie rezerwacji. Kaskada bazy usuwa powiązane zlecenie i jego dane operacyjne

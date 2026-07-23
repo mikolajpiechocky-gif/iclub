@@ -174,7 +174,10 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
         <SafeReservationOps job={job} isOwner={isOwner} profile={profile} />
       ) : (
         <SectionCard title="Realizacja" className="mt-4 p-5">
-          <p className="px-5 pb-5 text-[13px] text-ink-2">Brak powiązanego zlecenia. Zapisz ponownie rezerwację, aby wygenerować etapy realizacji.</p>
+          <div className="px-5 pb-5">
+            <p className="text-[13px] text-ink-2">Ta rezerwacja nie ma jeszcze zlecenia, dlatego nie widać sekcji zespołu (przypisania pracowników).</p>
+            <Link href={`/reservations/${reservation.id}/edit`} className="mt-3 inline-block rounded-field bg-brand px-4 py-2.5 text-[13px] font-semibold text-white">Edytuj i zapisz — wygeneruje zlecenie</Link>
+          </div>
         </SectionCard>
       )}
 
