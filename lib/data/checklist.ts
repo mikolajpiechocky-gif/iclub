@@ -5,11 +5,11 @@ import type { ChecklistItemRecord } from "./types";
 import type { ChecklistTemplateItem } from "@/lib/domain/checklist";
 
 const DEMO_CHECKLIST: ChecklistItemRecord[] = [
-  { id: "dc1", job_id: "demo-job-1", category: "Magazyn", label: "Namiot 6×8 Niebieski — poszycie", qty: "1 szt.", required: true, done: true, problem: false, sort: 0 },
-  { id: "dc2", job_id: "demo-job-1", category: "Magazyn", label: "Dmuchawa + wąż", qty: "1 szt.", required: true, done: true, problem: false, sort: 1 },
-  { id: "dc3", job_id: "demo-job-1", category: "Magazyn", label: "Kotwy i obciążniki", qty: "8 szt.", required: true, done: false, problem: false, sort: 2 },
-  { id: "dc4", job_id: "demo-job-1", category: "Załadunek", label: "Kolumny aktywne", qty: "2 szt.", required: false, done: true, problem: false, sort: 3 },
-  { id: "dc5", job_id: "demo-job-1", category: "Załadunek", label: "Kable i zasilanie", qty: null, required: true, done: false, problem: true, sort: 4 },
+  { id: "dc1", job_id: "demo-job-1", category: "Namiot", label: "Namiot 6×8 Niebieski — poszycie", qty: "1 szt.", required: true, done: true, problem: false, sort: 0 },
+  { id: "dc2", job_id: "demo-job-1", category: "Namiot", label: "Dmuchawa + zapasowa", qty: null, required: true, done: true, problem: false, sort: 1 },
+  { id: "dc3", job_id: "demo-job-1", category: "Namiot", label: "Kotwy / worki z piaskiem", qty: null, required: true, done: false, problem: false, sort: 2 },
+  { id: "dc4", job_id: "demo-job-1", category: "Nagłośnienie", label: "Kolumny", qty: null, required: false, done: true, problem: false, sort: 3 },
+  { id: "dc5", job_id: "demo-job-1", category: "Nagłośnienie", label: "Zasilanie kolumn", qty: null, required: false, done: false, problem: true, sort: 4 },
   { id: "dc6", job_id: "demo-job-1", category: "Dokumenty", label: "Umowa i dokumenty", qty: null, required: true, done: false, problem: false, sort: 5 },
 ];
 
