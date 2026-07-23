@@ -11,9 +11,13 @@ import { listChecklistItems } from "@/lib/data/checklist";
 import { listPayments } from "@/lib/data/payments";
 import { getSignature } from "@/lib/data/signatures";
 import { listJobPhotos } from "@/lib/data/photos";
+import { listCosts } from "@/lib/data/costs";
+import { listIncidents } from "@/lib/data/incidents";
+import { listTransportCalcs } from "@/lib/data/transport";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { JOB_STATUS_META } from "@/lib/data/types";
 import { PackingBlock, RealizationFlow, type RealizationContext } from "../realization-flow";
+import { ProtocolBlock } from "../protocol-block";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +30,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   if (!job) notFound();
 
   const r = job.reservation;
-  const [customer, checklist, payments, signature, photos, addonList, packageItems] = await Promise.all([
+  const [customer, checklist, payments, signature, photos, addonList, packageItems, costsAll, incidentsAll, transportCalcs] = await Promise.all([
     r?.customer_id ? getCustomer(r.customer_id) : Promise.resolve(null),
     listChecklistItems(job.id),
     listPayments(),
@@ -34,7 +38,18 @@ export default async function FieldRealizationPage({ params }: { params: Promise
     listJobPhotos(job.id),
     listReservationAddons(),
     r?.package_id ? listPackageItems(r.package_id) : Promise.resolve([]),
+    listCosts(),
+    listIncidents(),
+    listTransportCalcs(job.id),
   ]);
+
+  // Blok 3 (protokół): koszty + zgłoszenia dla tego zlecenia + podsumowanie transportu.
+  const jobCosts = costsAll.filter((c) => c.job_id === job.id);
+  const jobIncidents = incidentsAll.filter((i) => i.job_id === job.id);
+  const distanceKm = transportCalcs.reduce((m, t) => Math.max(m, Number(t.one_way_km ?? t.distance_km ?? 0)), 0) || null;
+  const transportCost = transportCalcs.reduce((s, t) => s + Number(t.fuel_cost ?? 0) + Number(t.amortization ?? 0), 0) || null;
+  const costsTotal = jobCosts.reduce((s, c) => s + Number(c.amount ?? 0), 0);
+  const equipmentSuggestions = [...new Set(packageItems.map((it) => it.equipment?.name).filter((n): n is string => Boolean(n)))];
   const m = JOB_STATUS_META[job.status];
 
   // §9.4 Dodatki realizacji → ostrzeżenie o większym czasie pakowania i montażu.
@@ -128,6 +143,15 @@ export default async function FieldRealizationPage({ params }: { params: Promise
 
         {/* Blok: Realizacja (kroki z własnymi czynnościami) */}
         <RealizationFlow jobId={job.id} steps={flowSteps} ctx={ctx} />
+
+        {/* Blok: Rozpakowanie i protokół (koszty + sprzęt do czyszczenia/naprawy) */}
+        <ProtocolBlock
+          jobId={job.id}
+          equipmentSuggestions={equipmentSuggestions}
+          costs={jobCosts.map((c) => ({ id: c.id, category: c.category, amount: Number(c.amount), note: c.note, status: c.status }))}
+          incidents={jobIncidents.map((i) => ({ id: i.id, category: i.category, equipment: i.equipment, priority: i.priority, status: i.status }))}
+          summary={{ distanceKm, transportCost, costsTotal }}
+        />
 
         {/* Akcje stałe */}
         <div className="mt-3.5 flex gap-2.5">
