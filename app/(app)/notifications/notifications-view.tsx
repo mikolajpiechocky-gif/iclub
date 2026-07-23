@@ -34,7 +34,9 @@ export function NotificationsView({ items }: { items: NotificationRecord[] }) {
               {!n.read && <button onClick={(e) => { e.preventDefault(); readOne(n.id); }} disabled={pending} className="self-center rounded-[9px] border border-border bg-surface-2 px-2.5 py-1.5 text-[11.5px] font-semibold text-ink-2">Przeczytane</button>}
             </div>
           );
-          return n.job_id ? <Link key={n.id} href={`/jobs/${n.job_id}`} onClick={() => readOne(n.id)}>{inner}</Link> : <div key={n.id}>{inner}</div>;
+          // Kliknięcie = nawigacja do zlecenia. Oznaczenie „przeczytane" strzelamy w tle
+          // (bez router.refresh — inaczej odświeżenie kasowało nawigację i „nic się nie działo").
+          return n.job_id ? <Link key={n.id} href={`/jobs/${n.job_id}`} onClick={() => { void markReadAction(n.id); }}>{inner}</Link> : <div key={n.id}>{inner}</div>;
         })}
       </div>
     </>
