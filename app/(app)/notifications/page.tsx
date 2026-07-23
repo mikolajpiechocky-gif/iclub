@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/ui";
 import { listMyNotifications } from "@/lib/data/notifications";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { NotificationsView } from "./notifications-view";
+import { PushCard } from "./push-card";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function NotificationsPage() {
   return (
     <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
       <PageHeader title="Powiadomienia" subtitle={`${items.filter((i) => !i.read).length} nieprzeczytanych`} />
+      <PushCard />
       {demo && (
         <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
           Tryb demo — powiadomienia pojawią się po zalogowaniu (np. przy przypisaniu do zlecenia).

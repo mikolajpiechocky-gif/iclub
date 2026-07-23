@@ -1416,3 +1416,21 @@ alter table public.job_assignments add column if not exists earnings_snapshot js
 -- Opcja „ogrzewanie" rezerwuje nagrzewnicę HT-01 z magazynu (dodatek + pozycja checklisty).
 alter table public.reservations add column if not exists heating boolean not null default false;
 
+-- ================= 0050: subskrypcje powiadomień push (§5x) =================
+-- Web Push: jedna subskrypcja = jedno urządzenie/przeglądarka użytkownika. Cisza nocna
+-- (quiet_from/quiet_to, godziny 0–23) opcjonalna. Wysyłką zajmuje się service_role.
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  quiet_from int,
+  quiet_to int,
+  created_at timestamptz not null default now()
+);
+alter table public.push_subscriptions enable row level security;
+drop policy if exists push_own on public.push_subscriptions;
+create policy push_own on public.push_subscriptions for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
