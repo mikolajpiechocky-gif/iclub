@@ -7,8 +7,8 @@ import { PageHeader } from "@/components/layout";
 import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
 import type { ReservationRecord, TentRecord, PackageRecord, ReservationAddon, ReservationStatus, BusinessLine, PricingSnapshot } from "@/lib/data/types";
 import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
-import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, checkAddonAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
-import type { AddonShortage } from "@/lib/data/reservations";
+import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, checkAddonAvailabilityAction, checkHeatingAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
+import type { AddonShortage, HeatingAvailability } from "@/lib/data/reservations";
 import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
 import { computeOrderPrice, suggestedDeposit } from "@/lib/domain/order-pricing";
 import { computeSetupTimes, fmtDuration, type AssemblyConfig } from "@/lib/domain/assembly";
@@ -89,6 +89,7 @@ export function ReservationForm({
     assembly_time: initial?.assembly_time ?? "",
     pricing_snapshot: initial?.pricing_snapshot ? JSON.stringify(initial.pricing_snapshot) : "",
     is_invoice: initial?.is_invoice ?? false,
+    heating: initial?.heating ?? false,
     source: initial?.source ?? "",
     status: initial?.status ?? "TEMPORARY",
     notes: initial?.notes ?? "",
@@ -98,6 +99,7 @@ export function ReservationForm({
   const [conflicts, setConflicts] = useState<TentConflict[]>([]);
   const [exceeded, setExceeded] = useState<string[]>([]);
   const [addonShortages, setAddonShortages] = useState<AddonShortage[]>([]);
+  const [heatingAvail, setHeatingAvail] = useState<HeatingAvailability | null>(null);
   // §13.6 Zadatek: śledzimy, czy Szef zmienił go ręcznie (wtedy nie nadpisujemy sugestią).
   const [depositTouched, setDepositTouched] = useState(isEdit);
   const [transportMsg, setTransportMsg] = useState<string | null>(null);
@@ -145,6 +147,18 @@ export function ReservationForm({
       active = false;
     };
   }, [v.addon_ids, v.addon_qty, v.package_id, occStart, occEnd, initial?.id]);
+
+  // §41 Ogrzewanie: kontrola dostępności nagrzewnicy HT-01 (tylko ostrzeżenie, nie blokuje).
+  // Ostrzeżenie i tak pokazujemy tylko przy zaznaczonym ogrzewaniu (guard w renderze).
+  useEffect(() => {
+    let active = true;
+    checkHeatingAvailabilityAction(occStart, occEnd, initial?.id).then((a) => {
+      if (active) setHeatingAvail(a);
+    });
+    return () => {
+      active = false;
+    };
+  }, [occStart, occEnd, initial?.id]);
 
   const set = <K extends keyof ReservationFormValues>(k: K, val: ReservationFormValues[K]) =>
     setV((s) => ({ ...s, [k]: val }));
@@ -311,6 +325,21 @@ export function ReservationForm({
                 <option value="">— wybierz pakiet —</option>
                 {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </SelectField>
+            </div>
+            <div className="px-5 pb-4">
+              <label className="flex items-center gap-2.5 text-[13px] text-ink">
+                <input type="checkbox" checked={v.heating} onChange={(e) => set("heating", e.target.checked)} className="h-4 w-4 accent-accent" />
+                Ogrzewanie (nagrzewnica HT-01)
+              </label>
+              {v.heating && heatingAvail && heatingAvail.free <= 0 && (
+                <div className="mt-2">
+                  <Alert tone="warn" title="Brak wolnej nagrzewnicy w tym terminie">
+                    {heatingAvail.hasItem
+                      ? `Wszystkie nagrzewnice HT-01 są zajęte (${heatingAvail.used}/${heatingAvail.total}). Możesz zapisać — to tylko ostrzeżenie.`
+                      : "W magazynie nie ma pozycji HT-01. Dodaj nagrzewnicę w Magazynie, aby śledzić dostępność."}
+                  </Alert>
+                </div>
+              )}
             </div>
             {(exceeded.length > 0 || addonShortages.length > 0) && (
               <div className="px-5 pb-4">

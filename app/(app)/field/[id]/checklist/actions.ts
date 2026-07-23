@@ -6,6 +6,7 @@ import { getJob } from "@/lib/data/jobs";
 import { listAddons } from "@/lib/data/resources";
 import { generateChecklist, toggleChecklistItem } from "@/lib/data/checklist";
 import { buildChecklistTemplate } from "@/lib/domain/checklist";
+import { getEventWeather } from "@/lib/integrations/weather";
 
 export interface ActionResult {
   ok: boolean;
@@ -22,6 +23,15 @@ export async function generateChecklistAction(jobId: string): Promise<ActionResu
     const addonNames = (r?.addon_ids ?? [])
       .map((id) => addons.find((a) => a.id === id)?.name)
       .filter((n): n is string => Boolean(n));
+    // §41 Ogrzewanie → nagrzewnica HT-01 na checkliście.
+    if (r?.heating) addonNames.push("Nagrzewnica HT-01");
+    // §41 Wentylacja dopina się automatycznie, gdy dla realizacji jest alert temperatury.
+    try {
+      if (r?.location && r?.event_date) {
+        const w = await getEventWeather(r.location, r.event_date);
+        if (w?.warnings.some((x) => x.kind === "heat")) addonNames.push("Wentylacja / wentylator");
+      }
+    } catch { /* pogoda opcjonalna — pomijamy przy braku danych */ }
     const template = buildChecklistTemplate({
       tentName: r?.tent?.name,
       packageName: r?.package?.name,

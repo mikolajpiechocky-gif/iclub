@@ -147,6 +147,41 @@ export async function checkAddonOverbooking(
   return { shortages };
 }
 
+// §41 Dostępność nagrzewnic HT-01 w danym terminie (nakładające się rezerwacje z ogrzewaniem).
+export interface HeatingAvailability { total: number; used: number; free: number; hasItem: boolean }
+
+export async function checkHeatingAvailability(
+  startDate: string | null,
+  endDate: string | null,
+  excludeId?: string,
+): Promise<HeatingAvailability> {
+  const empty: HeatingAvailability = { total: 0, used: 0, free: 0, hasItem: false };
+  if (!isSupabaseConfigured() || !startDate) return empty;
+  const end = endDate ?? startDate;
+  const supabase = await createClient();
+
+  // Nagrzewnica w magazynie (kod HT-01). Ilość = liczba sztuk.
+  const { data: eq } = await supabase.from("equipment").select("quantity").eq("code", "HT-01").maybeSingle();
+  const total = eq ? Number((eq as { quantity: number }).quantity) : 0;
+  const hasItem = Boolean(eq);
+
+  // Ile nagrzewnic zajmują inne rezerwacje z ogrzewaniem w nakładającym się terminie.
+  const { data } = await supabase
+    .from("reservations")
+    .select("id, setup_date, teardown_date, event_date, status")
+    .eq("heating", true)
+    .in("status", ["TEMPORARY", "CONFIRMED"]);
+  const rows = (data ?? []) as { id: string; setup_date: string | null; teardown_date: string | null; event_date: string | null }[];
+
+  let used = 0;
+  for (const r of rows) {
+    if (r.id === excludeId) continue;
+    const rg = reservationRange(r);
+    if (rangesOverlap(startDate, end, rg.start, rg.end)) used += 1;
+  }
+  return { total, used, free: total - used, hasItem };
+}
+
 export interface ReservationInput {
   business_line: BusinessLine;
   customer_id: string | null;
@@ -180,6 +215,7 @@ export interface ReservationInput {
   pricing_snapshot?: PricingSnapshot | null; // §11.2 kopia wyceny
   rental_settlement_flat?: number | null; // §18 ryczałt wypożyczalni per zlecenie
   is_invoice?: boolean;
+  heating?: boolean; // §41 ogrzewanie (nagrzewnica HT-01)
   source?: string | null;
   status: ReservationStatus;
   expires_at?: string | null;

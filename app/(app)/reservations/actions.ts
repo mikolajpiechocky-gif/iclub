@@ -3,7 +3,7 @@
 // rezerwacji automatycznie generuje zlecenie i etapy (warstwa danych).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, type ReservationInput, type AddonShortage } from "@/lib/data/reservations";
+import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, checkHeatingAvailability, type ReservationInput, type AddonShortage, type HeatingAvailability } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
 import { markJobPlannedPaid } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
@@ -52,6 +52,7 @@ export interface ReservationFormValues {
   assembly_time: string;    // §9.3 ustalona godzina montażu (opcjonalnie)
   pricing_snapshot: string; // §11.2 kopia wyceny (JSON zbudowany w formularzu)
   is_invoice: boolean;
+  heating: boolean; // §41 ogrzewanie (nagrzewnica HT-01)
   source: string;
   status: ReservationStatus;
   notes: string;
@@ -159,6 +160,7 @@ function toInput(v: ReservationFormValues): ReservationInput {
     // §18 ryczałt wypożyczalni: tylko dla linii wypożyczalni i gdy odznaczono „godzinowe".
     rental_settlement_flat: !isIclub && !v.rental_hourly ? toNumber(v.rental_flat) : null,
     is_invoice: v.is_invoice,
+    heating: isIclub ? v.heating : false, // ogrzewanie tylko dla iClub
     source: clean(v.source),
     status: v.status,
     expires_at,
@@ -239,6 +241,20 @@ export async function checkAddonAvailabilityAction(
     return shortages;
   } catch {
     return [];
+  }
+}
+
+// §41 Dostępność nagrzewnicy HT-01 dla ogrzewania w danym terminie (tylko ostrzeżenie).
+export async function checkHeatingAvailabilityAction(
+  startDate: string,
+  endDate: string,
+  excludeId?: string,
+): Promise<HeatingAvailability> {
+  if (!startDate) return { total: 0, used: 0, free: 0, hasItem: false };
+  try {
+    return await checkHeatingAvailability(startDate, endDate || startDate, excludeId);
+  } catch {
+    return { total: 0, used: 0, free: 0, hasItem: false };
   }
 }
 

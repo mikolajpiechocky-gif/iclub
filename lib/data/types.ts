@@ -228,6 +228,7 @@ export interface ReservationRecord {
   assembly_time_at: string | null;  // kiedy ustalono ręcznie
   pricing_snapshot: PricingSnapshot | null; // §11.2 kopia wyceny z chwili zapisu
   is_invoice: boolean;
+  heating: boolean; // §41 ogrzewanie — rezerwuje nagrzewnicę HT-01 (dodatek + checklista)
   source: string | null;
   status: ReservationStatus;
   expires_at: string | null;

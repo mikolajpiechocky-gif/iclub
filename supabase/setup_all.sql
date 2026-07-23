@@ -1412,3 +1412,7 @@ alter table public.employee_rates add column if not exists iclub_free_hourly num
 -- zmienia rozliczeń już zakończonych realizacji.
 alter table public.job_assignments add column if not exists earnings_snapshot jsonb;
 
+-- ================= 0049: ogrzewanie rezerwacji (§41) =================
+-- Opcja „ogrzewanie" rezerwuje nagrzewnicę HT-01 z magazynu (dodatek + pozycja checklisty).
+alter table public.reservations add column if not exists heating boolean not null default false;
+
