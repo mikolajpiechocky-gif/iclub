@@ -2,7 +2,7 @@
 // Odczyt przez Supabase; w TRYBIE DEMO zwraca dane przykładowe.
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import type { TentRecord, PackageRecord, AddonRecord, ReservationAddon, PackageItemRecord } from "./types";
+import type { TentRecord, TentStatus, PackageRecord, AddonRecord, ReservationAddon, PackageItemRecord } from "./types";
 import { DEMO_TENT_RECORDS, DEMO_PACKAGE_RECORDS, DEMO_ADDON_RECORDS } from "./demo-resources";
 import { listAddonInventory } from "./inventory";
 
@@ -12,6 +12,38 @@ export async function listTents(): Promise<TentRecord[]> {
   const { data, error } = await supabase.from("tents").select("*").order("code");
   if (error) throw new Error(error.message);
   return (data ?? []) as TentRecord[];
+}
+
+export interface TentInput {
+  code: string;
+  name: string;
+  size: string | null;
+  set_color: string | null;
+  has_back_door: boolean;
+  status: TentStatus;
+  notes: string | null;
+}
+
+export async function getTent(id: string): Promise<TentRecord | null> {
+  if (!isSupabaseConfigured()) return DEMO_TENT_RECORDS.find((t) => t.id === id) ?? null;
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("tents").select("*").eq("id", id).maybeSingle();
+  if (error) return null;
+  return (data as TentRecord) ?? null;
+}
+
+// Dodanie/edycja namiotu w magazynie. Zapis tylko Szef (RLS tents_write = is_owner()).
+export async function createTent(input: TentInput): Promise<{ id: string }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("tents").insert(input).select("id").single();
+  if (error) throw new Error(error.message);
+  return { id: data.id as string };
+}
+
+export async function updateTent(id: string, input: TentInput): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("tents").update(input).eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export async function listPackages(): Promise<PackageRecord[]> {

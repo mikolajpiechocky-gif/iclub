@@ -67,13 +67,18 @@ export default async function InventoryPage() {
       </div>
 
       {/* Namioty */}
-      <h2 className="mb-3 font-display text-[15px] font-bold text-white">Namioty</h2>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="font-display text-[15px] font-bold text-white">Namioty</h2>
+        <Link href="/inventory/tents/new" className="rounded-[9px] border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-2 transition hover:border-accent hover:text-ink">+ Dodaj namiot</Link>
+      </div>
       <div className="mb-6 flex flex-col gap-2.5">
-        {tents.map((t) => {
+        {tents.length === 0 ? (
+          <p className="rounded-card border border-border bg-surface px-4 py-4 text-[13px] text-ink-2">Brak namiotów. Dodaj pierwszy przyciskiem „Dodaj namiot”.</p>
+        ) : tents.map((t) => {
           const m = TENT_STATUS_META[t.status];
           const tint = (t.set_color && TENT_TINT[t.set_color]) || "#2a2d3a";
           return (
-            <div key={t.id} className="flex flex-wrap items-center gap-4 rounded-[14px] border border-border bg-surface px-4 py-3.5">
+            <Link key={t.id} href={`/inventory/tents/${t.id}/edit`} className="flex flex-wrap items-center gap-4 rounded-[14px] border border-border bg-surface px-4 py-3.5 transition hover:border-accent">
               <div className="h-11 w-16 flex-none rounded-lg border border-[#2a2d3a]" style={{ background: `repeating-linear-gradient(135deg,${tint},${tint} 7px,#171922 7px,#171922 14px)` }} />
               <div className="min-w-0 flex-1">
                 <div className="text-[14px] font-bold text-ink">{t.name}</div>
@@ -82,7 +87,8 @@ export default async function InventoryPage() {
                 </div>
               </div>
               <Pill label={m.label} fg={m.fg} bg={m.bg} />
-            </div>
+              <span className="text-[12px] font-semibold text-ink-2">Edytuj →</span>
+            </Link>
           );
         })}
       </div>
