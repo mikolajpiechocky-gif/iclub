@@ -87,7 +87,7 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
 
         <SectionCard title="Premie" className="mt-4 p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
-            <TextField label="Daleki wyjazd (zł)" inputMode="numeric" placeholder="100" value={v.far_bonus} onChange={(e) => set("far_bonus", e.target.value)} hint="Doliczany tylko w trybie „Czas wolny za pierwsze N” (umowa). Przy ryczałcie od pierwszej — nie." />
+            <TextField label="Daleki wyjazd (zł)" inputMode="numeric" placeholder="100" value={v.far_bonus} onChange={(e) => set("far_bonus", e.target.value)} hint="Doliczany tylko do realizacji w ramach umowy (pierwsze N = czas wolny). Poza umową (ryczałt) — nie." />
             <TextField label="Namiot gastronomiczny (zł)" inputMode="numeric" placeholder="80" value={v.gastro_bonus} onChange={(e) => set("gastro_bonus", e.target.value)} />
             <TextField label="Opinia (zł)" inputMode="numeric" placeholder="30" value={v.review_bonus} onChange={(e) => set("review_bonus", e.target.value)} />
             <TextField label="Rolka (zł)" inputMode="numeric" placeholder="30" value={v.reel_bonus} onChange={(e) => set("reel_bonus", e.target.value)} />

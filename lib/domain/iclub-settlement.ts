@@ -90,9 +90,9 @@ export function settlementForRealization(
   const gastroAmt = rate?.gastro_bonus ?? DEFAULT_BONUSES.gastro;
 
   const guaranteed: Bonus[] = [];
-  // Daleki wyjazd doliczamy TYLKO pracownikom rozliczanym „w ramach umowy" (THRESHOLD, np. Bartek).
-  // Przy ryczałcie od pierwszej realizacji stawka jest „all-in" — bez osobnej dopłaty za dystans.
-  if (opts.farTrip && mode === "THRESHOLD") guaranteed.push({ label: "Daleki wyjazd (>100 km)", amount: farAmt });
+  // Daleki wyjazd liczymy TYLKO do realizacji w ramach umowy (czas wolny = pierwsze N).
+  // Poza umową obowiązuje ryczałt (po przekroczeniu N u „Bartka" oraz cały tryb FLAT) — bez dopłaty.
+  if (opts.farTrip && form === "free_time") guaranteed.push({ label: "Daleki wyjazd (>100 km)", amount: farAmt });
   if (opts.hasGastro) guaranteed.push({ label: "Namiot gastronomiczny", amount: gastroAmt });
 
   const possible: Bonus[] = possibleAddonBonuses(rate);
