@@ -6,6 +6,13 @@ import type { EmployeeRate, IclubSettlementMode } from "@/lib/data/types";
 // Domyślne premie (§19.3) — nadpisywane wartościami ze stawki pracownika, jeśli są.
 export const DEFAULT_BONUSES = { far: 150, gastro: 150, review: 20, reel: 50 } as const;
 
+// PostgREST zwraca kolumny numeric jako STRING — koercja do liczby, by uniknąć
+// konkatenacji przy sumowaniu (np. „259.2" + „150" → błędny wynik zamiast dodawania).
+export const numOr = (v: unknown, fallback: number): number => {
+  const n = Number(v);
+  return v != null && v !== "" && Number.isFinite(n) ? n : fallback;
+};
+
 export interface IclubSettlementRules {
   freeHours: number;        // godziny czasu wolnego za realizację (np. 8)
   hourlyRate: number;       // stawka czasu wolnego zł/h (np. 32,40)
@@ -19,8 +26,8 @@ export interface Bonus { label: string; amount: number }
 // (Także z wynajmu — pracownik dostaje je za wystawioną opinię / nagraną rolkę.)
 export function possibleAddonBonuses(rate?: EmployeeRate | null): Bonus[] {
   return [
-    { label: "Opinia", amount: rate?.review_bonus ?? DEFAULT_BONUSES.review },
-    { label: "Rolka", amount: rate?.reel_bonus ?? DEFAULT_BONUSES.reel },
+    { label: "Opinia", amount: numOr(rate?.review_bonus, DEFAULT_BONUSES.review) },
+    { label: "Rolka", amount: numOr(rate?.reel_bonus, DEFAULT_BONUSES.reel) },
   ];
 }
 
@@ -66,8 +73,11 @@ export function settlementForRealization(
   const index = priorCompletedThisMonth + 1;
   const rate = opts.rate ?? null;
   const mode: IclubSettlementMode = opts.mode ?? rate?.iclub_settlement_mode ?? "FLAT";
-  const flatRate = rate?.iclub_flat ?? rules.flatRate; // ryczałt pracownika albo globalny
-  const threshold = rate?.iclub_threshold ?? rules.monthlyThreshold; // próg „w ramach umowy" per pracownik
+  const flatRate = numOr(rate?.iclub_flat, rules.flatRate); // ryczałt pracownika albo globalny
+  const threshold = numOr(rate?.iclub_threshold, rules.monthlyThreshold); // próg „w ramach umowy" per pracownik
+  // Czas wolny: godziny i stawka zł/h per pracownik (null = wartości globalne z Ustawień).
+  const cfgHours = numOr(rate?.iclub_free_hours, rules.freeHours);
+  const cfgHourly = numOr(rate?.iclub_free_hourly, rules.hourlyRate);
 
   let form: "free_time" | "flat";
   let baseValue: number;
@@ -76,9 +86,9 @@ export function settlementForRealization(
 
   if (mode === "THRESHOLD" && index <= threshold) {
     form = "free_time";
-    freeHours = rules.freeHours;
-    baseValue = round2(rules.freeHours * rules.hourlyRate);
-    baseLabel = freeTimeLabel(rules.freeHours);
+    freeHours = cfgHours;
+    baseValue = round2(cfgHours * cfgHourly);
+    baseLabel = freeTimeLabel(cfgHours);
   } else {
     form = "flat";
     freeHours = null;
@@ -86,8 +96,8 @@ export function settlementForRealization(
     baseLabel = "Ryczałt za realizację";
   }
 
-  const farAmt = rate?.far_bonus ?? DEFAULT_BONUSES.far;
-  const gastroAmt = rate?.gastro_bonus ?? DEFAULT_BONUSES.gastro;
+  const farAmt = numOr(rate?.far_bonus, DEFAULT_BONUSES.far);
+  const gastroAmt = numOr(rate?.gastro_bonus, DEFAULT_BONUSES.gastro);
 
   const guaranteed: Bonus[] = [];
   // Daleki wyjazd liczymy TYLKO do realizacji w ramach umowy (czas wolny = pierwsze N).

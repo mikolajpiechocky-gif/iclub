@@ -340,6 +340,8 @@ export interface EmployeeRate {
   notes: string | null;
   iclub_settlement_mode: IclubSettlementMode;
   iclub_threshold: number | null; // liczba realizacji na czas wolny „w ramach umowy" (null = globalny próg)
+  iclub_free_hours: number | null; // godziny czasu wolnego za realizację (null = globalne z Ustawień)
+  iclub_free_hourly: number | null; // stawka czasu wolnego zł/h (null = globalna z Ustawień)
 }
 
 export interface EmployeeWithRate extends ProfileRecord {

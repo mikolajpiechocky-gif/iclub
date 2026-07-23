@@ -1402,3 +1402,8 @@ alter table public.inquiries add column if not exists contract_signal boolean no
 -- Przechowuje surowy wątek + kilka wiadomości, żeby dostroić wydobywanie nicku/lokalizacji.
 alter table public.inquiries add column if not exists olx_raw jsonb;
 
+-- ================= 0047: czas wolny per pracownik (§19) =================
+-- Godziny i stawka „czasu wolnego" ustawiane per pracownik (null = wartości globalne z Ustawień).
+alter table public.employee_rates add column if not exists iclub_free_hours numeric(5,2);
+alter table public.employee_rates add column if not exists iclub_free_hourly numeric(10,2);
+

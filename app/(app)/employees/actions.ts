@@ -17,6 +17,8 @@ export interface RateFormValues {
   upsell_percent: string;
   iclub_settlement_mode: IclubSettlementMode;
   iclub_threshold: string;
+  iclub_free_hours: string;
+  iclub_free_hourly: string;
   notes: string;
 }
 
@@ -51,6 +53,8 @@ export async function saveEmployeeRateAction(profileId: string, v: RateFormValue
       upsell_percent: toNum(v.upsell_percent),
       iclub_settlement_mode: v.iclub_settlement_mode === "THRESHOLD" ? "THRESHOLD" : "FLAT",
       iclub_threshold: (() => { const n = toNum(v.iclub_threshold); return n != null && n >= 0 ? Math.round(n) : null; })(),
+      iclub_free_hours: toNum(v.iclub_free_hours),
+      iclub_free_hourly: toNum(v.iclub_free_hourly),
       notes: v.notes.trim() || null,
     });
     revalidatePath("/employees");

@@ -223,7 +223,7 @@ async function ReservationOps({
     listTransportCalcs(job.id),
   ]);
   const done = stages.filter((s) => s.status === "DONE").length;
-  const ownerBonus = job.owner_bonus ?? 0;
+  const ownerBonus = Number(job.owner_bonus ?? 0) || 0; // numeric z PG bywa stringiem
 
   // §18/§19 Wynagrodzenie: dla iClub — rozliczenie §19 (tryb per pracownik: czas wolny/ryczałt),
   // spójne z widokiem pracownika. Dla wypożyczalni — model stawki (predictedEarnings).
