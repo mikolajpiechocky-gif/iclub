@@ -75,23 +75,11 @@ export function SettingsForm({ initial, disabled }: { initial: AppSettings; disa
         <p className="px-5 pb-5 text-[12px] text-ink-2">Koszt bieżący auta bez paliwa (opony, serwis, płyny). Koszt wewnętrzny transportu = paliwo + eksploatacja × km.</p>
       </SectionCard>
 
-      <SectionCard title="Rozliczenia" className="mt-4 p-5">
+      <SectionCard title="Faktury" className="mt-4 p-5">
         <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
-          <TextField label="Godziny na realizację iClub" inputMode="decimal" value={v.iclub_hours} onChange={(e) => set("iclub_hours", e.target.value)} error={errors.iclub_hours} />
           <TextField label="Stawka VAT (%)" inputMode="decimal" value={v.vat_rate} onChange={(e) => set("vat_rate", e.target.value)} error={errors.vat_rate} />
         </div>
-        <p className="px-5 pb-5 text-[12px] text-ink-2">Godziny służą do wyliczeń stawki godzinowej. VAT wykorzysta moduł faktur.</p>
-      </SectionCard>
-
-      <SectionCard title="Rozliczenia iClub (realizacje w miesiącu)" className="mt-4 p-5">
-        <div className="grid grid-cols-1 gap-4 px-5 pb-2 sm:grid-cols-3">
-          <TextField label="Pierwszych realizacji = czas wolny" inputMode="numeric" value={v.iclub_month_threshold} onChange={(e) => set("iclub_month_threshold", e.target.value)} error={errors.iclub_month_threshold} hint="np. 4" />
-          <TextField label="Stawka czasu wolnego (zł/h)" inputMode="decimal" value={v.iclub_hourly_rate} onChange={(e) => set("iclub_hourly_rate", e.target.value)} error={errors.iclub_hourly_rate} hint="np. 32,40" />
-          <TextField label="Ryczałt od kolejnej (zł)" inputMode="decimal" value={v.iclub_flat_rate} onChange={(e) => set("iclub_flat_rate", e.target.value)} error={errors.iclub_flat_rate} hint="np. 500" />
-        </div>
-        <p className="px-5 pb-5 text-[12px] text-ink-2">
-          To parametry dla pracowników w trybie „czas wolny za pierwsze N” (np. Bartek): pierwsze {v.iclub_month_threshold || "4"} realizacji w miesiącu = {v.iclub_hours || "8"} h czasu wolnego (wartość {v.iclub_hours || "8"} h × {v.iclub_hourly_rate || "32,40"} zł), potem ryczałt {v.iclub_flat_rate || "500"} zł + premie. <b>Tryb rozliczenia (czas wolny / ryczałt od pierwszej) oraz premie ustawiasz per pracownik w „Pracownicy”.</b>
-        </p>
+        <p className="px-5 pb-5 text-[12px] text-ink-2">Stawka VAT wykorzystywana w module faktur. Rozliczenia iClub (czas wolny, próg, ryczałt, premie) ustawiasz teraz per pracownik w „Pracownicy”.</p>
       </SectionCard>
 
       <SectionCard title="Czas montażu (sugerowana godzina)" className="mt-4 p-5">

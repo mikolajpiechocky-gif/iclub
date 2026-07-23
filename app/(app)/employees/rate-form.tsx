@@ -73,10 +73,7 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
               placeholder="4"
               value={v.iclub_threshold}
               onChange={(e) => set("iclub_threshold", e.target.value)}
-              disabled={v.iclub_settlement_mode !== "THRESHOLD"}
-              hint={v.iclub_settlement_mode === "THRESHOLD"
-                ? "Pierwsze N realizacji w miesiącu = dzień wolny; kolejne = ryczałt. Puste = próg z Ustawień."
-                : "Dotyczy trybu „Czas wolny za pierwsze N”. Wybierz ten tryb powyżej, aby ustawić N."}
+              hint="Pierwsze N realizacji w miesiącu = dzień wolny; kolejne = ryczałt. Działa w trybie „Czas wolny za pierwsze N”."
             />
             <TextField
               label="Czas wolny — godziny za realizację"
@@ -84,8 +81,7 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
               placeholder="8"
               value={v.iclub_free_hours}
               onChange={(e) => set("iclub_free_hours", e.target.value)}
-              disabled={v.iclub_settlement_mode !== "THRESHOLD"}
-              hint="Ile godzin czasu wolnego = 1 realizacja w umowie (8 h = 1 dzień). Puste = globalne z Ustawień."
+              hint="Ile godzin czasu wolnego = 1 realizacja w umowie (8 h = 1 dzień)."
             />
             <TextField
               label="Czas wolny — stawka (zł/h)"
@@ -93,15 +89,14 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
               placeholder="32,40"
               value={v.iclub_free_hourly}
               onChange={(e) => set("iclub_free_hourly", e.target.value)}
-              disabled={v.iclub_settlement_mode !== "THRESHOLD"}
-              hint="Stawka za godzinę czasu wolnego. Puste = globalna z Ustawień."
+              hint="Stawka za godzinę czasu wolnego."
             />
             <TextField label="Ryczałt za realizację iClub (zł)" inputMode="numeric" placeholder="500" value={v.iclub_flat} onChange={(e) => set("iclub_flat", e.target.value)} hint="Kwota za realizację (ryczałt / po progu). Puste = globalny z Ustawień." />
             <TextField label="Stawka godzinowa — wypożyczalnia (zł/h)" inputMode="numeric" placeholder="40" value={v.hourly_rate} onChange={(e) => set("hourly_rate", e.target.value)} hint="Domyślne rozliczenie wypożyczalni. Ryczałt na konkretne zlecenie ustawiasz w rezerwacji." />
             <TextField label="Premia za dosprzedaż (%)" inputMode="numeric" placeholder="15" value={v.upsell_percent} onChange={(e) => set("upsell_percent", e.target.value)} />
           </div>
           <p className="px-5 pb-5 text-[12px] text-ink-2">
-            „Czas wolny za pierwsze N” (Bartek): pierwsze N realizacji iClub w miesiącu = dzień wolny (godziny × stawka ustawione powyżej), potem ryczałt + premie. „Ryczałt od pierwszej”: każda realizacja iClub = ryczałt + premie. Puste pola = wartości globalne z Ustawień → „Rozliczenia iClub”.
+            „Czas wolny za pierwsze N” (Bartek): pierwsze N realizacji iClub w miesiącu = dzień wolny (godziny × stawka ustawione powyżej), potem ryczałt + premie. „Ryczałt od pierwszej”: każda realizacja iClub = ryczałt + premie. Wszystkie stawki i premie ustawiasz tutaj, indywidualnie dla pracownika. Zmiany <b>nie ruszają</b> rozliczeń już zakończonych realizacji.
           </p>
         </SectionCard>
 

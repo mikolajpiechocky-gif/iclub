@@ -1407,3 +1407,8 @@ alter table public.inquiries add column if not exists olx_raw jsonb;
 alter table public.employee_rates add column if not exists iclub_free_hours numeric(5,2);
 alter table public.employee_rates add column if not exists iclub_free_hourly numeric(10,2);
 
+-- ================= 0048: zamrożone rozliczenie realizacji (§19) =================
+-- Snapshot zarobku pracownika z chwili zakończenia realizacji — zmiana stawek nie
+-- zmienia rozliczeń już zakończonych realizacji.
+alter table public.job_assignments add column if not exists earnings_snapshot jsonb;
+

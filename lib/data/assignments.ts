@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { EmployeeRate } from "./types";
+import type { EarningsBreakdown } from "@/lib/domain/earnings";
 
 export type AssignmentStatus = "REQUESTED" | "APPROVED";
 
@@ -14,6 +15,8 @@ export interface JobAssignment {
   note: string | null;
   employee: { id: string; full_name: string; role: string; avatar_url?: string | null } | null;
   rate: EmployeeRate | null;
+  // Zamrożone rozliczenie z chwili zakończenia realizacji (null = jeszcze nie zamknięte).
+  earnings_snapshot: EarningsBreakdown | null;
 }
 
 const DEMO_RATE_MAREK: EmployeeRate = { profile_id: "demo-emp1", rate_model: "FLAT_PLUS_BONUS", hourly_rate: null, iclub_flat: 250, far_bonus: 100, gastro_bonus: 80, review_bonus: 30, reel_bonus: 30, upsell_percent: 15, notes: null, iclub_settlement_mode: "THRESHOLD", iclub_threshold: 4, iclub_free_hours: 8, iclub_free_hourly: 32.4 };
@@ -21,8 +24,8 @@ const DEMO_RATE_KUBA: EmployeeRate = { profile_id: "demo-emp2", rate_model: "HOU
 
 const DEMO_ASSIGNMENTS: Record<string, JobAssignment[]> = {
   "demo-job-1": [
-    { id: "demo-as1", job_id: "demo-job-1", profile_id: "demo-emp1", is_lead: true, status: "APPROVED", note: null, employee: { id: "demo-emp1", full_name: "Marek W.", role: "EMPLOYEE" }, rate: DEMO_RATE_MAREK },
-    { id: "demo-as2", job_id: "demo-job-1", profile_id: "demo-emp2", is_lead: false, status: "APPROVED", note: null, employee: { id: "demo-emp2", full_name: "Kuba L.", role: "EMPLOYEE" }, rate: DEMO_RATE_KUBA },
+    { id: "demo-as1", job_id: "demo-job-1", profile_id: "demo-emp1", is_lead: true, status: "APPROVED", note: null, employee: { id: "demo-emp1", full_name: "Marek W.", role: "EMPLOYEE" }, rate: DEMO_RATE_MAREK, earnings_snapshot: null },
+    { id: "demo-as2", job_id: "demo-job-1", profile_id: "demo-emp2", is_lead: false, status: "APPROVED", note: null, employee: { id: "demo-emp2", full_name: "Kuba L.", role: "EMPLOYEE" }, rate: DEMO_RATE_KUBA, earnings_snapshot: null },
   ],
 };
 
@@ -84,5 +87,12 @@ export async function setAssignmentLead(id: string, isLead: boolean): Promise<vo
 export async function setJobOwnerBonus(jobId: string, amount: number): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("jobs").update({ owner_bonus: amount }).eq("id", jobId);
+  if (error) throw new Error(error.message);
+}
+
+// Zapis zamrożonego rozliczenia (snapshot) w chwili zakończenia realizacji.
+export async function setAssignmentEarningsSnapshot(id: string, snapshot: EarningsBreakdown): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("job_assignments").update({ earnings_snapshot: snapshot }).eq("id", id);
   if (error) throw new Error(error.message);
 }

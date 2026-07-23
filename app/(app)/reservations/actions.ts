@@ -12,6 +12,9 @@ import { sumSlots, type TentChoice } from "@/lib/domain/tents";
 import type { DiscountType } from "@/lib/domain/order-pricing";
 import { clientTransportPrice, tripClass } from "@/lib/domain/transport";
 import { getSettings } from "@/lib/data/settings";
+import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
+import { listTransportCalcs } from "@/lib/data/transport";
+import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
 import { geocode, routeLeg } from "@/lib/integrations/google-maps";
 import { isGoogleMapsConfigured } from "@/lib/integrations/google-maps/config";
 import type { ReservationStatus, BusinessLine, PricingSnapshot } from "@/lib/data/types";
@@ -319,6 +322,23 @@ export async function markRealizationDoneAction(reservationId: string): Promise<
   try {
     const job = await getJobByReservation(reservationId);
     if (!job) return { ok: false, error: "Brak powiązanego zlecenia." };
+    // Zamrożenie rozliczeń: policz i zapisz snapshot zarobku każdego pracownika ZANIM
+    // oznaczymy DONE (żeby liczba realizacji w miesiącu nie liczyła jeszcze tej realizacji).
+    // Snapshot to zabezpieczenie historii — jego błąd nie blokuje zakończenia realizacji.
+    try {
+      const [settings, assignments, transportCalcs] = await Promise.all([
+        getSettings(), listJobAssignments(job.id), listTransportCalcs(job.id),
+      ]);
+      const farTrip = transportCalcs.some((c) => (c.one_way_km ?? 0) > 100);
+      const ctx = jobEarningsCtx(job, settings, farTrip);
+      for (const a of assignments) {
+        if (a.status !== "APPROVED") continue;
+        const eb = await buildAssignmentEarnings(ctx, a.rate, a.profile_id);
+        if (eb) await setAssignmentEarningsSnapshot(a.id, eb);
+      }
+    } catch (e) {
+      console.error("Zamrożenie rozliczeń nie powiodło się:", e);
+    }
     await setJobStatus(job.id, "DONE");
     await markJobPlannedPaid(job.id);
     revalidatePath(`/reservations/${reservationId}`);

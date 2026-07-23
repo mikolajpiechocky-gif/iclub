@@ -8,12 +8,12 @@ import { SectionCard, Pill } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import { getReservation } from "@/lib/data/reservations";
 import { getCustomer } from "@/lib/data/customers";
-import { getJobByReservation, getJobStages, countDoneIclubRealizations } from "@/lib/data/jobs";
+import { getJobByReservation, getJobStages } from "@/lib/data/jobs";
 import { listJobAssignments } from "@/lib/data/assignments";
 import { listEmployees } from "@/lib/data/employees";
 import { getCurrentProfile, getProfileName } from "@/lib/data/profiles";
-import { predictedEarnings, type EarningsBreakdown } from "@/lib/domain/earnings";
-import { settlementForRealization, rulesFromSettings, possibleAddonBonuses } from "@/lib/domain/iclub-settlement";
+import type { EarningsBreakdown } from "@/lib/domain/earnings";
+import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
 import type { EmployeeRate } from "@/lib/data/types";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
@@ -225,33 +225,14 @@ async function ReservationOps({
   const done = stages.filter((s) => s.status === "DONE").length;
   const ownerBonus = Number(job.owner_bonus ?? 0) || 0; // numeric z PG bywa stringiem
 
-  // §18/§19 Wynagrodzenie: dla iClub — rozliczenie §19 (tryb per pracownik: czas wolny/ryczałt),
-  // spójne z widokiem pracownika. Dla wypożyczalni — model stawki (predictedEarnings).
-  const iclub = job.business_line === "ICLUB";
-  const rules = rulesFromSettings(settings);
-  const monthPrefix = (job.event_date ?? "").slice(0, 7);
+  // §18/§19 Wynagrodzenie: iClub = rozliczenie §19 (per pracownik), wypożyczalnia = model stawki.
+  // Zakończona realizacja używa ZAMROŻONEGO snapshotu — zmiana stawek nie zmienia historii.
+  const isDone = job.status === "DONE";
   const farTrip = transportCalcs.some((c) => (c.one_way_km ?? 0) > 100);
-  const hasGastro = job.reservation?.tent_extra === "GASTRO";
-  // §18 Ryczałt wypożyczalni per zlecenie (numeric z PG bywa stringiem) — nadpisuje godzinówkę.
-  const rentalFlat = job.reservation?.rental_settlement_flat != null ? Number(job.reservation.rental_settlement_flat) : null;
-  const buildEarnings = async (rate: EmployeeRate | null, profileId: string): Promise<EarningsBreakdown | null> => {
-    if (!iclub) {
-      if (rentalFlat != null) {
-        return { base: rentalFlat, baseLabel: "Ryczałt za zlecenie", ownerBonus, total: Math.round((rentalFlat + ownerBonus) * 100) / 100, possibleBonuses: possibleAddonBonuses(rate) };
-      }
-      return rate ? predictedEarnings(rate, job.business_line, ownerBonus, settings.iclub_hours) : null;
-    }
-    if (!rate) return null;
-    const priorCount = monthPrefix ? await countDoneIclubRealizations(profileId, monthPrefix) : 0;
-    const s = settlementForRealization(rules, priorCount, { farTrip, hasGastro, rate });
-    const guaranteed = s.guaranteed.map((b) => b.label).join(" + ");
-    return {
-      base: s.baseValue,
-      baseLabel: guaranteed ? `${s.baseLabel} + ${guaranteed}` : s.baseLabel,
-      ownerBonus,
-      total: Math.round((s.total + ownerBonus) * 100) / 100,
-      possibleBonuses: s.possible,
-    };
+  const earnCtx = jobEarningsCtx(job, settings, farTrip);
+  const buildEarnings = async (rate: EmployeeRate | null, profileId: string, snapshot: EarningsBreakdown | null): Promise<EarningsBreakdown | null> => {
+    if (isDone && snapshot) return snapshot; // rozliczenie zamrożone w chwili zakończenia
+    return buildAssignmentEarnings(earnCtx, rate, profileId);
   };
 
   const assignmentViews: AssignmentView[] = await Promise.all(assignments.map(async (a) => ({
@@ -261,12 +242,13 @@ async function ReservationOps({
     avatar_url: a.employee?.avatar_url ?? null,
     is_lead: a.is_lead,
     status: a.status,
-    earnings: await buildEarnings(a.rate, a.profile_id),
+    earnings: await buildEarnings(a.rate, a.profile_id, a.earnings_snapshot),
   })));
   const assignedIds = new Set(assignments.map((a) => a.profile_id));
   const availableEmployees = employees.filter((e) => !assignedIds.has(e.id)).map((e) => ({ id: e.id, full_name: e.full_name || "—" }));
   const myRate = employees.find((e) => e.id === profile?.id)?.rate ?? null;
-  const myEarnings = profile ? await buildEarnings(myRate, profile.id) : null;
+  const mySnapshot = profile ? assignments.find((a) => a.profile_id === profile.id)?.earnings_snapshot ?? null : null;
+  const myEarnings = profile ? await buildEarnings(myRate, profile.id, mySnapshot) : null;
   const amIAssigned = profile ? assignments.some((a) => a.profile_id === profile.id && a.status === "APPROVED") : false;
   const amIRequested = profile ? assignments.some((a) => a.profile_id === profile.id && a.status === "REQUESTED") : false;
   const unavailableIds = await getUnavailableProfileIds(job.event_date);
