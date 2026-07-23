@@ -113,7 +113,7 @@ export function TextField({ label, hint, error, id, ...p }: React.InputHTMLAttri
       <label htmlFor={fid} className="text-[12.5px] font-semibold text-ink-2">{label}</label>
       <input
         id={fid}
-        className={`min-h-[44px] rounded-field border bg-surface-2 px-3.5 text-[14px] text-ink placeholder:text-muted outline-none transition focus:border-accent ${error ? "border-bad" : "border-border"}`}
+        className={`min-h-[44px] rounded-field border bg-surface-2 px-3.5 text-[14px] text-ink placeholder:text-muted outline-none transition focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed ${error ? "border-bad" : "border-border"}`}
         aria-invalid={!!error}
         {...p}
       />

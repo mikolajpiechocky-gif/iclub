@@ -1,6 +1,7 @@
 // Reguły domenowe: przewidywany zarobek pracownika za zlecenie (§10).
 // iClub domyślnie: 1 realizacja = 8 godzin (do wyliczeń godzinowych/statystyk).
 import type { EmployeeRate, BusinessLine } from "@/lib/data/types";
+import { possibleAddonBonuses } from "./iclub-settlement";
 
 export const ICLUB_HOURS = 8;
 
@@ -41,8 +42,8 @@ export function predictedEarnings(
   const possibleBonuses: { label: string; amount: number }[] = [];
   if (rate?.far_bonus) possibleBonuses.push({ label: "Daleki wyjazd", amount: rate.far_bonus });
   if (rate?.gastro_bonus) possibleBonuses.push({ label: "Namiot gastronomiczny", amount: rate.gastro_bonus });
-  if (rate?.review_bonus) possibleBonuses.push({ label: "Opinia", amount: rate.review_bonus });
-  if (rate?.reel_bonus) possibleBonuses.push({ label: "Rolka", amount: rate.reel_bonus });
+  // Opinia i rolka — zawsze możliwe do zgarnięcia (także z wynajmu).
+  possibleBonuses.push(...possibleAddonBonuses(rate));
 
   return { base, baseLabel, ownerBonus, total: base + ownerBonus, possibleBonuses };
 }

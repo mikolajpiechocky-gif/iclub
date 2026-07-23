@@ -65,9 +65,17 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
             <SelectField label="Rozliczenie iClub" value={v.iclub_settlement_mode} onChange={(e) => set("iclub_settlement_mode", e.target.value as IclubSettlementMode)}>
               {(Object.keys(ICLUB_SETTLEMENT_MODE_LABELS) as IclubSettlementMode[]).map((m) => <option key={m} value={m}>{ICLUB_SETTLEMENT_MODE_LABELS[m]}</option>)}
             </SelectField>
-            {v.iclub_settlement_mode === "THRESHOLD" && (
-              <TextField label="Realizacje na czas wolny (umowa)" inputMode="numeric" placeholder="4" value={v.iclub_threshold} onChange={(e) => set("iclub_threshold", e.target.value)} hint="Ile pierwszych realizacji w miesiącu = dzień wolny. Puste = próg z Ustawień." />
-            )}
+            <TextField
+              label="Ile realizacji obejmuje umowa (N)"
+              inputMode="numeric"
+              placeholder="4"
+              value={v.iclub_threshold}
+              onChange={(e) => set("iclub_threshold", e.target.value)}
+              disabled={v.iclub_settlement_mode !== "THRESHOLD"}
+              hint={v.iclub_settlement_mode === "THRESHOLD"
+                ? "Pierwsze N realizacji w miesiącu = dzień wolny; kolejne = ryczałt. Puste = próg z Ustawień."
+                : "Dotyczy trybu „Czas wolny za pierwsze N”. Wybierz ten tryb powyżej, aby ustawić N."}
+            />
             <TextField label="Ryczałt za realizację iClub (zł)" inputMode="numeric" placeholder="500" value={v.iclub_flat} onChange={(e) => set("iclub_flat", e.target.value)} hint="Kwota za realizację (ryczałt / po progu). Puste = globalny z Ustawień." />
             <TextField label="Stawka godzinowa — wypożyczalnia (zł/h)" inputMode="numeric" placeholder="40" value={v.hourly_rate} onChange={(e) => set("hourly_rate", e.target.value)} hint="Domyślne rozliczenie wypożyczalni. Ryczałt na konkretne zlecenie ustawiasz w rezerwacji." />
             <TextField label="Premia za dosprzedaż (%)" inputMode="numeric" placeholder="15" value={v.upsell_percent} onChange={(e) => set("upsell_percent", e.target.value)} />
@@ -79,7 +87,7 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
 
         <SectionCard title="Premie" className="mt-4 p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
-            <TextField label="Daleki wyjazd (zł)" inputMode="numeric" placeholder="100" value={v.far_bonus} onChange={(e) => set("far_bonus", e.target.value)} />
+            <TextField label="Daleki wyjazd (zł)" inputMode="numeric" placeholder="100" value={v.far_bonus} onChange={(e) => set("far_bonus", e.target.value)} hint="Doliczany tylko w trybie „Czas wolny za pierwsze N” (umowa). Przy ryczałcie od pierwszej — nie." />
             <TextField label="Namiot gastronomiczny (zł)" inputMode="numeric" placeholder="80" value={v.gastro_bonus} onChange={(e) => set("gastro_bonus", e.target.value)} />
             <TextField label="Opinia (zł)" inputMode="numeric" placeholder="30" value={v.review_bonus} onChange={(e) => set("review_bonus", e.target.value)} />
             <TextField label="Rolka (zł)" inputMode="numeric" placeholder="30" value={v.reel_bonus} onChange={(e) => set("reel_bonus", e.target.value)} />

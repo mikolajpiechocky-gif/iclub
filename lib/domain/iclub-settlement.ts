@@ -15,6 +15,15 @@ export interface IclubSettlementRules {
 
 export interface Bonus { label: string; amount: number }
 
+// Add-ony możliwe do zgarnięcia niezależnie od linii i trybu: opinia i rolka.
+// (Także z wynajmu — pracownik dostaje je za wystawioną opinię / nagraną rolkę.)
+export function possibleAddonBonuses(rate?: EmployeeRate | null): Bonus[] {
+  return [
+    { label: "Opinia", amount: rate?.review_bonus ?? DEFAULT_BONUSES.review },
+    { label: "Rolka", amount: rate?.reel_bonus ?? DEFAULT_BONUSES.reel },
+  ];
+}
+
 export interface RealizationSettlement {
   index: number;               // która to realizacja w miesiącu (1-based)
   form: "free_time" | "flat";
@@ -79,17 +88,14 @@ export function settlementForRealization(
 
   const farAmt = rate?.far_bonus ?? DEFAULT_BONUSES.far;
   const gastroAmt = rate?.gastro_bonus ?? DEFAULT_BONUSES.gastro;
-  const reviewAmt = rate?.review_bonus ?? DEFAULT_BONUSES.review;
-  const reelAmt = rate?.reel_bonus ?? DEFAULT_BONUSES.reel;
 
   const guaranteed: Bonus[] = [];
-  if (opts.farTrip) guaranteed.push({ label: "Daleki wyjazd (>100 km)", amount: farAmt });
+  // Daleki wyjazd doliczamy TYLKO pracownikom rozliczanym „w ramach umowy" (THRESHOLD, np. Bartek).
+  // Przy ryczałcie od pierwszej realizacji stawka jest „all-in" — bez osobnej dopłaty za dystans.
+  if (opts.farTrip && mode === "THRESHOLD") guaranteed.push({ label: "Daleki wyjazd (>100 km)", amount: farAmt });
   if (opts.hasGastro) guaranteed.push({ label: "Namiot gastronomiczny", amount: gastroAmt });
 
-  const possible: Bonus[] = [
-    { label: "Opinia", amount: reviewAmt },
-    { label: "Rolka", amount: reelAmt },
-  ];
+  const possible: Bonus[] = possibleAddonBonuses(rate);
 
   const guaranteedTotal = guaranteed.reduce((s, b) => s + b.amount, 0);
   return {

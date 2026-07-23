@@ -81,6 +81,9 @@ export function JobTeam({
                       <span className="text-muted"> ({a.earnings.baseLabel}{a.earnings.ownerBonus ? ` + bonus ${fmtPLN(a.earnings.ownerBonus)}` : ""})</span>
                     </div>
                   )}
+                  {a.earnings && a.earnings.possibleBonuses.length > 0 && (
+                    <div className="text-[11px] text-muted">Możliwe: {a.earnings.possibleBonuses.map((b) => `${b.label.toLowerCase()} +${fmtPLN(b.amount)}`).join(" · ")}</div>
+                  )}
                 </div>
                 {isOwner && (
                   <div className="flex gap-2">
@@ -164,6 +167,7 @@ export function JobTeam({
                 <div>
                   <div className="text-[13px] font-bold text-ink">Wolne zlecenie</div>
                   {myEarnings && <div className="mt-0.5 text-[12px] text-ink-2">Twój przewidywany zarobek: <span className="font-bold text-ok">{fmtPLN(myEarnings.total)}</span> <span className="text-muted">({myEarnings.baseLabel})</span></div>}
+                  {myEarnings && myEarnings.possibleBonuses.length > 0 && <div className="text-[11px] text-muted">Możliwe: {myEarnings.possibleBonuses.map((b) => `${b.label.toLowerCase()} +${fmtPLN(b.amount)}`).join(" · ")}</div>}
                 </div>
                 <PrimaryButton onClick={() => run(() => selfClaimAction(jobId))} disabled={pending}>Poproś o przypisanie</PrimaryButton>
               </div>

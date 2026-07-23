@@ -13,7 +13,7 @@ import { listJobAssignments } from "@/lib/data/assignments";
 import { listEmployees } from "@/lib/data/employees";
 import { getCurrentProfile, getProfileName } from "@/lib/data/profiles";
 import { predictedEarnings, type EarningsBreakdown } from "@/lib/domain/earnings";
-import { settlementForRealization, rulesFromSettings } from "@/lib/domain/iclub-settlement";
+import { settlementForRealization, rulesFromSettings, possibleAddonBonuses } from "@/lib/domain/iclub-settlement";
 import type { EmployeeRate } from "@/lib/data/types";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
@@ -237,7 +237,7 @@ async function ReservationOps({
   const buildEarnings = async (rate: EmployeeRate | null, profileId: string): Promise<EarningsBreakdown | null> => {
     if (!iclub) {
       if (rentalFlat != null) {
-        return { base: rentalFlat, baseLabel: "Ryczałt za zlecenie", ownerBonus, total: Math.round((rentalFlat + ownerBonus) * 100) / 100, possibleBonuses: [] };
+        return { base: rentalFlat, baseLabel: "Ryczałt za zlecenie", ownerBonus, total: Math.round((rentalFlat + ownerBonus) * 100) / 100, possibleBonuses: possibleAddonBonuses(rate) };
       }
       return rate ? predictedEarnings(rate, job.business_line, ownerBonus, settings.iclub_hours) : null;
     }
