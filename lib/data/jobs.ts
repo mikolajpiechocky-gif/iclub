@@ -2,9 +2,9 @@
 // w TRYBIE DEMO zwraca dane przykładowe wywiedzione z rezerwacji demo.
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import type { JobWithReservation, JobStageRecord, JobStatus, StageStatus } from "./types";
+import type { JobWithReservation, JobStageRecord, JobStatus, StageStatus, BusinessLine } from "./types";
 import { DEMO_RESERVATIONS } from "./demo-resources";
-import { ICLUB_STAGES } from "@/lib/domain/stages";
+import { ICLUB_STAGES, stagesForBusinessLine } from "@/lib/domain/stages";
 
 const RESV_SELECT =
   "*, reservation:reservations(*, customer:customers(id,name), tent:tents!tent_id(id,name), package:packages(id,name))";
@@ -138,6 +138,45 @@ export async function getJobStages(jobId: string): Promise<JobStageRecord[]> {
     .order("sort");
   if (error) throw new Error(error.message);
   return (data ?? []) as JobStageRecord[];
+}
+
+// §II.15 Samonaprawianie etapów: dokłada do istniejącego zlecenia kroki, których brakuje
+// względem aktualnego szablonu (np. dodany później „Wynajem trwa"), i porządkuje kolejność.
+// Dzięki temu stare rezerwacje dostają nowe kroki BEZ odtwarzania. Zwraca true, gdy coś zmieniono.
+export async function syncJobStages(jobId: string, businessLine: BusinessLine, existing: JobStageRecord[]): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const template = stagesForBusinessLine(businessLine);
+  const existingKeys = new Set(existing.map((s) => s.stage_key));
+  const missing = template.filter((t) => !existingKeys.has(t.key));
+
+  const supabase = await createClient();
+  let changed = false;
+
+  if (missing.length > 0) {
+    // Status dokładanego kroku: DONE, jeśli którykolwiek PÓŹNIEJSZY etap jest już zrobiony
+    // (flow przeszedł już ten punkt) — inaczej TODO. Chroni ukończone realizacje przed cofnięciem.
+    const rows = missing.map((t) => {
+      const idx = template.findIndex((x) => x.key === t.key);
+      const laterDone = existing.some((s) => {
+        const si = template.findIndex((x) => x.key === s.stage_key);
+        return si > idx && s.status === "DONE";
+      });
+      return { job_id: jobId, stage_key: t.key, title: t.title, sort: idx, status: laterDone ? "DONE" : "TODO" };
+    });
+    const { error } = await supabase.from("job_stages").insert(rows);
+    if (error) throw new Error(error.message);
+    changed = true;
+  }
+
+  // Ustaw sort istniejących kroków wg pozycji w szablonie, by nowe kroki trafiły na miejsce.
+  for (const s of existing) {
+    const idx = template.findIndex((x) => x.key === s.stage_key);
+    if (idx >= 0 && s.sort !== idx) {
+      await supabase.from("job_stages").update({ sort: idx }).eq("id", s.id);
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 export async function setStageStatus(stageId: string, status: StageStatus): Promise<void> {

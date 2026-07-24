@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pill } from "@/components/ui";
-import { getJob, getJobStages } from "@/lib/data/jobs";
+import { getJob, getJobStages, syncJobStages } from "@/lib/data/jobs";
 import { getCustomer } from "@/lib/data/customers";
 import { listReservationAddons, listPackageItems } from "@/lib/data/resources";
 import { listChecklistItems } from "@/lib/data/checklist";
@@ -29,8 +29,13 @@ const fmtDate = (iso: string | null) =>
 
 export default async function FieldRealizationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [job, stages] = await Promise.all([getJob(id), getJobStages(id)]);
+  const [job, stagesRaw] = await Promise.all([getJob(id), getJobStages(id)]);
   if (!job) notFound();
+
+  // §II.15 Samonaprawianie: dołóż brakujące etapy (np. „Wynajem trwa") do starszych
+  // zleceń bez odtwarzania rezerwacji. Po zmianie przeładuj listę w prawidłowej kolejności.
+  const stagesChanged = await syncJobStages(job.id, job.business_line, stagesRaw).catch(() => false);
+  const stages = stagesChanged ? await getJobStages(id) : stagesRaw;
 
   const r = job.reservation;
   const [customer, checklist, payments, signature, photos, addonList, packageItems, costsAll, incidentsAll, transportCalcs] = await Promise.all([
