@@ -57,6 +57,8 @@ export default async function FieldRealizationPage({ params }: { params: Promise
 
   const phone = customer?.phone ?? null;
   const address = r?.location || customer?.address || customer?.city || null;
+  // §II.13 Szczegóły do nagłówka: wielkość namiotu (Duży/Mały), pakiet, dodatki.
+  const tentSizeLabel = r?.tent_main === "M" ? "Mały" : (r?.tent_main === "D" || r?.tent_main === "D_BACKDOOR") ? "Duży" : (r?.tent?.name ?? null);
   const navUrl = address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
 
   // Pakowanie = osobny blok; reszta kroków to właściwa realizacja.
@@ -87,6 +89,12 @@ export default async function FieldRealizationPage({ params }: { params: Promise
         </div>
         <div className="font-display text-[20px] font-bold">{r?.customer?.name ?? job.title ?? "Realizacja"}</div>
         <div className="mt-1 text-[13px] font-medium text-[#c9cddb]">{[fmtDate(job.event_date), address].filter(Boolean).join(" · ")}</div>
+        {/* §II.13 Szczegóły w nagłówku: namiot, pakiet, dodatki */}
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {tentSizeLabel && <span className="rounded-[8px] bg-white/[0.12] px-2 py-1 text-[11px] font-bold text-white">⛺ {tentSizeLabel}</span>}
+          {r?.package?.name && <span className="rounded-[8px] bg-white/[0.12] px-2 py-1 text-[11px] font-bold text-white">{r.package.name}</span>}
+          {addonNames.length > 0 && <span className="rounded-[8px] bg-white/[0.12] px-2 py-1 text-[11px] font-bold text-white">+ {addonNames.join(", ")}</span>}
+        </div>
         <div className="mt-3.5 flex gap-2.5">
           {phone ? (
             <a href={`tel:${phone.replace(/\s+/g, "")}`} className="flex-1 rounded-[13px] bg-white/10 py-3 text-center text-[13px] font-bold text-white">Zadzwoń</a>
@@ -107,7 +115,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
           {[
             r?.assembly_time ? `Montaż ${r.assembly_time}` : null,
             r?.event_start_time ? `Start ${r.event_start_time}` : null,
-            r?.tent?.name, r?.package?.name, r?.guests != null ? `${r.guests} os.` : null,
+            r?.guests != null ? `${r.guests} os.` : null,
           ].filter(Boolean).map((c) => (
             <span key={c as string} className="rounded-[10px] border border-border bg-surface px-2.5 py-2 text-[12px] font-semibold text-ink">{c}</span>
           ))}
