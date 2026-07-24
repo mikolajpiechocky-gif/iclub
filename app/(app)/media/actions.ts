@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createIncident, setIncidentStatus, setIncidentResolution } from "@/lib/data/incidents";
+import { createServiceTask } from "@/lib/data/service";
 import { sendPushToOwners } from "@/lib/integrations/push";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import type { IncidentPriority, IncidentStatus } from "@/lib/data/types";
@@ -69,5 +70,23 @@ export async function setIncidentResolutionAction(id: string, resolution: string
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Błąd." };
+  }
+}
+
+// §II.7 Przekształcenie zgłoszenia w zadanie serwisowe lub rozwojowe.
+export async function convertIncidentToServiceAction(id: string, equipment: string | null, category: string, description: string | null): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
+  const p = await getCurrentProfile();
+  if (p?.role !== "OWNER") return { ok: false, error: "Tylko szef przekształca zgłoszenia." };
+  // „Pomysł" → zadanie rozwojowe; „Czyszczenie" → czyszczenie; reszta → naprawa/serwis.
+  const kind = category === "Pomysł" ? "Rozwój" : category === "Czyszczenie" ? "Czyszczenie" : "Naprawa";
+  try {
+    await createServiceTask({ equipment, kind, description: description || category, due_date: null });
+    await setIncidentStatus(id, "RESOLVED");
+    revalidatePath("/media");
+    revalidatePath("/service");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się przekształcić." };
   }
 }

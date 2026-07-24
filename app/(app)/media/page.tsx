@@ -51,7 +51,7 @@ export default async function MediaPage() {
                       <Pill label={sm.label} fg={sm.fg} bg={sm.bg} />
                       <span>{it.job?.title ?? "—"} · {fmtDate(it.created_at)}</span>
                     </div>
-                    {isOwner && <IncidentStatusButtons id={it.id} status={it.status} resolution={it.resolution} />}
+                    {isOwner && <IncidentStatusButtons id={it.id} status={it.status} resolution={it.resolution} equipment={it.equipment} category={it.category} description={it.description} />}
                   </div>
                 </div>
               );
