@@ -18,7 +18,7 @@ import type { SettlementBreakdown } from "@/lib/domain/billing";
 import { REALIZATIONS_BUCKET } from "@/lib/config/storage";
 import { advanceStageAction, reportFieldPaymentAction } from "./actions";
 import { createJobPhotoAction } from "./photo-actions";
-import { reportEquipmentStatusAction, type EqStatus } from "./protocol-actions";
+import { reportEquipmentStatusAction, addIssueAction, type EqStatus, type IssueType } from "./protocol-actions";
 
 const fmtPLN = (v: number | null) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
@@ -266,8 +266,9 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
                   )}
                 </div>
 
-                {/* §II.21 Pasek postępu kroku (100% gdy gotowy, żywy ułamek gdy bieżący) */}
-                <div className="mt-1.5"><ProgressBar value={fill} tone={isDone ? "ok" : "accent"} height={4} /></div>
+                {/* §II.21 Pasek postępu kroku na osi — tylko dla kroków NIE-bieżących
+                    (bieżący krok ma własny, szczegółowy pasek w panelu, bez dublowania). */}
+                {!isCurrent && <div className="mt-1.5"><ProgressBar value={fill} tone={isDone ? "ok" : "accent"} height={4} /></div>}
 
                 {isCurrent && (
                   <div className="mt-2 rounded-[13px] border border-[#2a2340] bg-[#181423] p-3.5">
@@ -315,16 +316,7 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobI
       return <SettlementPanel jobId={jobId} ctx={ctx} pending={pending} onDone={onDone} onProgress={onProgress} />;
 
     case "RENTAL":
-      // §II.15 Namiot rozstawiony, impreza w toku — czekamy na jej koniec, potem demontaż.
-      return (
-        <div>
-          <div className="mb-3 rounded-[11px] border border-[#2a2340] bg-[#1a1526] px-3 py-3 text-center">
-            <div className="text-[13px] font-bold text-[#e9d5ff]">Namiot rozstawiony — wynajem trwa</div>
-            <div className="mt-1 text-[11.5px] text-ink-2">Kaucja 1 000 zł pobrana. Wróć na demontaż po zakończeniu imprezy.</div>
-          </div>
-          <DoneButton pending={pending} onClick={onDone} label="Impreza zakończona — demontaż" block />
-        </div>
-      );
+      return <RentalPanel jobId={jobId} pending={pending} onDone={onDone} />;
 
     case "TEARDOWN":
       return <TeardownPanel jobId={jobId} items={ctx.teardownItems} pending={pending} onDone={onDone} onProgress={onProgress} />;
@@ -332,6 +324,53 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobI
     default:
       return <DoneButton pending={pending} onClick={onDone} label="Gotowe" block />;
   }
+}
+
+// §II.15 „Wynajem trwa": namiot rozstawiony, impreza w toku. Pracownik może zgłosić
+// incydent (awaria / uszkodzenie / problem z klientem) — trafia do zgłoszeń serwisowych.
+function RentalPanel({ jobId, pending, onDone }: { jobId: string; pending: boolean; onDone: () => void }) {
+  const [busy, startBusy] = useTransition();
+  const [type, setType] = useState<IssueType>("Incydent");
+  const [desc, setDesc] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const TYPES: IssueType[] = ["Uwaga", "Incydent", "Pomysł"];
+
+  const add = () => {
+    if (!desc.trim()) { setError("Opisz zgłoszenie."); return; }
+    setError(null);
+    startBusy(async () => {
+      const res = await addIssueAction(jobId, type, desc);
+      if (res.ok) { setDesc(""); setSaved(true); }
+      else setError(res.error ?? "Błąd");
+    });
+  };
+
+  return (
+    <div>
+      <div className="mb-3 rounded-[11px] border border-[#2a2340] bg-[#1a1526] px-3 py-3 text-center">
+        <div className="text-[13px] font-bold text-[#e9d5ff]">Namiot rozstawiony — wynajem trwa</div>
+        <div className="mt-1 text-[11.5px] text-ink-2">Kaucja 1 000 zł pobrana. Wróć na demontaż po zakończeniu imprezy.</div>
+      </div>
+
+      {/* §II.15 Zgłoszenie w trakcie wynajmu (awaria, uszkodzenie, problem z klientem) */}
+      <div className="mb-3 rounded-[11px] border border-border bg-surface px-3 py-2.5">
+        <div className="mb-2 text-[12px] font-bold text-ink">Zgłoś w trakcie wynajmu</div>
+        <div className="mb-2 flex gap-1.5">
+          {TYPES.map((t) => (
+            <button key={t} onClick={() => setType(t)} className={`flex-1 rounded-[9px] px-2 py-1.5 text-[12px] font-bold ${type === t ? "bg-brand text-white" : "border border-border bg-surface-2 text-ink-2"}`}>{t}</button>
+          ))}
+        </div>
+        <input value={desc} onChange={(e) => { setDesc(e.target.value); setSaved(false); }} placeholder="Opis (awaria, uszkodzenie, problem z klientem…)" className="w-full rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-[13px] text-ink outline-none focus:border-accent" />
+        {error && <div className="mt-2"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
+        {saved && <div className="mt-2 text-[11.5px] font-semibold text-ok">✓ Zgłoszenie zapisane — Szef zostanie powiadomiony.</div>}
+        <button onClick={add} disabled={busy} className="mt-2 w-full rounded-[10px] bg-[#271b3f] py-2 text-[12.5px] font-bold text-[#e0c8ff]">{busy ? "Zapisywanie…" : "Dodaj zgłoszenie"}</button>
+      </div>
+
+      <DoneButton pending={pending} onClick={onDone} label="Impreza zakończona — demontaż" block />
+    </div>
+  );
 }
 
 // §II.8 Demontaż: kontrola sprzętu po tej samej checkliście. Dla każdej pozycji: OK

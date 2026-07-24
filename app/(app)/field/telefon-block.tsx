@@ -62,6 +62,7 @@ export function TelefonBlock({
   const [grass, setGrass] = useState(!skipGrass);      // true = bierzemy trawę
   const [grassTouched, setGrassTouched] = useState(phoneCallDone);
   const [query, setQuery] = useState("");
+  const [reason, setReason] = useState(""); // §II.9 powód, gdy nie wszystko potwierdzone
   const [err, setErr] = useState<string | null>(null);
   // Ręczne potwierdzenia punktów bez własnej kontrolki.
   const [ok, setOk] = useState<{ pakiet: boolean; dodatki: boolean; miejsce: boolean; podloze: boolean }>(
@@ -93,8 +94,12 @@ export function TelefonBlock({
   // §II.21 Pasek postępu telefonu: 6 punktów.
   const doneFlags = [ok.pakiet, chosen.length > 0 || ok.dodatki, grassTouched, asm.trim().length > 0, ok.miejsce, ok.podloze];
   const doneCount = doneFlags.filter(Boolean).length;
+  const allDone = doneCount === 6;
+  // §II.9 Zapis wymaga potwierdzenia wszystkich 6 punktów ALBO podania powodu.
+  const canFinish = allDone || reason.trim().length >= 3;
 
   const save = () => {
+    if (!canFinish) { setErr("Potwierdź wszystkie punkty albo podaj powód."); return; }
     setErr(null);
     startTransition(async () => {
       const res = await saveClientCallAction(reservationId, jobId, {
@@ -191,14 +196,14 @@ export function TelefonBlock({
 
           {/* 4. Godzina montażu + start imprezy */}
           <Point n={4} title="Godzina" done={asm.trim().length > 0}>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <div className="mb-0.5 text-[11px] font-medium text-ink-2">Montaż</div>
-                <input type="time" value={asm} onChange={(e) => setAsm(e.target.value)} className="h-10 w-full rounded-[10px] border border-border bg-surface-2 px-3 text-[13px] text-ink outline-none focus:border-accent" />
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-24 flex-none text-[12px] font-medium text-ink-2">Montaż</span>
+                <input type="time" value={asm} onChange={(e) => setAsm(e.target.value)} className="box-border h-10 min-w-0 flex-1 rounded-[10px] border border-border bg-surface-2 px-3 text-[13px] text-ink outline-none focus:border-accent" />
               </div>
-              <div>
-                <div className="mb-0.5 text-[11px] font-medium text-ink-2">Start imprezy</div>
-                <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="h-10 w-full rounded-[10px] border border-border bg-surface-2 px-3 text-[13px] text-ink outline-none focus:border-accent" />
+              <div className="flex items-center gap-2">
+                <span className="w-24 flex-none text-[12px] font-medium text-ink-2">Start imprezy</span>
+                <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="box-border h-10 min-w-0 flex-1 rounded-[10px] border border-border bg-surface-2 px-3 text-[13px] text-ink outline-none focus:border-accent" />
               </div>
             </div>
           </Point>
@@ -213,8 +218,11 @@ export function TelefonBlock({
             <div className="text-[11px] text-ink-2">Ustal podłoże (trawa / kostka / beton) — wpływa na sposób kotwienia.</div>
           </Point>
 
+          {!allDone && (
+            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={`Nie wszystko potwierdzone (${doneCount}/6) — podaj powód, aby zapisać`} className="w-full rounded-[10px] border border-[#3d3216] bg-[#241e10] px-3 py-2 text-[12.5px] text-ink outline-none focus:border-accent" />
+          )}
           {err && <Alert tone="bad" title="Błąd">{err}</Alert>}
-          <button onClick={save} disabled={pending} className="w-full rounded-[11px] bg-ok py-2.5 text-[12.5px] font-bold text-[#08170d] disabled:opacity-60">{pending ? "Zapisywanie…" : "Telefon wykonany — zapisz"}</button>
+          <button onClick={save} disabled={pending || !canFinish} className="w-full rounded-[11px] bg-ok py-2.5 text-[12.5px] font-bold text-[#08170d] disabled:opacity-60">{pending ? "Zapisywanie…" : allDone ? "Telefon wykonany — zapisz" : `Zapisz mimo braków (${doneCount}/6)`}</button>
         </div>
       )}
     </div>
