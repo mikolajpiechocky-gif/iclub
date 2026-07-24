@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { CostWithJob, CostStatus } from "./types";
+import { logActivity } from "./activity";
 
 const DEMO_COSTS: CostWithJob[] = [
   { id: "demo-cost1", job_id: "demo-job-1", job: { id: "demo-job-1", title: "Osiemnastka" }, category: "Paliwo", amount: 240, spent_on: "2026-07-18", note: "Tankowanie Orlen", status: "PENDING", created_at: "2026-07-18T10:00:00.000Z", updated_at: "2026-07-18T10:00:00.000Z" },
@@ -31,12 +32,14 @@ export async function listCosts(): Promise<CostWithJob[]> {
 export async function createCost(input: CostInput): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase.from("costs").insert({ ...input, created_by: user?.id ?? null });
+  const { data, error } = await supabase.from("costs").insert({ ...input, created_by: user?.id ?? null }).select("id").single();
   if (error) throw new Error(error.message);
+  await logActivity("cost", data.id as string, input.category, "Dodano koszt", `${input.amount} zł`);
 }
 
 export async function setCostStatus(id: string, status: CostStatus): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("costs").update({ status }).eq("id", id);
   if (error) throw new Error(error.message);
+  await logActivity("cost", id, null, status === "VERIFIED" ? "Zatwierdzono" : status === "REJECTED" ? "Odrzucono" : "Do weryfikacji");
 }

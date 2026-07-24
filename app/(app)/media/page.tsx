@@ -2,6 +2,8 @@
 import { PageHeader } from "@/components/layout";
 import { EmptyState, Pill } from "@/components/ui";
 import { listIncidents } from "@/lib/data/incidents";
+import { listActivity } from "@/lib/data/activity";
+import { ActivityList } from "@/components/activity-list";
 import { listJobs } from "@/lib/data/jobs";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -17,6 +19,7 @@ export default async function MediaPage() {
   const [incidents, jobsRaw, profile] = await Promise.all([listIncidents(), listJobs(), getCurrentProfile()]);
   const demo = !isSupabaseConfigured();
   const isOwner = profile?.role === "OWNER";
+  const activity = isOwner ? await listActivity("incident", undefined, 20) : [];
   const jobs = jobsRaw.map((j) => ({ id: j.id, label: `${j.reservation?.customer?.name ?? j.title ?? "Zlecenie"}${j.event_date ? " · " + j.event_date : ""}` }));
 
   return (
@@ -59,6 +62,8 @@ export default async function MediaPage() {
           </div>
         )}
       </div>
+
+      {isOwner && <ActivityList entries={activity} title="Historia zgłoszeń" />}
     </div>
   );
 }

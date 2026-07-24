@@ -5,6 +5,8 @@ import { PrimaryButton, EmptyState, Pill } from "@/components/ui";
 import { PeriodBar } from "@/components/period-bar";
 import { FilterSelect } from "@/components/filter-select";
 import { listCosts } from "@/lib/data/costs";
+import { listActivity } from "@/lib/data/activity";
+import { ActivityList } from "@/components/activity-list";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { COST_STATUS_META, COST_CATEGORIES, type CostStatus } from "@/lib/data/types";
@@ -23,6 +25,7 @@ export default async function CostsPage({ searchParams }: { searchParams: Promis
   const [costs, profile, sp] = await Promise.all([listCosts(), getCurrentProfile(), searchParams]);
   const demo = !isSupabaseConfigured();
   const isOwner = profile?.role === "OWNER";
+  const activity = isOwner ? await listActivity("cost", undefined, 20) : [];
 
   const now = new Date();
   const period = parsePeriod(sp.period, now);
@@ -104,6 +107,8 @@ export default async function CostsPage({ searchParams }: { searchParams: Promis
           })}
         </div>
       )}
+
+      {isOwner && <ActivityList entries={activity} title="Historia kosztów" />}
     </div>
   );
 }

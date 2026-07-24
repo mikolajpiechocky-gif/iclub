@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { IncidentWithJob, IncidentPriority, IncidentStatus } from "./types";
+import { logActivity } from "./activity";
 
 const now = "2026-07-18T12:00:00.000Z";
 
@@ -32,14 +33,16 @@ export async function listIncidents(): Promise<IncidentWithJob[]> {
 export async function createIncident(input: IncidentInput): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase.from("incidents").insert({ ...input, reported_by: user?.id ?? null });
+  const { data, error } = await supabase.from("incidents").insert({ ...input, reported_by: user?.id ?? null }).select("id").single();
   if (error) throw new Error(error.message);
+  await logActivity("incident", data.id as string, input.category, "Zgłoszono", input.equipment ?? input.description ?? null);
 }
 
 export async function setIncidentStatus(id: string, status: IncidentStatus): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("incidents").update({ status }).eq("id", id);
   if (error) throw new Error(error.message);
+  await logActivity("incident", id, null, `Status: ${status === "OPEN" ? "Otwarte" : status === "IN_PROGRESS" ? "W toku" : "Zamknięte"}`);
 }
 
 // §II.7 Odpowiedź Szefa na zgłoszenie.
@@ -47,4 +50,5 @@ export async function setIncidentResolution(id: string, resolution: string | nul
   const supabase = await createClient();
   const { error } = await supabase.from("incidents").update({ resolution }).eq("id", id);
   if (error) throw new Error(error.message);
+  await logActivity("incident", id, null, resolution ? "Odpowiedź szefa" : "Usunięto odpowiedź", resolution);
 }

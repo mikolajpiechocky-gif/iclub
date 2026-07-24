@@ -1444,3 +1444,23 @@ create policy tents_write on public.tents for all to authenticated using (true) 
 -- w transakcji — jeśli edytor SQL opakowuje całość w BEGIN/COMMIT, uruchom to polecenie osobno.
 alter type public.cost_status add value if not exists 'REJECTED';
 
+-- ================= 0053: historia zmian / audyt (§II.7) =================
+-- Generyczny log aktywności (koszty, zgłoszenia i inne). Odczyt dla zalogowanych.
+create table if not exists public.activity_log (
+  id uuid primary key default gen_random_uuid(),
+  entity_type text not null,
+  entity_id uuid,
+  entity_label text,
+  action text not null,
+  detail text,
+  actor uuid,
+  actor_name text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_activity_entity on public.activity_log (entity_type, entity_id, created_at desc);
+alter table public.activity_log enable row level security;
+drop policy if exists activity_read on public.activity_log;
+create policy activity_read on public.activity_log for select to authenticated using (true);
+drop policy if exists activity_write on public.activity_log;
+create policy activity_write on public.activity_log for insert to authenticated with check (true);
+
