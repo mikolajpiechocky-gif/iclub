@@ -24,7 +24,7 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
     review_bonus: str(r?.review_bonus),
     reel_bonus: str(r?.reel_bonus),
     upsell_percent: r?.upsell_percent != null ? String(r.upsell_percent) : "15",
-    iclub_settlement_mode: r?.iclub_settlement_mode ?? "FLAT",
+    iclub_settlement_mode: r?.iclub_settlement_mode ?? "THRESHOLD",
     iclub_threshold: str(r?.iclub_threshold),
     iclub_free_hours: str(r?.iclub_free_hours),
     iclub_free_hourly: str(r?.iclub_free_hourly),

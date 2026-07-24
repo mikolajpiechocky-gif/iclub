@@ -15,6 +15,7 @@ import { getSettings } from "@/lib/data/settings";
 import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
 import { listTransportCalcs } from "@/lib/data/transport";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
+import { generateChecklistForJob } from "@/lib/data/checklist-gen";
 import { sendPushToEmployees, sendPushToUsers } from "@/lib/integrations/push";
 import { geocode, routeLeg } from "@/lib/integrations/google-maps";
 import { isGoogleMapsConfigured } from "@/lib/integrations/google-maps/config";
@@ -326,6 +327,10 @@ export async function markReservationConfirmedAction(id: string, confirmed: bool
   if (me?.role !== "OWNER") return { ok: false, error: "Tylko szef zmienia potwierdzenie klienta." };
   try {
     await setReservationConfirmed(id, confirmed);
+    // §II.3 Po potwierdzeniu realizacji checklista pakowania tworzy się automatycznie.
+    if (confirmed) {
+      try { const job = await getJobByReservation(id); if (job) await generateChecklistForJob(job.id, { onlyIfEmpty: true }); } catch { /* nie blokuje potwierdzenia */ }
+    }
     revalidatePath(`/reservations/${id}`);
     revalidatePath("/dashboard");
     return { ok: true, id };

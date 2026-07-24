@@ -72,7 +72,8 @@ export function settlementForRealization(
 ): RealizationSettlement {
   const index = priorCompletedThisMonth + 1;
   const rate = opts.rate ?? null;
-  const mode: IclubSettlementMode = opts.mode ?? rate?.iclub_settlement_mode ?? "FLAT";
+  // Domyślnie model „Bartka" (czas wolny za pierwsze N). Ryczałt od pierwszej to jawny wyjątek.
+  const mode: IclubSettlementMode = opts.mode ?? rate?.iclub_settlement_mode ?? "THRESHOLD";
   const flatRate = numOr(rate?.iclub_flat, rules.flatRate); // ryczałt pracownika albo globalny
   const threshold = numOr(rate?.iclub_threshold, rules.monthlyThreshold); // próg „w ramach umowy" per pracownik
   // Czas wolny: godziny i stawka zł/h per pracownik (null = wartości globalne z Ustawień).
