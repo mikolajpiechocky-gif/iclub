@@ -223,6 +223,8 @@ function TeardownPanel({ jobId, items, pending, onDone }: { jobId: string; items
   const [busy, startBusy] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [reported, setReported] = useState<Record<string, string>>({});
+  const [deduction, setDeduction] = useState(""); // §II.16 potrącenie z kaucji za uszkodzenia
+  const deducted = Number(deduction.replace(",", ".")) || 0;
 
   const report = (item: string, status: EqStatus) => {
     setError(null);
@@ -256,6 +258,17 @@ function TeardownPanel({ jobId, items, pending, onDone }: { jobId: string; items
       ) : (
         <p className="mb-3 text-[12px] text-ink-2">Brak checklisty sprzętowej — wygeneruj checklistę pakowania, aby mieć listę do kontroli.</p>
       )}
+
+      {/* §II.16 Zwrot kaucji — domyślnie pełny, można wpisać potrącenie za uszkodzenia. */}
+      <div className="mb-3 rounded-[10px] border border-border bg-surface px-3 py-2.5">
+        <div className="mb-1.5 text-[12px] font-bold text-ink">Zwrot kaucji</div>
+        <div className="flex items-center justify-between text-[12px]"><span className="text-ink-2">Kaucja</span><span className="font-semibold text-ink">1 000 zł</span></div>
+        <label className="mt-1.5 block text-[11px] text-ink-2">Potrącenie za uszkodzenia (zł)
+          <input inputMode="decimal" value={deduction} onChange={(e) => setDeduction(e.target.value)} placeholder="0" className="mt-0.5 w-full rounded-[9px] border border-border bg-surface-2 px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent" />
+        </label>
+        <div className="mt-1.5 flex items-center justify-between text-[12px] font-bold"><span className="text-ink">Do zwrotu klientowi</span><span className="text-ok">{fmtPLN(Math.max(0, 1000 - deducted))}</span></div>
+      </div>
+
       <DoneButton pending={pending} onClick={onDone} label="Zakończone — sprzęt w bazie" block />
     </div>
   );
