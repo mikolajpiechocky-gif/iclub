@@ -93,7 +93,19 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
         {job && isOwner && <span className="ml-auto"><RealizationDoneButton reservationId={reservation.id} done={job.status === "DONE"} /></span>}
       </div>
 
-      {isOwner && <ClientConfirmToggle id={reservation.id} confirmed={reservation.client_confirmed} confirmedAt={reservation.client_confirmed_at} />}
+      {isOwner && (
+        <ClientConfirmToggle
+          id={reservation.id}
+          confirmed={reservation.client_confirmed}
+          confirmedAt={reservation.client_confirmed_at}
+          points={{
+            packageName: (r as { package?: { name?: string } }).package?.name ?? reservation.pricing_snapshot?.package?.name ?? null,
+            addons: reservation.pricing_snapshot?.addons?.length ? reservation.pricing_snapshot.addons.map((a) => a.name).join(", ") : null,
+            assembly: reservation.assembly_time,
+            location: reservation.location,
+          }}
+        />
+      )}
 
       {isOwner && reservation.is_invoice && (
         <InvoiceStatus
