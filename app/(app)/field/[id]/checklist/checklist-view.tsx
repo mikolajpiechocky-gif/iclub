@@ -13,30 +13,38 @@ export function ChecklistView({ jobId, items, backHref }: { jobId: string; items
   const [sheet, setSheet] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // §perf Odhaczenia trzymamy lokalnie (natychmiast), a zapis idzie w tle — bez przeładowania
+  // całej strony po każdym kliknięciu (to powodowało wolne działanie checklisty).
+  const [override, setOverride] = useState<Record<string, boolean>>({});
 
-  const done = items.filter((i) => i.done).length;
-  const missingRequired = items.filter((i) => i.required && !i.done).length;
-  const problems = items.filter((i) => i.problem).length;
-  const pct = items.length ? (done / items.length) * 100 : 0;
+  const effItems = items.map((i) => (i.id in override ? { ...i, done: override[i.id] } : i));
+  const done = effItems.filter((i) => i.done).length;
+  const missingRequired = effItems.filter((i) => i.required && !i.done).length;
+  const problems = effItems.filter((i) => i.problem).length;
+  const pct = effItems.length ? (done / effItems.length) * 100 : 0;
 
   const categories = [
-    ...CHECKLIST_CATEGORY_ORDER.filter((c) => items.some((i) => i.category === c)),
-    ...[...new Set(items.map((i) => i.category))].filter((c) => !CHECKLIST_CATEGORY_ORDER.includes(c)),
+    ...CHECKLIST_CATEGORY_ORDER.filter((c) => effItems.some((i) => i.category === c)),
+    ...[...new Set(effItems.map((i) => i.category))].filter((c) => !CHECKLIST_CATEGORY_ORDER.includes(c)),
   ];
 
   const toggle = (id: string, current: boolean) => {
+    const next = !current;
     setError(null);
+    setOverride((o) => ({ ...o, [id]: next })); // natychmiast w UI
     startTransition(async () => {
-      const res = await toggleItemAction(id, jobId, !current);
-      if (res.ok) router.refresh();
-      else setError(res.error ?? "Błąd");
+      const res = await toggleItemAction(id, jobId, next); // zapis w tle, bez router.refresh
+      if (!res.ok) {
+        setOverride((o) => { const n = { ...o }; delete n[id]; return n; }); // cofnij przy błędzie
+        setError(res.error ?? "Błąd");
+      }
     });
   };
   const generate = () => {
     setError(null);
     startTransition(async () => {
       const res = await generateChecklistAction(jobId);
-      if (res.ok) router.refresh();
+      if (res.ok) { setOverride({}); router.refresh(); }
       else setError(res.error ?? "Błąd");
     });
   };
@@ -84,7 +92,7 @@ export function ChecklistView({ jobId, items, backHref }: { jobId: string; items
 
       <div className="px-4">
         {categories.map((cat) => {
-          const group = items.filter((i) => i.category === cat);
+          const group = effItems.filter((i) => i.category === cat);
           if (!group.length) return null;
           return (
             <div key={cat}>
