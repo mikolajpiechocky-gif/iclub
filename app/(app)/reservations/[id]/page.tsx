@@ -14,6 +14,7 @@ import { listEmployees } from "@/lib/data/employees";
 import { getCurrentProfile, getProfileName } from "@/lib/data/profiles";
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
+import { listCosts } from "@/lib/data/costs";
 import type { EmployeeRate } from "@/lib/data/types";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
@@ -230,12 +231,13 @@ async function ReservationOps({
   isOwner,
   profile,
 }: OpsProps) {
-  const [stages, assignments, employees, settings, transportCalcs] = await Promise.all([
+  const [stages, assignments, employees, settings, transportCalcs, allCosts] = await Promise.all([
     getJobStages(job.id),
     listJobAssignments(job.id),
     listEmployees(),
     getSettings(),
     listTransportCalcs(job.id),
+    listCosts(),
   ]);
   const done = stages.filter((s) => s.status === "DONE").length;
   const ownerBonus = Number(job.owner_bonus ?? 0) || 0; // numeric z PG bywa stringiem
@@ -280,8 +282,31 @@ async function ReservationOps({
 
   const photos = await listJobPhotos(job.id);
 
+  // §II.7 Rentowność realizacji: przychód − koszty (zatwierdzone) − wynagrodzenia − transport.
+  const jobCosts = allCosts.filter((c) => c.job_id === job.id);
+  const revenue = Number(job.reservation?.price ?? 0) || 0;
+  const costsVerified = jobCosts.filter((c) => c.status === "VERIFIED").reduce((s, c) => s + Number(c.amount || 0), 0);
+  const costsPending = jobCosts.filter((c) => c.status === "PENDING").reduce((s, c) => s + Number(c.amount || 0), 0);
+  const laborSum = assignmentViews.filter((a) => a.status === "APPROVED").reduce((s, a) => s + (a.earnings?.total ?? 0), 0);
+  const transportSum = transportCalcs.reduce((s, t) => s + Number(t.fuel_cost || 0) + Number(t.amortization || 0), 0);
+  const profit = Math.round((revenue - costsVerified - laborSum - transportSum) * 100) / 100;
+  const margin = revenue > 0 ? profit / revenue : null;
+
   return (
     <>
+      {isOwner && (
+        <SectionCard title="Rentowność realizacji" className="mt-4 p-5">
+          <div className="flex flex-col gap-1.5 px-5 pb-5 text-[13px]">
+            <div className="flex justify-between"><span className="text-ink-2">Przychód (wartość)</span><span className="font-semibold text-ink">{fmtPLN(revenue)}</span></div>
+            <div className="flex justify-between"><span className="text-ink-2">− Koszty zatwierdzone</span><span className="font-semibold text-ink">{fmtPLN(costsVerified)}</span></div>
+            <div className="flex justify-between"><span className="text-ink-2">− Wynagrodzenia zespołu</span><span className="font-semibold text-ink">{fmtPLN(laborSum)}</span></div>
+            <div className="flex justify-between"><span className="text-ink-2">− Transport (paliwo + eksploatacja)</span><span className="font-semibold text-ink">{fmtPLN(transportSum)}</span></div>
+            <div className="mt-1 flex justify-between border-t border-border pt-2 font-bold"><span className="text-ink">Zysk</span><span style={{ color: profit >= 0 ? "#5fd68b" : "#f58585" }}>{fmtPLN(profit)}{margin != null ? ` · ${(margin * 100).toFixed(0)}%` : ""}</span></div>
+            {costsPending > 0 && <p className="mt-1 text-[11.5px] text-warn">+ {fmtPLN(costsPending)} kosztów czeka na weryfikację (nie wliczone w zysk).</p>}
+          </div>
+        </SectionCard>
+      )}
+
       <SectionCard title="Etapy realizacji" className="mt-4 p-5">
         <div className="px-5 pb-5">
           {stages.length === 0 ? (
