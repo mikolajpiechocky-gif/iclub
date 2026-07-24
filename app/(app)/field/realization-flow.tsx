@@ -17,6 +17,7 @@ import { PAYMENT_METHOD_LABELS } from "@/lib/data/types";
 import { REALIZATIONS_BUCKET } from "@/lib/config/storage";
 import { advanceStageAction, reportFieldPaymentAction } from "./actions";
 import { createJobPhotoAction } from "./photo-actions";
+import { reportEquipmentStatusAction, type EqStatus } from "./protocol-actions";
 
 const fmtPLN = (v: number | null) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
@@ -85,6 +86,7 @@ export interface RealizationContext {
   signatureHref: string;
   photos: { id: string; url: string }[];
   canUpload: boolean;
+  teardownItems: string[]; // §II.8 sprzęt do kontroli przy demontażu (z checklisty)
 }
 
 const TRAINING_POINTS = [
@@ -202,16 +204,55 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: string; s
       return <SettlementPanel jobId={jobId} ctx={ctx} pending={pending} onDone={onDone} />;
 
     case "TEARDOWN":
-      return (
-        <div>
-          <p className="mb-3 text-[12.5px] text-ink-2">Zdemontuj namiot, spakuj sprzęt, wróć do bazy i rozładuj.</p>
-          <DoneButton pending={pending} onClick={onDone} label="Zakończone — sprzęt w bazie" block />
-        </div>
-      );
+      return <TeardownPanel jobId={jobId} items={ctx.teardownItems} pending={pending} onDone={onDone} />;
 
     default:
       return <DoneButton pending={pending} onClick={onDone} label="Gotowe" block />;
   }
+}
+
+// §II.8 Demontaż: kontrola sprzętu po tej samej checkliście. Dla każdej pozycji: OK
+// (nic nie klikasz) / Czyszczenie / Uszkodzony / Brak → zgłoszenie serwisowe.
+function TeardownPanel({ jobId, items, pending, onDone }: { jobId: string; items: string[]; pending: boolean; onDone: () => void }) {
+  const [busy, startBusy] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [reported, setReported] = useState<Record<string, string>>({});
+
+  const report = (item: string, status: EqStatus) => {
+    setError(null);
+    startBusy(async () => {
+      const res = await reportEquipmentStatusAction(jobId, item, status, "");
+      if (res.ok) setReported((r) => ({ ...r, [item]: status }));
+      else setError(res.error ?? "Błąd");
+    });
+  };
+
+  return (
+    <div>
+      <p className="mb-3 text-[12.5px] text-ink-2">Zdemontuj i sprawdź każdy element. Zostaw „OK”, a problem zaznacz — trafi do zgłoszeń serwisowych.</p>
+      {error && <div className="mb-2"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
+      {items.length > 0 ? (
+        <div className="mb-3 flex flex-col gap-1.5">
+          {items.map((it) => {
+            const st = reported[it];
+            return (
+              <div key={it} className="rounded-[10px] border border-border bg-surface px-2.5 py-2">
+                <div className="mb-1.5 text-[12.5px] font-semibold text-ink">{it}{st && <span className="ml-1.5 text-[11px] font-bold text-warn">· {st}</span>}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(["Czyszczenie", "Uszkodzony", "Brak"] as EqStatus[]).map((s) => (
+                    <button key={s} onClick={() => report(it, s)} disabled={busy} className="rounded-[8px] border border-border bg-surface-2 px-2.5 py-1 text-[11px] font-bold text-ink-2">{s}</button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="mb-3 text-[12px] text-ink-2">Brak checklisty sprzętowej — wygeneruj checklistę pakowania, aby mieć listę do kontroli.</p>
+      )}
+      <DoneButton pending={pending} onClick={onDone} label="Zakończone — sprzęt w bazie" block />
+    </div>
+  );
 }
 
 function DoneButton({ pending, onClick, label, block }: { pending: boolean; onClick: () => void; label: string; block?: boolean }) {

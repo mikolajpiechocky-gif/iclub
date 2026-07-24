@@ -26,6 +26,23 @@ export async function addProtocolCostAction(jobId: string, name: string, amount:
   }
 }
 
+// §II.8 Demontaż: kontrola sprzętu — status niesprawnej pozycji → wspólna baza zgłoszeń serwisowych.
+export type EqStatus = "Czyszczenie" | "Uszkodzony" | "Brak";
+
+export async function reportEquipmentStatusAction(jobId: string, equipment: string, status: EqStatus, note: string): Promise<ProtocolResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
+  if (!equipment.trim()) return { ok: false, error: "Brak pozycji." };
+  const priority: IncidentPriority = status === "Uszkodzony" ? "HIGH" : status === "Brak" ? "HIGH" : "MEDIUM";
+  try {
+    await createIncident({ job_id: jobId, category: "Serwis", description: `Demontaż — ${status}${note.trim() ? `: ${note.trim()}` : ""}`, equipment: equipment.trim(), priority });
+    await sendPushToOwners({ title: `Sprzęt: ${status}`, body: equipment.trim(), url: "/media", tag: "teardown-eq" }).catch(() => {});
+    revalidatePath(`/field/${jobId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
+  }
+}
+
 export type IssueType = "Uwaga" | "Incydent" | "Pomysł";
 
 // §II.5 Dodaj zgłoszenie: typ (Uwaga / Incydent / Pomysł) + opis.

@@ -74,6 +74,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
     signatureHref: `/field/${job.id}/signature`,
     photos: photos.map((p) => ({ id: p.id, url: p.url })),
     canUpload: isSupabaseConfigured(),
+    teardownItems: checklist.filter((i) => i.category !== "Dokumenty").map((i) => i.label),
   };
 
   return (
