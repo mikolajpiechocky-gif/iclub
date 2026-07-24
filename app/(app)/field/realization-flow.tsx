@@ -87,6 +87,7 @@ export interface RealizationContext {
   photos: { id: string; url: string }[];
   canUpload: boolean;
   teardownItems: string[]; // §II.8 sprzęt do kontroli przy demontażu (z checklisty)
+  hasVehicle: boolean;     // §II.14 pojazd przypisany (wymagany, by rozpocząć)
 }
 
 // §II.15 Checklisty montażu i szkolenia klienta — treść z wytycznych.
@@ -184,13 +185,14 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: string; s
       return (
         <div>
           <p className="mb-3 text-[12.5px] text-ink-2">Jedź na miejsce imprezy i potwierdź przyjazd.</p>
+          {!ctx.hasVehicle && <div className="mb-2.5"><Alert tone="warn" title="Przypisz pojazd">Bez przypisanego pojazdu nie można rozpocząć realizacji (paliwo liczone z faktycznych km).</Alert></div>}
           <div className="flex gap-2.5">
             {ctx.navUrl ? (
               <a href={ctx.navUrl} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-[11px] border border-border bg-surface-2 py-2.5 text-center text-[12.5px] font-bold text-ink">Nawiguj</a>
             ) : (
               <span className="flex-1 rounded-[11px] border border-border bg-surface-2 py-2.5 text-center text-[12.5px] font-bold text-ink-2/50">Brak adresu</span>
             )}
-            <DoneButton pending={pending} onClick={onDone} label="Jestem na miejscu" />
+            <DoneButton pending={pending || !ctx.hasVehicle} onClick={onDone} label="Jestem na miejscu" />
           </div>
         </div>
       );

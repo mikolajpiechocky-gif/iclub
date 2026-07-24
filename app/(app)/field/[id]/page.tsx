@@ -14,6 +14,8 @@ import { listJobPhotos } from "@/lib/data/photos";
 import { listCosts } from "@/lib/data/costs";
 import { listIncidents } from "@/lib/data/incidents";
 import { listTransportCalcs } from "@/lib/data/transport";
+import { listVehicles, listJobVehicles } from "@/lib/data/vehicles";
+import { FieldVehicle } from "../field-vehicle";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { JOB_STATUS_META } from "@/lib/data/types";
 import { PackingBlock, RealizationFlow, type RealizationContext } from "../realization-flow";
@@ -42,6 +44,9 @@ export default async function FieldRealizationPage({ params }: { params: Promise
     listIncidents(),
     listTransportCalcs(job.id),
   ]);
+  const [vehicles, jobVehicles] = await Promise.all([listVehicles(), listJobVehicles(job.id)]);
+  const assignedVehicleIds = new Set(jobVehicles.map((jv) => jv.vehicle_id));
+  const hasVehicle = jobVehicles.length > 0;
 
   // Blok 3 (protokół): koszty + zgłoszenia dla tego zlecenia + podsumowanie transportu.
   const jobCosts = costsAll.filter((c) => c.job_id === job.id);
@@ -77,6 +82,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
     photos: photos.map((p) => ({ id: p.id, url: p.url })),
     canUpload: isSupabaseConfigured(),
     teardownItems: checklist.filter((i) => i.category !== "Dokumenty").map((i) => i.label),
+    hasVehicle,
   };
 
   return (
@@ -147,6 +153,13 @@ export default async function FieldRealizationPage({ params }: { params: Promise
           stage={packing}
           checklistHref={`/field/${job.id}/checklist`}
           progress={{ done: checklist.filter((i) => i.done).length, total: checklist.length }}
+        />
+
+        {/* §II.14 Pojazd realizacji (wymagany do rozpoczęcia) */}
+        <FieldVehicle
+          jobId={job.id}
+          assigned={jobVehicles.map((jv) => ({ id: jv.id, name: jv.vehicle?.name ?? "—", registration: jv.vehicle?.registration ?? null }))}
+          available={vehicles.filter((v) => !assignedVehicleIds.has(v.id)).map((v) => ({ id: v.id, name: v.name }))}
         />
 
         {/* Blok: Realizacja (kroki z własnymi czynnościami) */}

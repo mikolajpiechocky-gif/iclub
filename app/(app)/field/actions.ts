@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { setStageStatus } from "@/lib/data/jobs";
 import { createPayment } from "@/lib/data/payments";
+import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
 import type { StageStatus, PaymentMethod } from "@/lib/data/types";
 
 export interface ActionResult {
@@ -22,6 +23,30 @@ export async function advanceStageAction(stageId: string, jobId: string, status:
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
+  }
+}
+
+// §II.14 Przypisanie / usunięcie pojazdu do realizacji z widoku pracownika.
+export async function assignFieldVehicleAction(jobId: string, vehicleId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo: skonfiguruj Supabase." };
+  if (!vehicleId) return { ok: false, error: "Wybierz pojazd." };
+  try {
+    await assignVehicle(jobId, vehicleId);
+    revalidatePath(`/field/${jobId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się przypisać pojazdu." };
+  }
+}
+
+export async function removeFieldVehicleAction(jobVehicleId: string, jobId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
+  try {
+    await removeJobVehicle(jobVehicleId);
+    revalidatePath(`/field/${jobId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Błąd." };
   }
 }
 
