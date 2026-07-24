@@ -1439,3 +1439,8 @@ create policy push_own on public.push_subscriptions for all to authenticated
 drop policy if exists tents_write on public.tents;
 create policy tents_write on public.tents for all to authenticated using (true) with check (true);
 
+-- ================= 0052: status kosztu REJECTED (§II.7) =================
+-- Odrzucanie kosztów przez Szefa. UWAGA: „alter type add value" NIE może działać
+-- w transakcji — jeśli edytor SQL opakowuje całość w BEGIN/COMMIT, uruchom to polecenie osobno.
+alter type public.cost_status add value if not exists 'REJECTED';
+
