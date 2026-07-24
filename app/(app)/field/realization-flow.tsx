@@ -22,6 +22,30 @@ import { reportEquipmentStatusAction, type EqStatus } from "./protocol-actions";
 const fmtPLN = (v: number | null) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
 
+// §II.21 Pasek postępu — używany dla całej realizacji, dla kroku na osi i w panelach.
+function ProgressBar({ value, tone = "accent", className = "", height = 6 }: { value: number; tone?: "accent" | "ok"; className?: string; height?: number }) {
+  const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
+  const bg = tone === "ok" ? "#22c55e" : "#b98cf5";
+  return (
+    <div className={`w-full overflow-hidden rounded-full bg-[#262935] ${className}`} style={{ height }}>
+      <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, background: tone === "ok" ? bg : "linear-gradient(90deg,#8b5cf6,#e11d74)" }} />
+    </div>
+  );
+}
+
+// Etykieta z postępem kroku panelu (np. „Montaż · 3/5").
+function StepProgressHeader({ label, done, total }: { label: string; done: number; total: number }) {
+  return (
+    <div className="mb-2.5">
+      <div className="mb-1 flex items-center justify-between text-[11.5px] font-semibold">
+        <span className="text-ink-2">{label}</span>
+        <span className={done >= total && total > 0 ? "text-ok" : "text-ink-2"}>{done}/{total}</span>
+      </div>
+      <ProgressBar value={total > 0 ? done / total : 0} tone={done >= total && total > 0 ? "ok" : "accent"} />
+    </div>
+  );
+}
+
 /* --------------------------- Blok: Pakowanie -------------------------- */
 export function PackingBlock({
   jobId,
@@ -61,7 +85,11 @@ export function PackingBlock({
             {progress.total > 0 ? `Spakowane ${progress.done}/${progress.total}` : "Sprzęt do zabrania — odhacz przed wyjazdem"}
           </div>
         </div>
+        {progress.total > 0 && <span className="font-display text-[13px] font-bold text-[#b98cf5]">{Math.round((progress.done / progress.total) * 100)}%</span>}
       </div>
+
+      {/* §II.21 Pasek postępu pakowania */}
+      {progress.total > 0 && <div className="mt-2.5"><ProgressBar value={progress.done / progress.total} tone={done ? "ok" : "accent"} /></div>}
 
       {error && <div className="mt-3"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
 
@@ -109,11 +137,20 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // §II.21 Żywy postęp bieżącego kroku (zgłaszany przez panel). Trzymamy indeks kroku,
+  // żeby zignorować nieaktualny odczyt po przejściu dalej.
+  const [curProg, setCurProg] = useState<{ step: number; frac: number }>({ step: -1, frac: 0 });
 
   const doneCount = steps.filter((s) => s.status === "DONE").length;
   const currentIndex = steps.findIndex((s) => s.status !== "DONE");
   // Bez kroków (np. zaimportowana realizacja bez etapów) NIE jest „zakończona".
   const allDone = steps.length > 0 && currentIndex === -1;
+
+  const curFrac = curProg.step === currentIndex ? curProg.frac : 0;
+  // Całościowy postęp: ukończone kroki + ułamek bieżącego (płynnie rośnie w trakcie pracy).
+  const overall = steps.length > 0 ? (doneCount + (currentIndex >= 0 ? curFrac : 0)) / steps.length : 0;
+
+  const stepFill = (i: number, isDone: boolean) => (isDone ? 1 : i === currentIndex ? curFrac : 0);
 
   const setStatus = (stageId: string, status: "DONE" | "TODO") => {
     setError(null);
@@ -126,14 +163,17 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
 
   return (
     <div className="rounded-[18px] border border-border bg-surface p-4">
-      <div className="mb-3 flex items-center gap-3">
+      <div className="mb-2 flex items-center gap-3">
         <span className="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-[#271b3f] text-[#b98cf5]"><Icon name="truck" className="h-4.5 w-4.5" /></span>
         <div className="flex-1">
           <div className="font-display text-[15px] font-bold text-white">Realizacja</div>
-          <div className="text-[11.5px] font-medium text-ink-2">{steps.length === 0 ? "Brak kroków — zapisz rezerwację, aby wygenerować" : allDone ? "Wszystkie kroki gotowe" : `Krok ${doneCount + 1} z ${steps.length}`}</div>
+          <div className="text-[11.5px] font-medium text-ink-2">{steps.length === 0 ? "Brak kroków — zapisz rezerwację, aby wygenerować" : allDone ? "Wszystkie kroki gotowe" : `Krok ${doneCount + 1} z ${steps.length} · ${steps[currentIndex]?.title ?? ""}`}</div>
         </div>
-        <span className="font-display text-[13px] font-bold text-[#b98cf5]">{doneCount}/{steps.length}</span>
+        <span className="font-display text-[15px] font-bold text-[#e9d5ff]">{Math.round(overall * 100)}%</span>
       </div>
+
+      {/* §II.21 Pasek postępu całej realizacji */}
+      {steps.length > 0 && <div className="mb-3.5"><ProgressBar value={overall} tone={allDone ? "ok" : "accent"} height={8} /></div>}
 
       {error && <div className="mb-3"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
       {allDone && <div className="mb-1"><Alert tone="ok" title="Realizacja zakończona">Wszystkie kroki odhaczone. Dziękujemy!</Alert></div>}
@@ -142,6 +182,7 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
         {steps.map((s, i) => {
           const isDone = s.status === "DONE";
           const isCurrent = i === currentIndex;
+          const fill = stepFill(i, isDone);
           return (
             <div key={s.id} className="flex gap-3">
               {/* Oś kroków */}
@@ -164,9 +205,12 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
                   )}
                 </div>
 
+                {/* §II.21 Pasek postępu kroku (100% gdy gotowy, żywy ułamek gdy bieżący) */}
+                <div className="mt-1.5"><ProgressBar value={fill} tone={isDone ? "ok" : "accent"} height={4} /></div>
+
                 {isCurrent && (
                   <div className="mt-2 rounded-[13px] border border-[#2a2340] bg-[#181423] p-3.5">
-                    <StepPanel jobId={jobId} stageKey={s.stage_key} ctx={ctx} pending={pending} onDone={() => setStatus(s.id, "DONE")} />
+                    <StepPanel jobId={jobId} stageKey={s.stage_key} ctx={ctx} pending={pending} onDone={() => setStatus(s.id, "DONE")} onProgress={(frac) => setCurProg({ step: i, frac })} />
                   </div>
                 )}
               </div>
@@ -179,7 +223,7 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
 }
 
 /* ------------------- Panel czynności dla danego kroku ---------------- */
-function StepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: string; stageKey: string; ctx: RealizationContext; pending: boolean; onDone: () => void }) {
+function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobId: string; stageKey: string; ctx: RealizationContext; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
   switch (stageKey) {
     case "TRAVEL":
       return (
@@ -198,19 +242,19 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: string; s
       );
 
     case "SETUP":
-      return <CheckPanel points={MONTAZ_POINTS} doneLabel="Montaż gotowy" pending={pending} onDone={onDone} />;
+      return <CheckPanel points={MONTAZ_POINTS} title="Montaż" doneLabel="Montaż gotowy" pending={pending} onDone={onDone} onProgress={onProgress} />;
 
     case "TRAINING":
-      return <CheckPanel points={TRAINING_POINTS} doneLabel="Szkolenie przeprowadzone" pending={pending} onDone={onDone} />;
+      return <CheckPanel points={TRAINING_POINTS} title="Szkolenie klienta" doneLabel="Szkolenie przeprowadzone" pending={pending} onDone={onDone} onProgress={onProgress} />;
 
     case "PHOTOS":
-      return <PhotosPanel jobId={jobId} ctx={ctx} pending={pending} onDone={onDone} />;
+      return <PhotosPanel jobId={jobId} ctx={ctx} pending={pending} onDone={onDone} onProgress={onProgress} />;
 
     case "SETTLEMENT":
-      return <SettlementPanel jobId={jobId} ctx={ctx} pending={pending} onDone={onDone} />;
+      return <SettlementPanel jobId={jobId} ctx={ctx} pending={pending} onDone={onDone} onProgress={onProgress} />;
 
     case "TEARDOWN":
-      return <TeardownPanel jobId={jobId} items={ctx.teardownItems} pending={pending} onDone={onDone} />;
+      return <TeardownPanel jobId={jobId} items={ctx.teardownItems} pending={pending} onDone={onDone} onProgress={onProgress} />;
 
     default:
       return <DoneButton pending={pending} onClick={onDone} label="Gotowe" block />;
@@ -219,36 +263,46 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: string; s
 
 // §II.8 Demontaż: kontrola sprzętu po tej samej checkliście. Dla każdej pozycji: OK
 // (nic nie klikasz) / Czyszczenie / Uszkodzony / Brak → zgłoszenie serwisowe.
-function TeardownPanel({ jobId, items, pending, onDone }: { jobId: string; items: string[]; pending: boolean; onDone: () => void }) {
+function TeardownPanel({ jobId, items, pending, onDone, onProgress }: { jobId: string; items: string[]; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
   const [busy, startBusy] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [reported, setReported] = useState<Record<string, string>>({});
   const [deduction, setDeduction] = useState(""); // §II.16 potrącenie z kaucji za uszkodzenia
   const deducted = Number(deduction.replace(",", ".")) || 0;
+  const reviewed = Object.keys(reported).length;
 
+  const applyStatus = (item: string, status: string) => {
+    const next = { ...reported, [item]: status };
+    setReported(next);
+    onProgress(items.length ? Object.keys(next).length / items.length : 0);
+  };
+  // Problem trafia do zgłoszeń serwisowych; „OK" tylko potwierdza sprawdzenie pozycji.
   const report = (item: string, status: EqStatus) => {
     setError(null);
     startBusy(async () => {
       const res = await reportEquipmentStatusAction(jobId, item, status, "");
-      if (res.ok) setReported((r) => ({ ...r, [item]: status }));
+      if (res.ok) applyStatus(item, status);
       else setError(res.error ?? "Błąd");
     });
   };
 
   return (
     <div>
-      <p className="mb-3 text-[12.5px] text-ink-2">Zdemontuj i sprawdź każdy element. Zostaw „OK”, a problem zaznacz — trafi do zgłoszeń serwisowych.</p>
+      {items.length > 0 && <StepProgressHeader label="Sprawdzony sprzęt" done={reviewed} total={items.length} />}
+      <p className="mb-3 text-[12.5px] text-ink-2">Zdemontuj i sprawdź każdy element. Potwierdź „OK”, a problem zaznacz — trafi do zgłoszeń serwisowych.</p>
       {error && <div className="mb-2"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
       {items.length > 0 ? (
         <div className="mb-3 flex flex-col gap-1.5">
           {items.map((it) => {
             const st = reported[it];
+            const ok = st === "OK";
             return (
-              <div key={it} className="rounded-[10px] border border-border bg-surface px-2.5 py-2">
-                <div className="mb-1.5 text-[12.5px] font-semibold text-ink">{it}{st && <span className="ml-1.5 text-[11px] font-bold text-warn">· {st}</span>}</div>
+              <div key={it} className={`rounded-[10px] border px-2.5 py-2 ${ok ? "border-[#1d3a28] bg-[#12271b]" : st ? "border-[#3d3216] bg-[#241e10]" : "border-border bg-surface"}`}>
+                <div className="mb-1.5 text-[12.5px] font-semibold text-ink">{it}{st && <span className={`ml-1.5 text-[11px] font-bold ${ok ? "text-ok" : "text-warn"}`}>· {st}</span>}</div>
                 <div className="flex flex-wrap gap-1.5">
+                  <button onClick={() => applyStatus(it, "OK")} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold ${ok ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface-2 text-ink-2"}`}>OK</button>
                   {(["Czyszczenie", "Uszkodzony", "Brak"] as EqStatus[]).map((s) => (
-                    <button key={s} onClick={() => report(it, s)} disabled={busy} className="rounded-[8px] border border-border bg-surface-2 px-2.5 py-1 text-[11px] font-bold text-ink-2">{s}</button>
+                    <button key={s} onClick={() => report(it, s)} disabled={busy} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold ${st === s ? "border-warn bg-[#332814] text-warn" : "border-border bg-surface-2 text-ink-2"}`}>{s}</button>
                   ))}
                 </div>
               </div>
@@ -283,20 +337,26 @@ function DoneButton({ pending, onClick, label, block }: { pending: boolean; onCl
 }
 
 // §II.15 Panel checklisty kroku (montaż / szkolenie). §II.9 Zakończenie wymaga
-// odhaczenia wszystkiego ALBO podania powodu.
-function CheckPanel({ points, doneLabel, pending, onDone }: { points: string[]; doneLabel: string; pending: boolean; onDone: () => void }) {
+// odhaczenia wszystkiego ALBO podania powodu. §II.21 Pasek postępu punktów.
+function CheckPanel({ points, title, doneLabel, pending, onDone, onProgress }: { points: string[]; title: string; doneLabel: string; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
   const [checked, setChecked] = useState<boolean[]>(points.map(() => false));
   const [reason, setReason] = useState("");
   const doneCount = checked.filter(Boolean).length;
   const allDone = doneCount === points.length;
   const canFinish = allDone || reason.trim().length >= 3;
+  const toggle = (i: number) => {
+    const next = checked.map((v, j) => (j === i ? !v : v));
+    setChecked(next);
+    onProgress(next.filter(Boolean).length / points.length);
+  };
   return (
     <div>
+      <StepProgressHeader label={title} done={doneCount} total={points.length} />
       <div className="mb-3 flex flex-col gap-1.5">
         {points.map((p, i) => (
           <button
             key={p}
-            onClick={() => setChecked((c) => c.map((v, j) => (j === i ? !v : v)))}
+            onClick={() => toggle(i)}
             className="flex items-start gap-2.5 rounded-[10px] border border-border bg-surface px-2.5 py-2 text-left"
           >
             <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-[6px] border-2" style={{ background: checked[i] ? "#22c55e" : "transparent", borderColor: checked[i] ? "#22c55e" : "#3a3d4a" }}>
@@ -314,15 +374,19 @@ function CheckPanel({ points, doneLabel, pending, onDone }: { points: string[]; 
   );
 }
 
-function PhotosPanel({ jobId, ctx, pending, onDone }: { jobId: string; ctx: RealizationContext; pending: boolean; onDone: () => void }) {
+function PhotosPanel({ jobId, ctx, pending, onDone, onProgress }: { jobId: string; ctx: RealizationContext; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localPreviews, setLocalPreviews] = useState<string[]>([]);
 
+  const PHOTO_TARGET = 3; // sugerowana liczba zdjęć gotowego ustawienia
+  const shownCount = ctx.photos.length + localPreviews.length;
+
   const onPick = async (file: File | null) => {
     if (!file) return;
     setError(null);
+    onProgress(Math.min(1, (shownCount + 1) / PHOTO_TARGET));
     // Tryb demo (brak Supabase): tylko podgląd lokalny.
     if (!ctx.canUpload) {
       setLocalPreviews((p) => [URL.createObjectURL(file), ...p]);
@@ -352,6 +416,7 @@ function PhotosPanel({ jobId, ctx, pending, onDone }: { jobId: string; ctx: Real
 
   return (
     <div>
+      <StepProgressHeader label="Zdjęcia" done={Math.min(shownCount, PHOTO_TARGET)} total={PHOTO_TARGET} />
       <p className="mb-2.5 text-[12.5px] text-ink-2">Zrób zdjęcia gotowego ustawienia:</p>
       <div className="mb-2 grid grid-cols-3 gap-2">
         {ctx.photos.map((ph) => (
@@ -379,7 +444,7 @@ function PhotosPanel({ jobId, ctx, pending, onDone }: { jobId: string; ctx: Real
   );
 }
 
-function SettlementPanel({ jobId, ctx, pending, onDone }: { jobId: string; ctx: RealizationContext; pending: boolean; onDone: () => void }) {
+function SettlementPanel({ jobId, ctx, pending, onDone, onProgress }: { jobId: string; ctx: RealizationContext; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
   const router = useRouter();
   const [reportPending, startReport] = useTransition();
   const [method, setMethod] = useState<PaymentMethod>("CASH");
@@ -388,19 +453,22 @@ function SettlementPanel({ jobId, ctx, pending, onDone }: { jobId: string; ctx: 
   const [error, setError] = useState<string | null>(null);
 
   const methods: PaymentMethod[] = ["CASH", "BLIK", "TRANSFER", "CARD"];
+  // §II.21 Postęp rozliczenia: płatność zgłoszona + podpis klienta (2 elementy).
+  const settleDone = (reported ? 1 : 0) + (ctx.hasSignature ? 1 : 0);
 
   const report = () => {
     setError(null);
     const value = Number(amount.replace(",", "."));
     startReport(async () => {
       const res = await reportFieldPaymentAction(jobId, method, value);
-      if (res.ok) { setReported(true); router.refresh(); }
+      if (res.ok) { setReported(true); onProgress((1 + (ctx.hasSignature ? 1 : 0)) / 2); router.refresh(); }
       else setError(res.error ?? "Błąd");
     });
   };
 
   return (
     <div>
+      <StepProgressHeader label="Rozliczenie" done={settleDone} total={2} />
       <div className="mb-2 flex items-center justify-between rounded-[10px] bg-surface px-3 py-2.5">
         <span className="text-[12px] font-semibold text-ink-2">Do zapłaty</span>
         <span className="font-display text-[15px] font-bold text-ink">{fmtPLN(ctx.toPay)}</span>
