@@ -3,7 +3,7 @@
 // zgłoszenie odbioru płatności na miejscu (krok „Rozliczenie”).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { setStageStatus } from "@/lib/data/jobs";
+import { setStageStatus, recomputeJobStatus } from "@/lib/data/jobs";
 import { createPayment } from "@/lib/data/payments";
 import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
 import { saveCallDetails } from "@/lib/data/reservations";
@@ -28,8 +28,11 @@ export async function advanceStageAction(stageId: string, jobId: string, status:
     return { ok: false, error: "Tryb demo: skonfiguruj Supabase, aby zapisywać postęp." };
   try {
     await setStageStatus(stageId, status);
+    // §II.11/§II.15 Zaktualizuj status zlecenia wg postępu etapów (Zaplanowane → W realizacji → Zakończone).
+    await recomputeJobStatus(jobId);
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/field`);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };

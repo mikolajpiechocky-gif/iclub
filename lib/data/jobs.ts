@@ -204,10 +204,15 @@ export async function syncJobStages(jobId: string, businessLine: BusinessLine, e
 export async function setStageStatus(stageId: string, status: StageStatus): Promise<void> {
   const supabase = await createClient();
   // §II.19 Stempel zakończenia: ustaw przy DONE, wyczyść przy cofnięciu — do wyliczenia czasu pracy.
-  const { error } = await supabase
+  let { error } = await supabase
     .from("job_stages")
     .update({ status, done_at: status === "DONE" ? new Date().toISOString() : null })
     .eq("id", stageId);
+  // Odporność na brak migracji 0055: gdy kolumny done_at jeszcze nie ma, zapisz sam status,
+  // by odhaczanie kroków (i status zlecenia) działało nawet przed uruchomieniem SQL.
+  if (error && /done_at/i.test(error.message)) {
+    ({ error } = await supabase.from("job_stages").update({ status }).eq("id", stageId));
+  }
   if (error) throw new Error(error.message);
 }
 
@@ -215,4 +220,20 @@ export async function setJobStatus(jobId: string, status: JobStatus): Promise<vo
   const supabase = await createClient();
   const { error } = await supabase.from("jobs").update({ status }).eq("id", jobId);
   if (error) throw new Error(error.message);
+}
+
+// §II.11/§II.15 Status zlecenia wynika z postępu etapów: wszystkie DONE → Zakończone,
+// część zrobiona → W realizacji, nic → Zaplanowane. Nie rusza zleceń anulowanych.
+export async function recomputeJobStatus(jobId: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const supabase = await createClient();
+  const { data } = await supabase.from("job_stages").select("status").eq("job_id", jobId);
+  const stages = (data ?? []) as { status: string }[];
+  if (stages.length === 0) return;
+  const doneCount = stages.filter((s) => s.status === "DONE").length;
+  const next: JobStatus = doneCount === stages.length ? "DONE" : doneCount > 0 ? "IN_PROGRESS" : "PLANNED";
+  const { data: job } = await supabase.from("jobs").select("status").eq("id", jobId).maybeSingle();
+  const cur = (job as { status: JobStatus } | null)?.status;
+  if (cur === "CANCELLED" || cur === next) return;
+  await supabase.from("jobs").update({ status: next }).eq("id", jobId);
 }

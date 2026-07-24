@@ -367,7 +367,14 @@ export async function saveCallDetails(id: string, input: {
     patch.assembly_time_by = user?.id ?? null;
     patch.assembly_time_at = now;
   }
-  const { error } = await supabase.from("reservations").update(patch).eq("id", id);
+  let { error } = await supabase.from("reservations").update(patch).eq("id", id);
+  // Odporność na brak migracji: jeśli nowych kolumn jeszcze nie ma w bazie, zapisz resztę
+  // (godziny, dodatki, potwierdzenie) — funkcje trawy/telefonu włączą się po uruchomieniu SQL.
+  if (error && /skip_grass|phone_call_done/i.test(error.message)) {
+    const { skip_grass, phone_call_done, ...safe } = patch;
+    void skip_grass; void phone_call_done;
+    ({ error } = await supabase.from("reservations").update(safe).eq("id", id));
+  }
   if (error) throw new Error(error.message);
 }
 

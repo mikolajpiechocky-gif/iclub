@@ -36,7 +36,7 @@ export function FieldVehicle({ jobId, assigned, available }: {
           {assigned.map((v) => (
             <div key={v.id} className="flex items-center gap-2 text-[12.5px]">
               <span className="min-w-0 flex-1 truncate font-semibold text-ink">{v.name}{v.registration ? ` · ${v.registration}` : ""}</span>
-              <button onClick={() => run(() => removeFieldVehicleAction(v.id, jobId))} disabled={pending} className="text-[11px] font-semibold text-bad">Usuń</button>
+              <button onClick={() => run(() => removeFieldVehicleAction(v.id, jobId))} disabled={pending} className="flex-none rounded-[9px] border border-[#3a1c1f] bg-[#251215] px-3 py-1.5 text-[12px] font-bold text-bad disabled:opacity-50">{pending ? "…" : "Usuń"}</button>
             </div>
           ))}
         </div>
