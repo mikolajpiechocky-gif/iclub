@@ -21,6 +21,7 @@ export const ICLUB_STAGES: StageTemplate[] = [
   { key: "TRAINING", title: "Szkolenie klienta" },
   { key: "PHOTOS", title: "Zdjęcia" },
   { key: "SETTLEMENT", title: "Rozliczenie" },
+  { key: "RENTAL", title: "Wynajem trwa" },
   { key: "TEARDOWN", title: "Demontaż i powrót" },
 ];
 

@@ -253,6 +253,18 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobI
     case "SETTLEMENT":
       return <SettlementPanel jobId={jobId} ctx={ctx} pending={pending} onDone={onDone} onProgress={onProgress} />;
 
+    case "RENTAL":
+      // §II.15 Namiot rozstawiony, impreza w toku — czekamy na jej koniec, potem demontaż.
+      return (
+        <div>
+          <div className="mb-3 rounded-[11px] border border-[#2a2340] bg-[#1a1526] px-3 py-3 text-center">
+            <div className="text-[13px] font-bold text-[#e9d5ff]">Namiot rozstawiony — wynajem trwa</div>
+            <div className="mt-1 text-[11.5px] text-ink-2">Kaucja 1 000 zł pobrana. Wróć na demontaż po zakończeniu imprezy.</div>
+          </div>
+          <DoneButton pending={pending} onClick={onDone} label="Impreza zakończona — demontaż" block />
+        </div>
+      );
+
     case "TEARDOWN":
       return <TeardownPanel jobId={jobId} items={ctx.teardownItems} pending={pending} onDone={onDone} onProgress={onProgress} />;
 
