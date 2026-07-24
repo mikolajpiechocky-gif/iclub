@@ -103,7 +103,8 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
 
   const doneCount = steps.filter((s) => s.status === "DONE").length;
   const currentIndex = steps.findIndex((s) => s.status !== "DONE");
-  const allDone = currentIndex === -1;
+  // Bez kroków (np. zaimportowana realizacja bez etapów) NIE jest „zakończona".
+  const allDone = steps.length > 0 && currentIndex === -1;
 
   const setStatus = (stageId: string, status: "DONE" | "TODO") => {
     setError(null);
@@ -120,7 +121,7 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
         <span className="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-[#271b3f] text-[#b98cf5]"><Icon name="truck" className="h-4.5 w-4.5" /></span>
         <div className="flex-1">
           <div className="font-display text-[15px] font-bold text-white">Realizacja</div>
-          <div className="text-[11.5px] font-medium text-ink-2">{allDone ? "Wszystkie kroki gotowe" : `Krok ${doneCount + 1} z ${steps.length}`}</div>
+          <div className="text-[11.5px] font-medium text-ink-2">{steps.length === 0 ? "Brak kroków — zapisz rezerwację, aby wygenerować" : allDone ? "Wszystkie kroki gotowe" : `Krok ${doneCount + 1} z ${steps.length}`}</div>
         </div>
         <span className="font-display text-[13px] font-bold text-[#b98cf5]">{doneCount}/{steps.length}</span>
       </div>

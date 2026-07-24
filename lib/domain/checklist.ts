@@ -59,6 +59,7 @@ const CATALOG: CatalogItem[] = [
   { category: "Dodatki", label: "Materac + koc + poduszka", tier: 1 },
   { category: "Dodatki", label: "Skrzynka z narzędziami", tier: 1 },
   { category: "Dodatki", label: "Szampan", tier: 1 },
+  { category: "Dodatki", label: "Zapasowe nagłośnienie (jeśli dostępne)", tier: 1 },
 ];
 
 function packageTier(packageName?: string | null): Tier {
@@ -84,12 +85,9 @@ export function buildChecklistTemplate(opts: {
   // Dodatki z rezerwacji (zamówione przez klienta / dopięte automatycznie, np. nagrzewnica).
   for (const a of addons) items.push({ category: "Dodatki", label: a, required: false });
 
-  // Dokumenty na koniec.
-  items.push({ category: "Dokumenty", label: "Umowa i dokumenty", required: true });
-
   return items;
 }
 
 export const CHECKLIST_CATEGORY_ORDER = [
-  "Namiot", "Nagłośnienie", "Oświetlenie i efekty", "Wystrój / wyposażenie", "Dodatki", "Dokumenty",
+  "Namiot", "Nagłośnienie", "Oświetlenie i efekty", "Wystrój / wyposażenie", "Dodatki",
 ];

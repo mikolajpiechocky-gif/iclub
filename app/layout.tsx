@@ -20,6 +20,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#08090d",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1, // blokuje auto-zoom iOS przy fokusie inputa (apka „przybliżała się" po logowaniu)
 };
 
 export default function RootLayout({
