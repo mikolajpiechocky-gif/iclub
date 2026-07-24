@@ -21,6 +21,7 @@ import { JOB_STATUS_META } from "@/lib/data/types";
 import { PackingBlock, RealizationFlow, type RealizationContext } from "../realization-flow";
 import { ProtocolBlock } from "../protocol-block";
 import { TelefonBlock } from "../telefon-block";
+import { settlementBreakdown, type AddonPriceMap } from "@/lib/domain/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,10 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   const addonName = new Map(addonList.map((a) => [a.id, a.name]));
   const addonNames = (r?.addon_ids ?? []).map((aid) => addonName.get(aid)).filter((n): n is string => Boolean(n));
 
+  // §II.2 Rozbicie rozliczenia (pakiet/dodatki/transport/suma/zadatek/do zapłaty na miejscu).
+  const addonPrice: AddonPriceMap = new Map(addonList.map((a) => [a.id, { name: a.name, price: Number(a.price ?? 0) }]));
+  const billing = r ? settlementBreakdown(r, addonPrice) : null;
+
   const phone = customer?.phone ?? null;
   const address = r?.location || customer?.address || customer?.city || null;
   // §II.13 Szczegóły do nagłówka: wielkość namiotu (Duży/Mały), pakiet, dodatki.
@@ -82,6 +87,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   const ctx: RealizationContext = {
     navUrl,
     toPay,
+    billing,
     hasSignature: Boolean(signature),
     paymentReported,
     signatureHref: `/field/${job.id}/signature`,

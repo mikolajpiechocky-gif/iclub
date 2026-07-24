@@ -14,6 +14,7 @@ import { Alert } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import type { JobStageRecord, PaymentMethod } from "@/lib/data/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/data/types";
+import type { SettlementBreakdown } from "@/lib/domain/billing";
 import { REALIZATIONS_BUCKET } from "@/lib/config/storage";
 import { advanceStageAction, reportFieldPaymentAction } from "./actions";
 import { createJobPhotoAction } from "./photo-actions";
@@ -30,6 +31,13 @@ function ProgressBar({ value, tone = "accent", className = "", height = 6 }: { v
     <div className={`w-full overflow-hidden rounded-full bg-[#262935] ${className}`} style={{ height }}>
       <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, background: tone === "ok" ? bg : "linear-gradient(90deg,#8b5cf6,#e11d74)" }} />
     </div>
+  );
+}
+
+// Wiersz „etykieta — wartość" w rozbiciu rozliczenia (§II.2).
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="mt-1 flex items-center justify-between first:mt-0"><span className="truncate pr-2 text-ink-2">{label}</span><span className="flex-none font-semibold text-ink">{value}</span></div>
   );
 }
 
@@ -109,6 +117,7 @@ export function PackingBlock({
 export interface RealizationContext {
   navUrl: string | null;
   toPay: number | null;
+  billing: SettlementBreakdown | null; // §II.2 rozbicie rozliczenia (pakiet/dodatki/transport/zadatek)
   hasSignature: boolean;
   paymentReported: boolean;
   signatureHref: string;
@@ -458,9 +467,12 @@ function PhotosPanel({ jobId, ctx, pending, onDone, onProgress }: { jobId: strin
 
 function SettlementPanel({ jobId, ctx, pending, onDone, onProgress }: { jobId: string; ctx: RealizationContext; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
   const router = useRouter();
+  const b = ctx.billing;
+  // §II.2 Kwota do zapłaty na miejscu = suma − zadatek (a nie cała cena − zadatek historyczny).
+  const onSite = b ? b.toPayOnSite : ctx.toPay;
   const [reportPending, startReport] = useTransition();
   const [method, setMethod] = useState<PaymentMethod>("CASH");
-  const [amount, setAmount] = useState<string>(ctx.toPay != null && ctx.toPay > 0 ? String(ctx.toPay) : "");
+  const [amount, setAmount] = useState<string>(onSite != null && onSite > 0 ? String(onSite) : "");
   const [reported, setReported] = useState(ctx.paymentReported);
   const [error, setError] = useState<string | null>(null);
 
@@ -481,10 +493,37 @@ function SettlementPanel({ jobId, ctx, pending, onDone, onProgress }: { jobId: s
   return (
     <div>
       <StepProgressHeader label="Rozliczenie" done={settleDone} total={2} />
-      <div className="mb-2 flex items-center justify-between rounded-[10px] bg-surface px-3 py-2.5">
-        <span className="text-[12px] font-semibold text-ink-2">Do zapłaty</span>
-        <span className="font-display text-[15px] font-bold text-ink">{fmtPLN(ctx.toPay)}</span>
-      </div>
+
+      {/* §II.2 Rozbicie rozliczenia: Pakiet / Dodatki / Transport / Suma / Zadatek / Do zapłaty na miejscu */}
+      {b ? (
+        <div className="mb-3 rounded-[10px] border border-border bg-surface px-3 py-2.5 text-[12px]">
+          <Row label={`Pakiet${b.packageName ? ` · ${b.packageName}` : ""}`} value={fmtPLN(b.packagePrice)} />
+          {b.addons.length > 0 ? (
+            <>
+              <div className="mt-1 flex items-center justify-between"><span className="text-ink-2">Dodatki</span><span className="font-semibold text-ink">{fmtPLN(b.addonsTotal)}</span></div>
+              <div className="mb-0.5 mt-0.5 flex flex-col gap-0.5 pl-2.5">
+                {b.addons.map((a, i) => (
+                  <div key={`${a.name}-${i}`} className="flex items-center justify-between text-[11px] text-ink-2"><span className="truncate pr-2">• {a.name}</span><span>{fmtPLN(a.price)}</span></div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <Row label="Dodatki" value="—" />
+          )}
+          <Row label="Transport" value={b.transport > 0 ? fmtPLN(b.transport) : "—"} />
+          {b.discount > 0 && <Row label="Rabat" value={`− ${fmtPLN(b.discount)}`} />}
+          <div className="my-1.5 border-t border-border" />
+          <div className="flex items-center justify-between"><span className="font-semibold text-ink">Suma</span><span className="font-display text-[14px] font-bold text-ink">{fmtPLN(b.total)}</span></div>
+          <div className="flex items-center justify-between"><span className="text-ink-2">Zadatek{b.depositSuggested ? " (sugerowany)" : ""}</span><span className="font-semibold text-ink">− {fmtPLN(b.deposit)}</span></div>
+          <div className="mt-1 flex items-center justify-between rounded-[8px] bg-[#16301f] px-2 py-1.5"><span className="font-bold text-ok">Do zapłaty na miejscu</span><span className="font-display text-[15px] font-bold text-ok">{fmtPLN(b.toPayOnSite)}</span></div>
+        </div>
+      ) : (
+        <div className="mb-2 flex items-center justify-between rounded-[10px] bg-surface px-3 py-2.5">
+          <span className="text-[12px] font-semibold text-ink-2">Do zapłaty</span>
+          <span className="font-display text-[15px] font-bold text-ink">{fmtPLN(ctx.toPay)}</span>
+        </div>
+      )}
+
       {/* §II.15 Kaucja pobierana na miejscu (zwracana przy demontażu). */}
       <div className="mb-3 flex items-center justify-between rounded-[10px] border border-border bg-surface px-3 py-2 text-[12px]">
         <span className="font-semibold text-ink-2">Kaucja (zwrotna)</span>
