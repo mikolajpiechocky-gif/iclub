@@ -339,15 +339,31 @@ async function resolveFromChoices(input: ReservationInput): Promise<{ tent_id: s
   return { tent_id: resolveTentId(input.tent_main, tents), tent_id_2: resolveTentId(input.tent_extra, tents) };
 }
 
-// §II.12 Zapis potwierdzonych z klientem terminów (godzina montażu + start imprezy).
-export async function setReservationSchedule(id: string, assemblyTime: string | null, eventStartTime: string | null): Promise<void> {
+// §II.12 Zapis ustaleń z telefonu do klienta: godzina montażu + start imprezy,
+// decyzja o sztucznej trawie oraz zaktualizowana lista dodatków (dosprzedaż w rozmowie).
+// Wszystko jednym zapisem + oznaczenie realizacji jako potwierdzonej z klientem.
+export async function saveCallDetails(id: string, input: {
+  assemblyTime: string | null;
+  eventStartTime: string | null;
+  addonIds: string[];
+  addonQty: Record<string, number>;
+  skipGrass: boolean;
+}): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const patch: Record<string, unknown> = { event_start_time: eventStartTime || null };
-  if (assemblyTime) {
-    patch.assembly_time = assemblyTime;
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    event_start_time: input.eventStartTime || null,
+    addon_ids: input.addonIds,
+    addon_qty: input.addonQty,
+    skip_grass: input.skipGrass,
+    client_confirmed: true,
+    client_confirmed_at: now,
+  };
+  if (input.assemblyTime) {
+    patch.assembly_time = input.assemblyTime;
     patch.assembly_time_by = user?.id ?? null;
-    patch.assembly_time_at = new Date().toISOString();
+    patch.assembly_time_at = now;
   }
   const { error } = await supabase.from("reservations").update(patch).eq("id", id);
   if (error) throw new Error(error.message);

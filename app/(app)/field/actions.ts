@@ -6,8 +6,17 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { setStageStatus } from "@/lib/data/jobs";
 import { createPayment } from "@/lib/data/payments";
 import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
-import { setReservationSchedule, setReservationConfirmed } from "@/lib/data/reservations";
+import { saveCallDetails } from "@/lib/data/reservations";
 import type { StageStatus, PaymentMethod } from "@/lib/data/types";
+
+// §II.12 Ustalenia z telefonu do klienta przekazywane z formularza.
+export interface ClientCallInput {
+  assemblyTime: string;
+  startTime: string;
+  addonIds: string[];
+  addonQty: Record<string, number>;
+  skipGrass: boolean;
+}
 
 export interface ActionResult {
   ok: boolean;
@@ -27,13 +36,18 @@ export async function advanceStageAction(stageId: string, jobId: string, status:
   }
 }
 
-// §II.12 Telefon do klienta: zapis potwierdzonej godziny montażu + startu imprezy
-// i oznaczenie realizacji jako potwierdzonej z klientem.
-export async function saveClientCallAction(reservationId: string, jobId: string, assemblyTime: string, startTime: string): Promise<ActionResult> {
+// §II.12 Telefon do klienta: zapis godziny montażu + startu imprezy, decyzji o sztucznej
+// trawie i zaktualizowanej listy dodatków (dosprzedaż) + potwierdzenie z klientem.
+export async function saveClientCallAction(reservationId: string, jobId: string, input: ClientCallInput): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo: skonfiguruj Supabase." };
   try {
-    await setReservationSchedule(reservationId, assemblyTime.trim() || null, startTime.trim() || null);
-    await setReservationConfirmed(reservationId, true);
+    await saveCallDetails(reservationId, {
+      assemblyTime: input.assemblyTime.trim() || null,
+      eventStartTime: input.startTime.trim() || null,
+      addonIds: input.addonIds,
+      addonQty: input.addonQty,
+      skipGrass: input.skipGrass,
+    });
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/reservations/${reservationId}`);
     return { ok: true };

@@ -1464,3 +1464,7 @@ create policy activity_read on public.activity_log for select to authenticated u
 drop policy if exists activity_write on public.activity_log;
 create policy activity_write on public.activity_log for insert to authenticated with check (true);
 
+-- ================= 0054: telefon do klienta — pominięcie sztucznej trawy (§II.12) =================
+-- Czasem, mimo że trawa jest w pakiecie, ustalamy z klientem realizację bez niej.
+alter table public.reservations add column if not exists skip_grass boolean not null default false;
+

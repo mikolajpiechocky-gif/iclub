@@ -235,6 +235,7 @@ export interface ReservationRecord {
   notes: string | null;
   client_confirmed: boolean;
   client_confirmed_at: string | null;
+  skip_grass: boolean; // §II.12 klient rezygnuje ze sztucznej trawy (mimo pakietu)
   invoice_issued: boolean;
   invoice_issued_at: string | null;
   invoice_number: string | null;

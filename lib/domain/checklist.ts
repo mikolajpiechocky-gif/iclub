@@ -73,6 +73,7 @@ export function buildChecklistTemplate(opts: {
   tentName?: string | null;
   packageName?: string | null;
   addonNames?: string[];
+  skipGrass?: boolean; // §II.12 klient ustalił realizację bez sztucznej trawy
 }): ChecklistTemplateItem[] {
   const tent = opts.tentName ?? "Namiot";
   const tier = packageTier(opts.packageName);
@@ -80,6 +81,7 @@ export function buildChecklistTemplate(opts: {
 
   const items: ChecklistTemplateItem[] = CATALOG
     .filter((c) => c.tier <= tier)
+    .filter((c) => !(opts.skipGrass && c.label === "Sztuczna trawa"))
     .map((c) => ({ category: c.category, label: c.label.replace("{TENT}", tent), qty: c.qty, required: Boolean(c.required) }));
 
   // Dodatki z rezerwacji (zamówione przez klienta / dopięte automatycznie, np. nagrzewnica).

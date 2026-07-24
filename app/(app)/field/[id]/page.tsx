@@ -154,7 +154,10 @@ export default async function FieldRealizationPage({ params }: { params: Promise
             reservationId={r?.id ?? ""}
             jobId={job.id}
             packageName={r?.package?.name ?? null}
-            addons={addonNames}
+            catalog={addonList.map((a) => ({ id: a.id, name: a.name, price: Number(a.price ?? 0), available: a.available ?? null }))}
+            currentAddonIds={r?.addon_ids ?? []}
+            currentAddonQty={r?.addon_qty ?? {}}
+            skipGrass={r?.skip_grass ?? false}
             assemblyTime={r?.assembly_time ?? null}
             eventStartTime={r?.event_start_time ?? null}
             confirmed={r?.client_confirmed ?? false}

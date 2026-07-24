@@ -23,6 +23,6 @@ export async function generateChecklistForJob(jobId: string, opts: { onlyIfEmpty
       if (w?.warnings.some((x) => x.kind === "heat")) addonNames.push("Wentylacja / wentylator");
     }
   } catch { /* pogoda opcjonalna */ }
-  const template = buildChecklistTemplate({ tentName: r?.tent?.name, packageName: r?.package?.name, addonNames });
+  const template = buildChecklistTemplate({ tentName: r?.tent?.name, packageName: r?.package?.name, addonNames, skipGrass: r?.skip_grass ?? false });
   await generateChecklist(jobId, template);
 }
