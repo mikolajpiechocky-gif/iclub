@@ -49,7 +49,6 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   const distanceKm = transportCalcs.reduce((m, t) => Math.max(m, Number(t.one_way_km ?? t.distance_km ?? 0)), 0) || null;
   const transportCost = transportCalcs.reduce((s, t) => s + Number(t.fuel_cost ?? 0) + Number(t.amortization ?? 0), 0) || null;
   const costsTotal = jobCosts.reduce((s, c) => s + Number(c.amount ?? 0), 0);
-  const equipmentSuggestions = [...new Set(packageItems.map((it) => it.equipment?.name).filter((n): n is string => Boolean(n)))];
   const m = JOB_STATUS_META[job.status];
 
   // §9.4 Dodatki realizacji → ostrzeżenie o większym czasie pakowania i montażu.
@@ -147,7 +146,6 @@ export default async function FieldRealizationPage({ params }: { params: Promise
         {/* Blok: Rozpakowanie i protokół (koszty + sprzęt do czyszczenia/naprawy) */}
         <ProtocolBlock
           jobId={job.id}
-          equipmentSuggestions={equipmentSuggestions}
           costs={jobCosts.map((c) => ({ id: c.id, category: c.category, amount: Number(c.amount), note: c.note, status: c.status }))}
           incidents={jobIncidents.map((i) => ({ id: i.id, category: i.category, equipment: i.equipment, priority: i.priority, status: i.status }))}
           summary={{ distanceKm, transportCost, costsTotal }}

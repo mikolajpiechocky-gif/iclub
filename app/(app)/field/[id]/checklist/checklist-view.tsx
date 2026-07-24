@@ -61,9 +61,16 @@ export function ChecklistView({ jobId, items, backHref }: { jobId: string; items
   return (
     <div className="pb-28">
       <div className="border-b border-border-soft bg-workspace px-4 py-3.5">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <span className="font-display text-[15px] font-bold text-white">Checklista pakowania</span>
-          <span className="text-[13px] font-bold text-ink">{done} / {items.length}</span>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => { if (typeof window !== "undefined" && window.confirm("Przegenerować checklistę z aktualnych reguł? Odhaczenia zostaną zresetowane.")) generate(); }}
+              disabled={pending}
+              className="text-[11px] font-semibold text-ink-2 underline"
+            >↻ Przegeneruj</button>
+            <span className="text-[13px] font-bold text-ink">{done} / {items.length}</span>
+          </div>
         </div>
         <ProgressBar value={pct} />
         <div className="mt-2.5 flex gap-3.5 text-[11.5px] font-semibold">
