@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { setStageStatus } from "@/lib/data/jobs";
 import { createPayment } from "@/lib/data/payments";
 import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
+import { setReservationSchedule, setReservationConfirmed } from "@/lib/data/reservations";
 import type { StageStatus, PaymentMethod } from "@/lib/data/types";
 
 export interface ActionResult {
@@ -20,6 +21,21 @@ export async function advanceStageAction(stageId: string, jobId: string, status:
     await setStageStatus(stageId, status);
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/jobs/${jobId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
+  }
+}
+
+// §II.12 Telefon do klienta: zapis potwierdzonej godziny montażu + startu imprezy
+// i oznaczenie realizacji jako potwierdzonej z klientem.
+export async function saveClientCallAction(reservationId: string, jobId: string, assemblyTime: string, startTime: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo: skonfiguruj Supabase." };
+  try {
+    await setReservationSchedule(reservationId, assemblyTime.trim() || null, startTime.trim() || null);
+    await setReservationConfirmed(reservationId, true);
+    revalidatePath(`/field/${jobId}`);
+    revalidatePath(`/reservations/${reservationId}`);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };

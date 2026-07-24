@@ -339,6 +339,20 @@ async function resolveFromChoices(input: ReservationInput): Promise<{ tent_id: s
   return { tent_id: resolveTentId(input.tent_main, tents), tent_id_2: resolveTentId(input.tent_extra, tents) };
 }
 
+// §II.12 Zapis potwierdzonych z klientem terminów (godzina montażu + start imprezy).
+export async function setReservationSchedule(id: string, assemblyTime: string | null, eventStartTime: string | null): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const patch: Record<string, unknown> = { event_start_time: eventStartTime || null };
+  if (assemblyTime) {
+    patch.assembly_time = assemblyTime;
+    patch.assembly_time_by = user?.id ?? null;
+    patch.assembly_time_at = new Date().toISOString();
+  }
+  const { error } = await supabase.from("reservations").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // Potwierdzenie szczegółów przez klienta (§42) — osobno od edycji rezerwacji.
 export async function setReservationConfirmed(id: string, confirmed: boolean): Promise<void> {
   const supabase = await createClient();

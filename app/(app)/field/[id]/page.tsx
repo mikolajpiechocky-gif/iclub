@@ -20,6 +20,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { JOB_STATUS_META } from "@/lib/data/types";
 import { PackingBlock, RealizationFlow, type RealizationContext } from "../realization-flow";
 import { ProtocolBlock } from "../protocol-block";
+import { TelefonBlock } from "../telefon-block";
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +146,19 @@ export default async function FieldRealizationPage({ params }: { params: Promise
               ))}
             </div>
           </div>
+        )}
+
+        {/* §II.12 Blok: Telefon do klienta (przed pakowaniem) */}
+        {job.business_line === "ICLUB" && (
+          <TelefonBlock
+            reservationId={r?.id ?? ""}
+            jobId={job.id}
+            packageName={r?.package?.name ?? null}
+            addons={addonNames}
+            assemblyTime={r?.assembly_time ?? null}
+            eventStartTime={r?.event_start_time ?? null}
+            confirmed={r?.client_confirmed ?? false}
+          />
         )}
 
         {/* Blok: Pakowanie (osobny etap, dzień przed) */}
