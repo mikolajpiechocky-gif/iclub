@@ -45,12 +45,13 @@ export default async function MediaPage() {
                     <Pill label={pm.label} fg={pm.fg} bg={pm.bg} />
                   </div>
                   {it.description && <div className="mt-1 text-[12.5px] text-ink-2">{it.description}</div>}
+                  {it.resolution && <div className="mt-1.5 rounded-[8px] border border-[#1e4a2c] bg-[#12251a] px-2.5 py-1.5 text-[12px] text-ok">Odpowiedź szefa: {it.resolution}</div>}
                   <div className="mt-2.5 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-[11.5px] text-muted">
                       <Pill label={sm.label} fg={sm.fg} bg={sm.bg} />
                       <span>{it.job?.title ?? "—"} · {fmtDate(it.created_at)}</span>
                     </div>
-                    {isOwner && <IncidentStatusButtons id={it.id} status={it.status} />}
+                    {isOwner && <IncidentStatusButtons id={it.id} status={it.status} resolution={it.resolution} />}
                   </div>
                 </div>
               );

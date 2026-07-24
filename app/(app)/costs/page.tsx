@@ -10,6 +10,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { COST_STATUS_META, COST_CATEGORIES, type CostStatus } from "@/lib/data/types";
 import { parsePeriod, periodContains } from "@/lib/domain/period";
 import { VerifyCostButton } from "./verify-button";
+import { ExportCostsButton } from "./export-button";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,12 @@ export default async function CostsPage({ searchParams }: { searchParams: Promis
       <PageHeader
         title="Koszty"
         subtitle={`${list.length} pozycji · razem ${fmtPLN(total)}`}
-        actions={<Link href="/costs/new"><PrimaryButton icon="plus">Dodaj koszt</PrimaryButton></Link>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {isOwner && <ExportCostsButton rows={list.map((c) => ({ spent_on: c.spent_on, category: c.category, job: c.job?.title ?? null, amount: Number(c.amount), status: COST_STATUS_META[c.status].label, note: c.note }))} />}
+            <Link href="/costs/new"><PrimaryButton icon="plus">Dodaj koszt</PrimaryButton></Link>
+          </div>
+        }
       />
 
       {demo && (

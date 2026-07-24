@@ -41,3 +41,10 @@ export async function setIncidentStatus(id: string, status: IncidentStatus): Pro
   const { error } = await supabase.from("incidents").update({ status }).eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+// §II.7 Odpowiedź Szefa na zgłoszenie.
+export async function setIncidentResolution(id: string, resolution: string | null): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("incidents").update({ resolution }).eq("id", id);
+  if (error) throw new Error(error.message);
+}

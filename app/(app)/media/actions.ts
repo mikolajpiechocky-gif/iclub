@@ -2,8 +2,9 @@
 // Server Actions: zgłoszenia i szkody (§22, §30).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createIncident, setIncidentStatus } from "@/lib/data/incidents";
+import { createIncident, setIncidentStatus, setIncidentResolution } from "@/lib/data/incidents";
 import { sendPushToOwners } from "@/lib/integrations/push";
+import { getCurrentProfile } from "@/lib/data/profiles";
 import type { IncidentPriority, IncidentStatus } from "@/lib/data/types";
 
 export interface IncidentFormValues {
@@ -50,6 +51,20 @@ export async function setIncidentStatusAction(id: string, status: IncidentStatus
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   try {
     await setIncidentStatus(id, status);
+    revalidatePath("/media");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Błąd." };
+  }
+}
+
+// §II.7 Odpowiedź Szefa na zgłoszenie.
+export async function setIncidentResolutionAction(id: string, resolution: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
+  const p = await getCurrentProfile();
+  if (p?.role !== "OWNER") return { ok: false, error: "Tylko szef odpowiada na zgłoszenia." };
+  try {
+    await setIncidentResolution(id, resolution.trim() || null);
     revalidatePath("/media");
     return { ok: true };
   } catch (e) {

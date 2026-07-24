@@ -455,7 +455,7 @@ export interface ChecklistItemRecord {
 
 export type PaymentMethod = "CASH" | "TRANSFER" | "BLIK" | "CARD";
 export type PaymentStatus = "PLANNED" | "REPORTED" | "PAID" | "OVERDUE" | "REFUNDED";
-export type CostStatus = "PENDING" | "VERIFIED";
+export type CostStatus = "PENDING" | "VERIFIED" | "REJECTED";
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   CASH: "Gotówka", TRANSFER: "Przelew", BLIK: "BLIK", CARD: "Karta",
@@ -473,6 +473,7 @@ export const PAYMENT_STATUS_ORDER: PaymentStatus[] = ["PLANNED", "REPORTED", "PA
 export const COST_STATUS_META: Record<CostStatus, { label: string; fg: string; bg: string }> = {
   PENDING: { label: "Do weryfikacji", fg: "#ebb05a", bg: "#332814" },
   VERIFIED: { label: "Zweryfikowany", fg: "#5fd68b", bg: "#16301f" },
+  REJECTED: { label: "Odrzucony", fg: "#f58585", bg: "#341a1d" },
 };
 
 export const COST_CATEGORIES = [

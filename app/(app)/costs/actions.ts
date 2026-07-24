@@ -59,3 +59,17 @@ export async function verifyCostAction(id: string): Promise<ActionResult> {
     return { ok: false, error: e instanceof Error ? e.message : "Błąd." };
   }
 }
+
+// §II.7 Odrzucenie kosztu (Szef). Odrzucone nie wliczają się do rentowności realizacji.
+export async function rejectCostAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
+  const p = await getCurrentProfile();
+  if (p?.role !== "OWNER") return { ok: false, error: "Tylko szef odrzuca koszty." };
+  try {
+    await setCostStatus(id, "REJECTED");
+    revalidatePath("/costs");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Błąd." };
+  }
+}
