@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Icon } from "@/components/icons";
 import { Alert } from "@/components/ui";
-import { addProtocolCostAction, addIssueAction, type IssueType } from "./protocol-actions";
+import { addProtocolCostAction, addIssueAction, saveActualKmAction, type IssueType } from "./protocol-actions";
 
 const fmtPLN = (v: number | null | undefined) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 2 }).format(v);
@@ -38,6 +38,7 @@ export function ProtocolBlock({
   const [comment, setComment] = useState("");
   const [issueType, setIssueType] = useState<IssueType>("Uwaga");
   const [issueDesc, setIssueDesc] = useState("");
+  const [actualKm, setActualKm] = useState(""); // §II.17 faktyczny przejazd z licznika
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) => {
     setError(null);
@@ -49,6 +50,7 @@ export function ProtocolBlock({
   };
   const addCost = () => run(() => addProtocolCostAction(jobId, name, amount, comment), () => { setName(""); setAmount(""); setComment(""); });
   const addIssue = () => run(() => addIssueAction(jobId, issueType, issueDesc), () => setIssueDesc(""));
+  const saveKm = () => run(() => saveActualKmAction(jobId, actualKm), () => setActualKm(""));
 
   return (
     <div className="mt-3.5 rounded-[18px] border border-border bg-surface p-4">
@@ -81,6 +83,15 @@ export function ProtocolBlock({
           <div className="flex justify-between"><span className="text-ink-2">Trasa</span><span className="font-semibold text-ink">{summary.distanceKm != null ? `${summary.distanceKm} km` : "—"}</span></div>
           <div className="flex justify-between"><span className="text-ink-2">Transport (paliwo + eksploatacja)</span><span className="font-semibold text-ink">{fmtPLN(summary.transportCost)}</span></div>
           <div className="flex justify-between border-t border-border-soft pt-1"><span className="text-ink-2">Koszty dopisane</span><span className="font-bold text-ink">{fmtPLN(summary.costsTotal)}</span></div>
+        </div>
+        {/* §II.17 Faktyczny przejazd z licznika → przelicza koszt paliwa z realnych km. */}
+        <div className="mb-2 rounded-[10px] border border-border bg-surface px-3 py-2.5">
+          <div className="mb-1 text-[11.5px] font-semibold text-ink-2">Faktyczny przejazd (licznik)</div>
+          <div className="flex gap-2">
+            <input inputMode="numeric" value={actualKm} onChange={(e) => setActualKm(e.target.value)} placeholder="km" className="w-24 rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-[13px] text-ink outline-none focus:border-accent" />
+            <button onClick={saveKm} disabled={pending} className="flex-1 rounded-[10px] bg-[#271b3f] px-3 py-2 text-[12.5px] font-bold text-[#e0c8ff]">{pending ? "Zapisywanie…" : "Przelicz koszt paliwa"}</button>
+          </div>
+          <div className="mt-1 text-[10.5px] text-ink-2">Aktualizuje koszt paliwa z realnych km (bez dodawania osobnego kosztu).</div>
         </div>
         <div className="flex flex-wrap gap-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nazwa (paliwo, autostrada…)" className="min-w-[140px] flex-1 rounded-[10px] border border-border bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-accent" />

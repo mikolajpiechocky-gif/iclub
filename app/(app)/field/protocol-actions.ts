@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createCost } from "@/lib/data/costs";
 import { createIncident } from "@/lib/data/incidents";
+import { setActualKm } from "@/lib/data/transport";
 import { sendPushToOwners } from "@/lib/integrations/push";
 import type { IncidentPriority } from "@/lib/data/types";
 
@@ -24,6 +25,18 @@ export async function addProtocolCostAction(jobId: string, name: string, amount:
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać kosztu." };
   }
+}
+
+// §II.17 Faktyczny przejazd (licznik) → przelicza koszt paliwa na pozycji transportu.
+export async function saveActualKmAction(jobId: string, km: string): Promise<ProtocolResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
+  const n = Number(km.replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return { ok: false, error: "Podaj liczbę km większą od zera." };
+  const res = await setActualKm(jobId, Math.round(n));
+  if (!res.ok) return { ok: false, error: res.reason ?? "Nie udało się zapisać." };
+  revalidatePath(`/field/${jobId}`);
+  revalidatePath(`/reservations`);
+  return { ok: true };
 }
 
 // §II.8 Demontaż: kontrola sprzętu — status niesprawnej pozycji → wspólna baza zgłoszeń serwisowych.
