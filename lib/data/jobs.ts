@@ -161,37 +161,44 @@ export async function getJobStages(jobId: string): Promise<JobStageRecord[]> {
 export async function syncJobStages(jobId: string, businessLine: BusinessLine, existing: JobStageRecord[]): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
   const template = stagesForBusinessLine(businessLine);
+  if (template.length === 0) return false;
   const existingKeys = new Set(existing.map((s) => s.stage_key));
   const missing = template.filter((t) => !existingKeys.has(t.key));
 
-  const supabase = await createClient();
-  let changed = false;
+  try {
+    const supabase = await createClient();
+    let changed = false;
 
-  if (missing.length > 0) {
-    // Status dokładanego kroku: DONE, jeśli którykolwiek PÓŹNIEJSZY etap jest już zrobiony
-    // (flow przeszedł już ten punkt) — inaczej TODO. Chroni ukończone realizacje przed cofnięciem.
-    const rows = missing.map((t) => {
-      const idx = template.findIndex((x) => x.key === t.key);
-      const laterDone = existing.some((s) => {
-        const si = template.findIndex((x) => x.key === s.stage_key);
-        return si > idx && s.status === "DONE";
+    if (missing.length > 0) {
+      // Status dokładanego kroku: DONE, jeśli którykolwiek PÓŹNIEJSZY etap jest już zrobiony
+      // (flow przeszedł już ten punkt) — inaczej TODO. Chroni ukończone realizacje przed cofnięciem.
+      const rows = missing.map((t) => {
+        const idx = template.findIndex((x) => x.key === t.key);
+        const laterDone = existing.some((s) => {
+          const si = template.findIndex((x) => x.key === s.stage_key);
+          return si > idx && s.status === "DONE";
+        });
+        return { job_id: jobId, stage_key: t.key, title: t.title, sort: idx, status: laterDone ? "DONE" : "TODO" };
       });
-      return { job_id: jobId, stage_key: t.key, title: t.title, sort: idx, status: laterDone ? "DONE" : "TODO" };
-    });
-    const { error } = await supabase.from("job_stages").insert(rows);
-    if (error) throw new Error(error.message);
-    changed = true;
-  }
-
-  // Ustaw sort istniejących kroków wg pozycji w szablonie, by nowe kroki trafiły na miejsce.
-  for (const s of existing) {
-    const idx = template.findIndex((x) => x.key === s.stage_key);
-    if (idx >= 0 && s.sort !== idx) {
-      await supabase.from("job_stages").update({ sort: idx }).eq("id", s.id);
+      const { error } = await supabase.from("job_stages").insert(rows);
+      if (error) throw new Error(error.message);
       changed = true;
     }
+
+    // Ustaw sort istniejących kroków wg pozycji w szablonie, by nowe kroki trafiły na miejsce.
+    for (const s of existing) {
+      const idx = template.findIndex((x) => x.key === s.stage_key);
+      if (idx >= 0 && s.sort !== idx) {
+        await supabase.from("job_stages").update({ sort: idx }).eq("id", s.id);
+        changed = true;
+      }
+    }
+    return changed;
+  } catch (e) {
+    // Nie wywracamy ekranu realizacji — logujemy powód (widoczny w logach serwera).
+    console.error("syncJobStages failed for job", jobId, e);
+    return false;
   }
-  return changed;
 }
 
 export async function setStageStatus(stageId: string, status: StageStatus): Promise<void> {

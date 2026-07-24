@@ -357,6 +357,8 @@ export async function saveCallDetails(id: string, input: {
     addon_ids: input.addonIds,
     addon_qty: input.addonQty,
     skip_grass: input.skipGrass,
+    // §II.12 Telefon do klienta ma WŁASNY znacznik — niezależny od potwierdzenia rezerwacji.
+    phone_call_done: true,
     client_confirmed: true,
     client_confirmed_at: now,
   };

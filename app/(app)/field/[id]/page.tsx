@@ -194,7 +194,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
             skipGrass={r?.skip_grass ?? false}
             assemblyTime={r?.assembly_time ?? null}
             eventStartTime={r?.event_start_time ?? null}
-            confirmed={r?.client_confirmed ?? false}
+            phoneCallDone={r?.phone_call_done ?? false}
           />
         )}
 

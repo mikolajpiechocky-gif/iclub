@@ -1472,3 +1472,8 @@ alter table public.reservations add column if not exists skip_grass boolean not 
 -- Pozwala policzyć czas pracy na miejscu (montaż) i przy demontażu.
 alter table public.job_stages add column if not exists done_at timestamptz;
 
+-- ================= 0056: telefon do klienta — osobny znacznik wykonania (§II.12) =================
+-- Zadanie „Telefon do klienta" ma własny stan ukończenia, NIEZALEŻNY od potwierdzenia
+-- rezerwacji przez Szefa (client_confirmed). Inaczej telefon odhaczał się z automatu.
+alter table public.reservations add column if not exists phone_call_done boolean not null default false;
+
