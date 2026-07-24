@@ -36,6 +36,18 @@ export default async function EmployeeDashboardPage() {
   const next = upcoming[0] ?? jobs[0];
   const name = profile?.full_name?.trim() || "Pracowniku";
 
+  // §II.20 „Ten weekend": sobota+niedziela bieżącego (poniedziałkowego) tygodnia.
+  // Liczone po UTC spójnie z todayStr — przelicza się automatycznie w każdy poniedziałek.
+  const baseUTC = new Date(todayStr + "T00:00:00Z");
+  const isoDow = baseUTC.getUTCDay() === 0 ? 7 : baseUTC.getUTCDay(); // Pon=1 … Ndz=7
+  const shiftISO = (days: number) => { const d = new Date(baseUTC); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+  const satISO = shiftISO(6 - isoDow);
+  const sunISO = shiftISO(7 - isoDow);
+  const weekendJobs = jobs
+    .filter((j) => j.event_date && j.event_date >= satISO && j.event_date <= sunISO)
+    .sort((a, b) => (a.event_date! < b.event_date! ? -1 : 1));
+  const weekdayName = (iso: string | null) => (iso ? new Date(iso + "T00:00:00Z").toLocaleDateString("pl-PL", { weekday: "long", timeZone: "UTC" }) : "");
+
   // Kafelki „do zgarnięcia": co / kiedy / gdzie / km od bazy / ile może zgarnąć.
   // Km i stawki liczymy tylko gdy jest co pokazać; geokodujemy bazę i unikalne
   // lokalizacje raz (dedup), potem trasa base→cel.
@@ -103,6 +115,29 @@ export default async function EmployeeDashboardPage() {
         </div>
       ) : (
         <div className="mb-4"><EmptyState icon="truck" title="Brak przypisanych realizacji" desc="Gdy szef przypisze Cię do zlecenia (lub podejmiesz wolne), pojawi się tutaj." /></div>
+      )}
+
+      {/* §II.20 Ten weekend — wszystkie realizacje pracownika w sob+ndz bieżącego tygodnia */}
+      {weekendJobs.length > 0 && (
+        <div className="mb-4 rounded-card border border-[#2a2340] bg-[#181423] p-1.5">
+          <div className="flex items-center gap-2 px-3 pt-2 pb-0.5">
+            <span className="font-display text-[13.5px] font-bold text-[#e9d5ff]">Ten weekend</span>
+            <span className="text-[11px] font-semibold text-ink-2">{fmtDate(satISO)} – {fmtDate(sunISO)}</span>
+            <span className="ml-auto rounded-full bg-[#271b3f] px-2 py-0.5 text-[11px] font-bold text-[#e9d5ff]">{weekendJobs.length}</span>
+          </div>
+          {weekendJobs.map((j) => (
+            <Link key={j.id} href={`/field/${j.id}`} className="flex items-center gap-3 rounded-[12px] px-3 py-2.5 transition hover:bg-surface-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13.5px] font-bold text-ink">{j.reservation?.customer?.name ?? j.title ?? "Realizacja"}</div>
+                <div className="truncate text-[12px] text-ink-2">{[j.reservation?.location, j.reservation?.assembly_time ? `montaż ${j.reservation.assembly_time}` : null].filter(Boolean).join(" · ") || "—"}</div>
+              </div>
+              <div className="flex-none text-right">
+                <div className="text-[12px] font-bold capitalize text-[#e9d5ff]">{weekdayName(j.event_date)}</div>
+                <div className="text-[11px] text-ink-2">{fmtDate(j.event_date)}</div>
+              </div>
+            </Link>
+          ))}
+        </div>
       )}
 
       {/* 2. kafelek: nieprzypisane realizacje iClub do zgarnięcia */}
