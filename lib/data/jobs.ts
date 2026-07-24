@@ -47,6 +47,20 @@ export async function listJobs(): Promise<JobWithReservation[]> {
   return (data ?? []) as unknown as JobWithReservation[];
 }
 
+// §II.4 Zlecenia z liczbą przypisanych (zaakceptowanych) osób — do sekcji „Wymaga uwagi"
+// (realizacje bez zespołu). Jedno zapytanie zbiorcze zamiast N per zlecenie.
+export type JobWithTeam = JobWithReservation & { assignedCount: number };
+export async function listJobsWithTeam(): Promise<JobWithTeam[]> {
+  const jobs = await listJobs();
+  if (!isSupabaseConfigured() || jobs.length === 0) return jobs.map((j) => ({ ...j, assignedCount: 0 }));
+  const supabase = await createClient();
+  const ids = jobs.map((j) => j.id);
+  const { data } = await supabase.from("job_assignments").select("job_id, status").in("job_id", ids).eq("status", "APPROVED");
+  const counts = new Map<string, number>();
+  for (const a of (data ?? []) as { job_id: string }[]) counts.set(a.job_id, (counts.get(a.job_id) ?? 0) + 1);
+  return jobs.map((j) => ({ ...j, assignedCount: counts.get(j.id) ?? 0 }));
+}
+
 export async function listAssignedJobs(profileId: string): Promise<JobWithReservation[]> {
   if (!isSupabaseConfigured()) return DEMO_JOBS;
   const supabase = await createClient();
