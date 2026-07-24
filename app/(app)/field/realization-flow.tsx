@@ -89,11 +89,19 @@ export interface RealizationContext {
   teardownItems: string[]; // §II.8 sprzęt do kontroli przy demontażu (z checklisty)
 }
 
+// §II.15 Checklisty montażu i szkolenia klienta — treść z wytycznych.
+const MONTAZ_POINTS = [
+  "Rozstaw namiot",
+  "Zakotwienie",
+  "Test nagłośnienia",
+  "Test oświetlenia",
+  "Wytwornica uzupełniona płynem",
+];
 const TRAINING_POINTS = [
-  "Obsługa dmuchawy i zasilania",
-  "Zasady bezpieczeństwa (dzieci, bez butów, bez ostrych przedmiotów)",
-  "Zakaz samodzielnej zmiany ustawień sprzętu",
-  "Kontakt awaryjny do iClub",
+  "Zakaz palenia",
+  "Nie wyłączać dmuchawy (kaucja przepada)",
+  "Zachowanie przy silnym wietrze",
+  "Jeżeli namiot zacznie tracić ciśnienie — najpierw bezpiecznie wyprowadzamy wszystkich, a dopiero potem szukamy przyczyny",
 ];
 
 export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: JobStageRecord[]; ctx: RealizationContext }) {
@@ -188,15 +196,10 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: string; s
       );
 
     case "SETUP":
-      return (
-        <div>
-          <p className="mb-3 text-[12.5px] text-ink-2">Rozstaw namiot, podłącz dmuchawę i zasilanie, ustaw światło oraz nagłośnienie, sprawdź stabilność i kotwy.</p>
-          <DoneButton pending={pending} onClick={onDone} label="Montaż gotowy" block />
-        </div>
-      );
+      return <CheckPanel points={MONTAZ_POINTS} doneLabel="Montaż gotowy" pending={pending} onDone={onDone} />;
 
     case "TRAINING":
-      return <TrainingPanel pending={pending} onDone={onDone} />;
+      return <CheckPanel points={TRAINING_POINTS} doneLabel="Szkolenie przeprowadzone" pending={pending} onDone={onDone} />;
 
     case "PHOTOS":
       return <PhotosPanel jobId={jobId} ctx={ctx} pending={pending} onDone={onDone} />;
@@ -264,27 +267,34 @@ function DoneButton({ pending, onClick, label, block }: { pending: boolean; onCl
   );
 }
 
-function TrainingPanel({ pending, onDone }: { pending: boolean; onDone: () => void }) {
-  const [checked, setChecked] = useState<boolean[]>(TRAINING_POINTS.map(() => false));
+// §II.15 Panel checklisty kroku (montaż / szkolenie). §II.9 Zakończenie wymaga
+// odhaczenia wszystkiego ALBO podania powodu.
+function CheckPanel({ points, doneLabel, pending, onDone }: { points: string[]; doneLabel: string; pending: boolean; onDone: () => void }) {
+  const [checked, setChecked] = useState<boolean[]>(points.map(() => false));
+  const [reason, setReason] = useState("");
   const doneCount = checked.filter(Boolean).length;
+  const allDone = doneCount === points.length;
+  const canFinish = allDone || reason.trim().length >= 3;
   return (
     <div>
-      <p className="mb-2.5 text-[12.5px] text-ink-2">Omów z klientem i odhacz:</p>
       <div className="mb-3 flex flex-col gap-1.5">
-        {TRAINING_POINTS.map((p, i) => (
+        {points.map((p, i) => (
           <button
             key={p}
             onClick={() => setChecked((c) => c.map((v, j) => (j === i ? !v : v)))}
-            className="flex items-center gap-2.5 rounded-[10px] border border-border bg-surface px-2.5 py-2 text-left"
+            className="flex items-start gap-2.5 rounded-[10px] border border-border bg-surface px-2.5 py-2 text-left"
           >
-            <span className="flex h-5 w-5 flex-none items-center justify-center rounded-[6px] border-2" style={{ background: checked[i] ? "#22c55e" : "transparent", borderColor: checked[i] ? "#22c55e" : "#3a3d4a" }}>
+            <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-[6px] border-2" style={{ background: checked[i] ? "#22c55e" : "transparent", borderColor: checked[i] ? "#22c55e" : "#3a3d4a" }}>
               {checked[i] && <Icon name="check" className="h-3 w-3 text-[#08170d]" />}
             </span>
             <span className="text-[12.5px] font-semibold text-ink">{p}</span>
           </button>
         ))}
       </div>
-      <DoneButton pending={pending} onClick={onDone} label={`Szkolenie przeprowadzone${doneCount ? ` (${doneCount}/${TRAINING_POINTS.length})` : ""}`} block />
+      {!allDone && (
+        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Nie wszystko odhaczone — podaj powód, aby zakończyć" className="mb-2.5 w-full rounded-[10px] border border-[#3d3216] bg-[#241e10] px-3 py-2 text-[12.5px] text-ink outline-none focus:border-accent" />
+      )}
+      <DoneButton pending={pending || !canFinish} onClick={onDone} label={`${doneLabel}${!allDone ? ` (${doneCount}/${points.length})` : ""}`} block />
     </div>
   );
 }
@@ -376,9 +386,14 @@ function SettlementPanel({ jobId, ctx, pending, onDone }: { jobId: string; ctx: 
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between rounded-[10px] bg-surface px-3 py-2.5">
+      <div className="mb-2 flex items-center justify-between rounded-[10px] bg-surface px-3 py-2.5">
         <span className="text-[12px] font-semibold text-ink-2">Do zapłaty</span>
         <span className="font-display text-[15px] font-bold text-ink">{fmtPLN(ctx.toPay)}</span>
+      </div>
+      {/* §II.15 Kaucja pobierana na miejscu (zwracana przy demontażu). */}
+      <div className="mb-3 flex items-center justify-between rounded-[10px] border border-border bg-surface px-3 py-2 text-[12px]">
+        <span className="font-semibold text-ink-2">Kaucja (zwrotna)</span>
+        <span className="font-bold text-ink">1 000 zł</span>
       </div>
 
       {reported ? (
