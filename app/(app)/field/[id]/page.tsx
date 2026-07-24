@@ -4,7 +4,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pill } from "@/components/ui";
-import { getJob, getJobStages, syncJobStages } from "@/lib/data/jobs";
+import { getJob, getJobStages, syncJobStages, countDoneIclubRealizations } from "@/lib/data/jobs";
+import { getCurrentProfile } from "@/lib/data/profiles";
+import { getSettings } from "@/lib/data/settings";
+import { getEmployee } from "@/lib/data/employees";
+import { rulesFromSettings, settlementForRealization } from "@/lib/domain/iclub-settlement";
 import { getCustomer } from "@/lib/data/customers";
 import { listReservationAddons, listPackageItems } from "@/lib/data/resources";
 import { listChecklistItems } from "@/lib/data/checklist";
@@ -63,6 +67,23 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   const costsTotal = jobCosts.reduce((s, c) => s + Number(c.amount ?? 0), 0);
   const m = JOB_STATUS_META[job.status];
 
+  // §II.19 Wynagrodzenie pracownika za tę realizację (forma + premie gwarantowane + łącznie).
+  // Liczone dla zalogowanego pracownika iClub; dla szefa bez stawki → wartości globalne.
+  const profile = await getCurrentProfile();
+  let earnings: { baseLabel: string; baseValue: number; guaranteed: { label: string; amount: number }[]; total: number } | null = null;
+  if (profile && job.business_line === "ICLUB") {
+    const [settings, employee] = await Promise.all([getSettings(), getEmployee(profile.id)]);
+    const monthPrefix = (job.event_date ?? new Date().toISOString().slice(0, 10)).slice(0, 7);
+    const doneThisMonth = await countDoneIclubRealizations(profile.id, monthPrefix);
+    const prior = Math.max(0, doneThisMonth - (job.status === "DONE" ? 1 : 0)); // indeks tej realizacji
+    const s = settlementForRealization(rulesFromSettings(settings), prior, {
+      farTrip: distanceKm != null && distanceKm > 100,
+      hasGastro: r?.tent_extra === "GASTRO",
+      rate: employee?.rate ?? null,
+    });
+    earnings = { baseLabel: s.baseLabel, baseValue: s.baseValue, guaranteed: s.guaranteed, total: s.total };
+  }
+
   // §9.4 Dodatki realizacji → ostrzeżenie o większym czasie pakowania i montażu.
   const addonName = new Map(addonList.map((a) => [a.id, a.name]));
   const addonNames = (r?.addon_ids ?? []).map((aid) => addonName.get(aid)).filter((n): n is string => Boolean(n));
@@ -96,6 +117,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
     teardownItems: checklist.filter((i) => i.category !== "Dokumenty").map((i) => i.label),
     hasVehicle,
     roundTripKm: distanceKm != null ? distanceKm * 2 : null,
+    earnings,
   };
 
   return (

@@ -126,6 +126,7 @@ export interface RealizationContext {
   teardownItems: string[]; // §II.8 sprzęt do kontroli przy demontażu (z checklisty)
   hasVehicle: boolean;     // §II.14 pojazd przypisany (wymagany, by rozpocząć)
   roundTripKm: number | null; // §II.19 trasa tam i z powrotem (do podsumowania pracy)
+  earnings: { baseLabel: string; baseValue: number; guaranteed: { label: string; amount: number }[]; total: number } | null; // §II.19 wynagrodzenie za realizację
 }
 
 // §II.19 Czas pracy = sekcja montażu (przyjazd → koniec rozliczenia) + demontaż
@@ -224,6 +225,17 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
               <div className="text-[10.5px] text-ink-2">tam i z powrotem</div>
             </div>
           </div>
+
+          {/* §II.19 Wynagrodzenie za realizację: forma + premie gwarantowane + łącznie */}
+          {ctx.earnings && (
+            <div className="mt-2 rounded-[11px] border border-[#1d3a28] bg-[#12271b] px-3 py-2.5 text-[12px]">
+              <div className="flex items-center justify-between"><span className="text-ok/80">{ctx.earnings.baseLabel}</span><span className="font-semibold text-ok">{fmtPLN(ctx.earnings.baseValue)}</span></div>
+              {ctx.earnings.guaranteed.map((g) => (
+                <div key={g.label} className="mt-0.5 flex items-center justify-between"><span className="text-ok/80">+ {g.label}</span><span className="font-semibold text-ok">{fmtPLN(g.amount)}</span></div>
+              ))}
+              <div className="mt-1.5 flex items-center justify-between border-t border-[#1d3a28] pt-1.5"><span className="font-bold text-ok">Łącznie za realizację</span><span className="font-display text-[15px] font-bold text-ok">{fmtPLN(ctx.earnings.total)}</span></div>
+            </div>
+          )}
         </div>
       )}
 
