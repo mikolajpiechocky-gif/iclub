@@ -24,7 +24,6 @@ export function TentForm({ initial }: { initial?: TentRecord }) {
     code: initial?.code ?? "",
     name: initial?.name ?? "",
     size: initial?.size ?? "",
-    set_color: initial?.set_color ?? "",
     has_back_door: initial?.has_back_door ?? false,
     status: initial?.status ?? "AVAILABLE",
     notes: initial?.notes ?? "",
@@ -62,7 +61,6 @@ export function TentForm({ initial }: { initial?: TentRecord }) {
             <TextField label="Nazwa" placeholder="Namiot 6×8 niebieski" value={v.name} onChange={(e) => set("name", e.target.value)} error={errors.name} />
             <TextField label="Kod (opcjonalnie)" placeholder="auto z nazwy" value={v.code} onChange={(e) => set("code", e.target.value)} hint="Puste = wygeneruje się automatycznie" />
             <TextField label="Rozmiar" placeholder="6×8" value={v.size} onChange={(e) => set("size", e.target.value)} />
-            <TextField label="Zestaw / kolor" placeholder="Niebieski / Żółty / Zielony" value={v.set_color} onChange={(e) => set("set_color", e.target.value)} />
             <SelectField label="Status" value={v.status} onChange={(e) => set("status", e.target.value as TentStatus)}>
               {STATUS.map((s) => <option key={s.v} value={s.v}>{s.label}</option>)}
             </SelectField>

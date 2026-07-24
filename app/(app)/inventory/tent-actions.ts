@@ -1,8 +1,8 @@
 "use server";
-// Server Actions: namioty w magazynie (§17). Zapis tylko Szef (spójne z RLS tents_write).
+// Server Actions: namioty w magazynie (§17). §II.2 Dodawanie/edycja dostępne dla
+// każdego zalogowanego pracownika (spójne z RLS tents_write).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getCurrentProfile } from "@/lib/data/profiles";
 import { createTent, updateTent, getTent, type TentInput } from "@/lib/data/resources";
 import type { TentStatus } from "@/lib/data/types";
 
@@ -10,7 +10,6 @@ export interface TentFormValues {
   code: string;
   name: string;
   size: string;
-  set_color: string;
   has_back_door: boolean;
   status: TentStatus;
   notes: string;
@@ -35,7 +34,7 @@ function genCode(name: string): string {
 function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
   if (/duplicate key|23505|unique/i.test(msg)) return "Namiot o tym kodzie już istnieje — podaj inny kod.";
-  if (/row-level security|permission|policy/i.test(msg)) return "Tylko szef może dodawać i edytować namioty.";
+  if (/row-level security|permission|policy/i.test(msg)) return "Brak uprawnień do zapisu namiotu — uruchom migrację 0051 (RLS namiotów).";
   return msg;
 }
 
@@ -50,7 +49,7 @@ function toInput(v: TentFormValues): TentInput {
     code: v.code.trim(),
     name: v.name.trim(),
     size: clean(v.size),
-    set_color: clean(v.set_color),
+    set_color: null, // §II.1 logika kolorów zestawów usunięta
     has_back_door: v.has_back_door,
     status: v.status,
     notes: clean(v.notes),
@@ -59,8 +58,6 @@ function toInput(v: TentFormValues): TentInput {
 
 export async function createTentAction(v: TentFormValues): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
-  const profile = await getCurrentProfile();
-  if (profile?.role !== "OWNER") return { ok: false, error: "Tylko szef może dodawać namioty." };
   const fieldErrors = validate(v);
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
   try {
@@ -76,8 +73,6 @@ export async function createTentAction(v: TentFormValues): Promise<ActionResult>
 
 export async function updateTentAction(id: string, v: TentFormValues): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
-  const profile = await getCurrentProfile();
-  if (profile?.role !== "OWNER") return { ok: false, error: "Tylko szef może edytować namioty." };
   const fieldErrors = validate(v);
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
   try {

@@ -92,7 +92,7 @@ export default async function EmployeeDashboardPage() {
           <div className="font-display text-[19px] font-bold">{next.reservation?.customer?.name ?? next.title ?? "Realizacja"}</div>
           <div className="mt-1 text-[13px] font-medium text-[#c9cddb]">{[fmtDate(next.event_date), next.reservation?.location].filter(Boolean).join(" · ")}</div>
           <div className="mt-3.5 flex gap-2.5">
-            {[["NAMIOT", next.reservation?.tent?.name ?? "—"], ["PAKIET", next.reservation?.package?.name ?? "—"], ["OSOBY", next.reservation?.guests != null ? String(next.reservation.guests) : "—"]].map(([k, v]) => (
+            {[["NAMIOT", next.reservation?.tent?.name ?? "—"], ["PAKIET", next.reservation?.package?.name ?? "—"], ["MONTAŻ", next.reservation?.assembly_time || "—"]].map(([k, v]) => (
               <div key={k} className="flex-1 rounded-xl bg-white/[0.07] px-3 py-2.5">
                 <div className="text-[10px] font-semibold text-[#9aa0b2]">{k}</div>
                 <div className="mt-0.5 truncate font-display text-[13px] font-bold">{v}</div>

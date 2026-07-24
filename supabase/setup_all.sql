@@ -1434,3 +1434,8 @@ drop policy if exists push_own on public.push_subscriptions;
 create policy push_own on public.push_subscriptions for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+-- ================= 0051: namioty edytowalne przez pracownika (§II.2) =================
+-- Dodawanie/edycja namiotów dostępne dla każdego zalogowanego (dotąd tylko Szef).
+drop policy if exists tents_write on public.tents;
+create policy tents_write on public.tents for all to authenticated using (true) with check (true);
+

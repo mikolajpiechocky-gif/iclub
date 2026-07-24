@@ -10,8 +10,6 @@ import { InventoryAuditList } from "./audit-list";
 
 export const dynamic = "force-dynamic";
 
-const TENT_TINT: Record<string, string> = { Niebieski: "#25406e", Żółty: "#5a4a17", Zielony: "#1e4a2c" };
-
 const TENT_STATUS_META: Record<TentStatus, { label: string; fg: string; bg: string }> = {
   AVAILABLE: { label: "Dostępny", fg: "#5fd68b", bg: "#16301f" },
   RESERVED: { label: "Zarezerwowany", fg: "#7fa8f5", bg: "#182238" },
@@ -76,10 +74,9 @@ export default async function InventoryPage() {
           <p className="rounded-card border border-border bg-surface px-4 py-4 text-[13px] text-ink-2">Brak namiotów. Dodaj pierwszy przyciskiem „Dodaj namiot”.</p>
         ) : tents.map((t) => {
           const m = TENT_STATUS_META[t.status];
-          const tint = (t.set_color && TENT_TINT[t.set_color]) || "#2a2d3a";
           return (
             <Link key={t.id} href={`/inventory/tents/${t.id}/edit`} className="flex flex-wrap items-center gap-4 rounded-[14px] border border-border bg-surface px-4 py-3.5 transition hover:border-accent">
-              <div className="h-11 w-16 flex-none rounded-lg border border-[#2a2d3a]" style={{ background: `repeating-linear-gradient(135deg,${tint},${tint} 7px,#171922 7px,#171922 14px)` }} />
+              <div className="flex h-11 w-16 flex-none items-center justify-center rounded-lg border border-[#2a2d3a] bg-surface-2 text-[18px]">⛺</div>
               <div className="min-w-0 flex-1">
                 <div className="text-[14px] font-bold text-ink">{t.name}</div>
                 <div className="mt-0.5 text-[12px] font-medium text-ink-2">
