@@ -1468,3 +1468,7 @@ create policy activity_write on public.activity_log for insert to authenticated 
 -- Czasem, mimo że trawa jest w pakiecie, ustalamy z klientem realizację bez niej.
 alter table public.reservations add column if not exists skip_grass boolean not null default false;
 
+-- ================= 0055: stempel zakończenia etapu realizacji (§II.19) =================
+-- Pozwala policzyć czas pracy na miejscu (montaż) i przy demontażu.
+alter table public.job_stages add column if not exists done_at timestamptz;
+

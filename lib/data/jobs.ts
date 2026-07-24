@@ -33,6 +33,7 @@ function demoStages(jobId: string): JobStageRecord[] {
     status: (i < 2 ? "DONE" : i === 2 ? "IN_PROGRESS" : "TODO") as StageStatus,
     sort: i,
     planned_at: null,
+    done_at: null,
   }));
 }
 
@@ -195,7 +196,11 @@ export async function syncJobStages(jobId: string, businessLine: BusinessLine, e
 
 export async function setStageStatus(stageId: string, status: StageStatus): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.from("job_stages").update({ status }).eq("id", stageId);
+  // §II.19 Stempel zakończenia: ustaw przy DONE, wyczyść przy cofnięciu — do wyliczenia czasu pracy.
+  const { error } = await supabase
+    .from("job_stages")
+    .update({ status, done_at: status === "DONE" ? new Date().toISOString() : null })
+    .eq("id", stageId);
   if (error) throw new Error(error.message);
 }
 

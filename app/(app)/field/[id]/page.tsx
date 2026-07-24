@@ -95,6 +95,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
     canUpload: isSupabaseConfigured(),
     teardownItems: checklist.filter((i) => i.category !== "Dokumenty").map((i) => i.label),
     hasVehicle,
+    roundTripKm: distanceKm != null ? distanceKm * 2 : null,
   };
 
   return (

@@ -288,6 +288,7 @@ export interface JobStageRecord {
   status: StageStatus;
   sort: number;
   planned_at: string | null;
+  done_at: string | null; // §II.19 stempel zakończenia kroku (do wyliczenia czasu pracy)
 }
 
 export interface JobWithReservation extends JobRecord {

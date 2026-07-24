@@ -125,6 +125,29 @@ export interface RealizationContext {
   canUpload: boolean;
   teardownItems: string[]; // §II.8 sprzęt do kontroli przy demontażu (z checklisty)
   hasVehicle: boolean;     // §II.14 pojazd przypisany (wymagany, by rozpocząć)
+  roundTripKm: number | null; // §II.19 trasa tam i z powrotem (do podsumowania pracy)
+}
+
+// §II.19 Czas pracy = sekcja montażu (przyjazd → koniec rozliczenia) + demontaż
+// (koniec wynajmu → sprzęt w bazie). Pomija przerwę „wynajem trwa". Zwraca ms.
+function workMsFromSteps(steps: JobStageRecord[]): number {
+  const at = (key: string): number | null => {
+    const s = steps.find((x) => x.stage_key === key)?.done_at;
+    return s ? new Date(s).getTime() : null;
+  };
+  const seg = (a: string, b: string): number => {
+    const x = at(a), y = at(b);
+    return x != null && y != null && y > x ? y - x : 0;
+  };
+  return seg("TRAVEL", "SETTLEMENT") + seg("RENTAL", "TEARDOWN");
+}
+
+function fmtDuration(ms: number): string {
+  if (ms <= 0) return "—";
+  const min = Math.round(ms / 60000);
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h > 0 ? `${h} h ${m} min` : `${m} min`;
 }
 
 // §II.15 Checklisty montażu i szkolenia klienta — treść z wytycznych.
@@ -185,7 +208,24 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
       {steps.length > 0 && <div className="mb-3.5"><ProgressBar value={overall} tone={allDone ? "ok" : "accent"} height={8} /></div>}
 
       {error && <div className="mb-3"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
-      {allDone && <div className="mb-1"><Alert tone="ok" title="Realizacja zakończona">Wszystkie kroki odhaczone. Dziękujemy!</Alert></div>}
+      {allDone && (
+        <div className="mb-1">
+          <Alert tone="ok" title="Realizacja zakończona">Wszystkie kroki odhaczone. Dziękujemy!</Alert>
+          {/* §II.19 Podsumowanie pracy po demontażu: czas na miejscu + przejechane km */}
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="rounded-[11px] border border-border bg-surface px-3 py-2.5">
+              <div className="text-[11px] font-semibold text-ink-2">Czas pracy</div>
+              <div className="mt-0.5 font-display text-[15px] font-bold text-ink">{fmtDuration(workMsFromSteps(steps))}</div>
+              <div className="text-[10.5px] text-ink-2">montaż + demontaż</div>
+            </div>
+            <div className="rounded-[11px] border border-border bg-surface px-3 py-2.5">
+              <div className="text-[11px] font-semibold text-ink-2">Przejechano</div>
+              <div className="mt-0.5 font-display text-[15px] font-bold text-ink">{ctx.roundTripKm != null ? `${Math.round(ctx.roundTripKm)} km` : "—"}</div>
+              <div className="text-[10.5px] text-ink-2">tam i z powrotem</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div>
         {steps.map((s, i) => {
