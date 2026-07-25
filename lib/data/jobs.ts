@@ -222,18 +222,20 @@ export async function setJobStatus(jobId: string, status: JobStatus): Promise<vo
   if (error) throw new Error(error.message);
 }
 
-// §II.11/§II.15 Status zlecenia wynika z postępu etapów: wszystkie DONE → Zakończone,
-// część zrobiona → W realizacji, nic → Zaplanowane. Nie rusza zleceń anulowanych.
+// §II.11/§K4/§W2 Status zlecenia wg postępu etapów: rozpoczęte → „W realizacji", nic → „Zaplanowane".
+// NIE ustawiamy automatycznie „Zakończone" — domknięcie realizacji (rozliczenie płatności +
+// zamrożenie zarobków) robi Szef przez „Zakończ realizację". Nie ruszamy też DONE/CANCELLED,
+// żeby odhaczenie kroku w terenie nie cofało już zamkniętej, opłaconej realizacji.
 export async function recomputeJobStatus(jobId: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const supabase = await createClient();
+  const { data: job } = await supabase.from("jobs").select("status").eq("id", jobId).maybeSingle();
+  const cur = (job as { status: JobStatus } | null)?.status;
+  if (!cur || cur === "CANCELLED" || cur === "DONE") return;
   const { data } = await supabase.from("job_stages").select("status").eq("job_id", jobId);
   const stages = (data ?? []) as { status: string }[];
   if (stages.length === 0) return;
-  const doneCount = stages.filter((s) => s.status === "DONE").length;
-  const next: JobStatus = doneCount === stages.length ? "DONE" : doneCount > 0 ? "IN_PROGRESS" : "PLANNED";
-  const { data: job } = await supabase.from("jobs").select("status").eq("id", jobId).maybeSingle();
-  const cur = (job as { status: JobStatus } | null)?.status;
-  if (cur === "CANCELLED" || cur === next) return;
+  const next: JobStatus = stages.some((s) => s.status === "DONE") ? "IN_PROGRESS" : "PLANNED";
+  if (cur === next) return;
   await supabase.from("jobs").update({ status: next }).eq("id", jobId);
 }

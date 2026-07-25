@@ -52,7 +52,9 @@ export async function setPaymentStatus(id: string, status: PaymentStatus): Promi
   if (error) throw new Error(error.message);
 }
 
-// Rozliczenie salda przy zakończeniu realizacji: zaplanowane/zgłoszone → zapłacone.
+// §K5 Rozliczenie salda przy zakończeniu realizacji: tylko ZAPLANOWANE płatności → zapłacone.
+// Gotówka zgłoszona przez pracownika (REPORTED) wymaga JAWNEJ weryfikacji Szefa na ekranie
+// Płatności, a zaległości (OVERDUE) to realnie nieopłacone kwoty — nie zamykamy ich hurtem.
 export async function markJobPlannedPaid(jobId: string): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -60,6 +62,6 @@ export async function markJobPlannedPaid(jobId: string): Promise<void> {
     .from("payments")
     .update({ status: "PAID", verified_by: user?.id ?? null })
     .eq("job_id", jobId)
-    .in("status", ["PLANNED", "REPORTED", "OVERDUE"]);
+    .eq("status", "PLANNED");
   if (error) throw new Error(error.message);
 }
