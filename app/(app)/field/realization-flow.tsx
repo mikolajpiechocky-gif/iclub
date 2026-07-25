@@ -22,6 +22,9 @@ import { reportEquipmentStatusAction, addIssueAction, type EqStatus, type IssueT
 
 const fmtPLN = (v: number | null) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
+// §N1 Kwoty wynagrodzenia z groszami (np. 259,20 zł) — spójnie z ekranem /me.
+const fmtPLN2 = (v: number) =>
+  new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(v);
 
 // §II.21 Pasek postępu — używany dla całej realizacji, dla kroku na osi i w panelach.
 function ProgressBar({ value, tone = "accent", className = "", height = 6 }: { value: number; tone?: "accent" | "ok"; className?: string; height?: number }) {
@@ -126,7 +129,7 @@ export interface RealizationContext {
   teardownItems: string[]; // §II.8 sprzęt do kontroli przy demontażu (z checklisty)
   hasVehicle: boolean;     // §II.14 pojazd przypisany (wymagany, by rozpocząć)
   roundTripKm: number | null; // §II.19 trasa tam i z powrotem (do podsumowania pracy)
-  earnings: { baseLabel: string; baseValue: number; guaranteed: { label: string; amount: number }[]; total: number } | null; // §II.19 wynagrodzenie za realizację
+  earnings: { baseLabel: string; total: number } | null; // §II.19 wynagrodzenie za realizację (forma + łącznie)
 }
 
 // §II.19 Czas pracy = sekcja montażu (przyjazd → koniec rozliczenia) + demontaż
@@ -226,14 +229,14 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
             </div>
           </div>
 
-          {/* §II.19 Wynagrodzenie za realizację: forma + premie gwarantowane + łącznie */}
+          {/* §II.19 Wynagrodzenie za realizację: forma (z premiami) + łącznie */}
           {ctx.earnings && (
             <div className="mt-2 rounded-[11px] border border-[#1d3a28] bg-[#12271b] px-3 py-2.5 text-[12px]">
-              <div className="flex items-center justify-between"><span className="text-ok/80">{ctx.earnings.baseLabel}</span><span className="font-semibold text-ok">{fmtPLN(ctx.earnings.baseValue)}</span></div>
-              {ctx.earnings.guaranteed.map((g) => (
-                <div key={g.label} className="mt-0.5 flex items-center justify-between"><span className="text-ok/80">+ {g.label}</span><span className="font-semibold text-ok">{fmtPLN(g.amount)}</span></div>
-              ))}
-              <div className="mt-1.5 flex items-center justify-between border-t border-[#1d3a28] pt-1.5"><span className="font-bold text-ok">Łącznie za realizację</span><span className="font-display text-[15px] font-bold text-ok">{fmtPLN(ctx.earnings.total)}</span></div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="min-w-0 text-ok/80">{ctx.earnings.baseLabel}</span>
+                <span className="flex-none font-display text-[15px] font-bold text-ok">{fmtPLN2(ctx.earnings.total)}</span>
+              </div>
+              <div className="mt-0.5 text-[10.5px] text-ok/60">Twoje wynagrodzenie za tę realizację</div>
             </div>
           )}
         </div>
