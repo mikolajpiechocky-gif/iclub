@@ -102,10 +102,10 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
 
         <SectionCard title="Premie" className="mt-4 p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
-            <TextField label="Daleki wyjazd (zł)" inputMode="numeric" placeholder="100" value={v.far_bonus} onChange={(e) => set("far_bonus", e.target.value)} hint="Doliczany tylko do realizacji w ramach umowy (pierwsze N = czas wolny). Poza umową (ryczałt) — nie." />
-            <TextField label="Namiot gastronomiczny (zł)" inputMode="numeric" placeholder="80" value={v.gastro_bonus} onChange={(e) => set("gastro_bonus", e.target.value)} />
-            <TextField label="Opinia (zł)" inputMode="numeric" placeholder="30" value={v.review_bonus} onChange={(e) => set("review_bonus", e.target.value)} />
-            <TextField label="Rolka (zł)" inputMode="numeric" placeholder="30" value={v.reel_bonus} onChange={(e) => set("reel_bonus", e.target.value)} />
+            <TextField label="Daleki wyjazd (zł)" inputMode="numeric" placeholder="150" value={v.far_bonus} onChange={(e) => set("far_bonus", e.target.value)} hint="Puste = 150 zł. Doliczany tylko do realizacji w ramach umowy (pierwsze N = czas wolny). Poza umową (ryczałt) — nie." />
+            <TextField label="Namiot gastronomiczny (zł)" inputMode="numeric" placeholder="150" value={v.gastro_bonus} onChange={(e) => set("gastro_bonus", e.target.value)} hint="Puste = 150 zł" />
+            <TextField label="Opinia (zł)" inputMode="numeric" placeholder="20" value={v.review_bonus} onChange={(e) => set("review_bonus", e.target.value)} hint="Puste = 20 zł" />
+            <TextField label="Rolka (zł)" inputMode="numeric" placeholder="50" value={v.reel_bonus} onChange={(e) => set("reel_bonus", e.target.value)} hint="Puste = 50 zł" />
             <div className="sm:col-span-2 flex flex-col gap-1.5">
               <label htmlFor="notes" className="text-[12.5px] font-semibold text-ink-2">Notatki</label>
               <textarea id="notes" rows={2} value={v.notes} onChange={(e) => set("notes", e.target.value)} className="rounded-field border border-border bg-surface-2 px-3.5 py-3 text-[14px] text-ink outline-none focus:border-accent" placeholder="Ustalenia, wyjątki…" />

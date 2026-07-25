@@ -7,6 +7,7 @@ import { setStageStatus, recomputeJobStatus } from "@/lib/data/jobs";
 import { createPayment } from "@/lib/data/payments";
 import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
 import { saveCallDetails } from "@/lib/data/reservations";
+import { generateChecklistForJob } from "@/lib/data/checklist-gen";
 import type { StageStatus, PaymentMethod } from "@/lib/data/types";
 
 // §II.12 Ustalenia z telefonu do klienta przekazywane z formularza.
@@ -51,6 +52,8 @@ export async function saveClientCallAction(reservationId: string, jobId: string,
       addonQty: input.addonQty,
       skipGrass: input.skipGrass,
     });
+    // §S3 Po telefonie (ustalono zakres/dodatki) wygeneruj checklistę pakowania, jeśli jej nie ma.
+    await generateChecklistForJob(jobId, { onlyIfEmpty: true }).catch(() => {});
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/reservations/${reservationId}`);
     return { ok: true };

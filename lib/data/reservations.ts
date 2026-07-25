@@ -27,7 +27,10 @@ export async function getTentCapacities(): Promise<TentCapacities> {
     if (tentSizeCode(t.size) === "D") { large++; if (t.has_back_door) backdoor++; } else small++;
   }
   const gastro = tents.filter((t) => /gastr/i.test(t.name ?? "")).length;
-  return { small: small || 1, large: large || 2, backdoor: backdoor || 1, gastro: gastro || 1 };
+  // §N5 Fałszywą pojemność (|| 1/2) stosujemy TYLKO w trybie demo. Przy realnej bazie 0 sztuk
+  // danego typu = brak zasobu (overbooking nie dopuści rezerwacji namiotu, którego nie ma).
+  if (!isSupabaseConfigured()) return { small: small || 1, large: large || 2, backdoor: backdoor || 1, gastro: gastro || 1 };
+  return { small, large, backdoor, gastro };
 }
 
 // §10.3 Sprawdza overbooking POJEMNOŚCIOWY po typie (mały/duży/z drzwiami/gastro).
@@ -306,22 +309,28 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
   const supabase = await createClient();
   const resolved = input.tent_main !== undefined ? await resolveFromChoices(input) : {};
   const stamp = await assemblyStampFor(supabase, id, input);
-  const { error } = await supabase.from("reservations").update({ ...input, ...resolved, ...(stamp ?? {}) }).eq("id", id);
+  // §N3 Edycja rezerwacji NIE przedłuża blokady tymczasowej — zachowujemy istniejące expires_at
+  // (inaczej cyklicznie edytowana rezerwacja tymczasowa nigdy by nie wygasła).
+  const { expires_at, ...rest } = input;
+  void expires_at;
+  const { error } = await supabase.from("reservations").update({ ...rest, ...resolved, ...(stamp ?? {}) }).eq("id", id);
   if (error) throw new Error(error.message);
 
   // Zabezpieczenie: rezerwacja bez zlecenia (np. starsza albo utworzona zanim generowaliśmy
   // zlecenia) nie miała sekcji zespołu → nie dało się przypisać pracownika. Dogeneruj zlecenie.
   const { data: existingJob } = await supabase.from("jobs").select("id").eq("reservation_id", id).maybeSingle();
   if (!existingJob) {
-    const { data: job } = await supabase
+    // §S2 Łapiemy błędy obu insertów — inaczej job/etapy mogły cicho nie powstać
+    // (rezerwacja zapisana „ok", ale bez zlecenia → „Brak kroków"/brak sekcji zespołu).
+    const { data: job, error: jErr } = await supabase
       .from("jobs")
       .insert({ reservation_id: id, business_line: input.business_line, title: input.event_type ?? "Zlecenie", event_date: input.event_date ?? null, status: "PLANNED" })
       .select("id")
       .single();
-    if (job) {
-      const stages = stagesForBusinessLine(input.business_line).map((s, i) => ({ job_id: (job as { id: string }).id, stage_key: s.key, title: s.title, sort: i }));
-      await supabase.from("job_stages").insert(stages);
-    }
+    if (jErr) throw new Error(jErr.message);
+    const stages = stagesForBusinessLine(input.business_line).map((s, i) => ({ job_id: (job as { id: string }).id, stage_key: s.key, title: s.title, sort: i }));
+    const { error: sErr } = await supabase.from("job_stages").insert(stages);
+    if (sErr) throw new Error(sErr.message);
   }
 }
 
