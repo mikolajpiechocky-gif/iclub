@@ -39,7 +39,8 @@ export default async function CostsPage({ searchParams }: { searchParams: Promis
       (status ? c.status === status : true),
   );
 
-  const total = list.reduce((s, c) => s + Number(c.amount || 0), 0);
+  // Odrzucone koszty NIE liczą się do sumy (spójnie z kartą rentowności, która bierze tylko VERIFIED).
+  const total = list.filter((c) => c.status !== "REJECTED").reduce((s, c) => s + Number(c.amount || 0), 0);
   const pendingList = list.filter((c) => c.status === "PENDING");
   const pendingTotal = pendingList.reduce((s, c) => s + Number(c.amount || 0), 0);
   const extra = { ...(category ? { category } : {}), ...(status ? { status } : {}) };

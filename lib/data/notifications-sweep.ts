@@ -39,7 +39,9 @@ export async function runNotificationsSweep(): Promise<{ ok: boolean; sent: Reco
   try {
     const { data } = await s.from("olx_adverts").select("title, valid_to").not("valid_to", "is", null);
     const rows = (data ?? []) as { title: string | null; valid_to: string }[];
-    const soon = rows.filter((r) => r.valid_to.slice(0, 10) <= in2);
+    // Tylko ogłoszenia wygasające w oknie [dziś; dziś+2]. Bez dolnej granicy dawno wygasłe
+    // ogłoszenia byłyby zgłaszane CODZIENNIE w nieskończoność.
+    const soon = rows.filter((r) => { const d = r.valid_to.slice(0, 10); return d >= today && d <= in2; });
     if (soon.length) {
       await sendPushToOwners({ title: soon.length === 1 ? "Ogłoszenie OLX wygasa" : `${soon.length} ogłoszeń OLX wygasa`, body: soon.slice(0, 3).map((r) => r.title ?? "Ogłoszenie").join(", "), url: "/adverts", tag: "advert-expiry" });
       sent.adverts = soon.length;

@@ -283,7 +283,9 @@ async function ReservationOps({
   const photos = await listJobPhotos(job.id);
 
   // §II.7 Rentowność realizacji: przychód − koszty (zatwierdzone) − wynagrodzenia − transport.
-  const jobCosts = allCosts.filter((c) => c.job_id === job.id);
+  // Wynagrodzenia liczymy z rozliczenia zespołu (laborSum); koszty kategorii „Wynagrodzenie"/„Premia"
+  // pomijamy, żeby nie odjąć tego samego dwa razy.
+  const jobCosts = allCosts.filter((c) => c.job_id === job.id && c.category !== "Wynagrodzenie" && c.category !== "Premia");
   const revenue = Number(job.reservation?.price ?? 0) || 0;
   const costsVerified = jobCosts.filter((c) => c.status === "VERIFIED").reduce((s, c) => s + Number(c.amount || 0), 0);
   const costsPending = jobCosts.filter((c) => c.status === "PENDING").reduce((s, c) => s + Number(c.amount || 0), 0);

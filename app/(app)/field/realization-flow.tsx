@@ -381,22 +381,29 @@ function RentalPanel({ jobId, pending, onDone }: { jobId: string; pending: boole
 function TeardownPanel({ jobId, items, pending, onDone, onProgress }: { jobId: string; items: string[]; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
   const [busy, startBusy] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [reported, setReported] = useState<Record<string, string>>({});
+  // Klucz po INDEKSIE pozycji (etykiety mogą się powtarzać między kategoriami → inaczej
+  // dwa wiersze o tej samej nazwie dzieliłyby status i dawały duplikat klucza React).
+  const [reported, setReported] = useState<Record<number, string>>({});
+  const [sent, setSent] = useState<Set<number>>(new Set()); // indeksy, dla których już utworzono zgłoszenie
   const [deduction, setDeduction] = useState(""); // §II.16 potrącenie z kaucji za uszkodzenia
   const deducted = Number(deduction.replace(",", ".")) || 0;
   const reviewed = Object.keys(reported).length;
 
-  const applyStatus = (item: string, status: string) => {
-    const next = { ...reported, [item]: status };
+  const applyStatus = (idx: number, status: string) => {
+    const next = { ...reported, [idx]: status };
     setReported(next);
     onProgress(items.length ? Object.keys(next).length / items.length : 0);
   };
   // Problem trafia do zgłoszeń serwisowych; „OK" tylko potwierdza sprawdzenie pozycji.
-  const report = (item: string, status: EqStatus) => {
+  // Zgłoszenie tworzymy najwyżej RAZ na pozycję — ponowne kliknięcia tylko zmieniają status lokalnie
+  // (koniec duplikatów zgłoszeń przy dwukrotnym tapnięciu).
+  const report = (idx: number, item: string, status: EqStatus) => {
+    if (reported[idx] === status) return;
+    if (sent.has(idx)) { applyStatus(idx, status); return; }
     setError(null);
     startBusy(async () => {
       const res = await reportEquipmentStatusAction(jobId, item, status, "");
-      if (res.ok) applyStatus(item, status);
+      if (res.ok) { setSent((s) => new Set(s).add(idx)); applyStatus(idx, status); }
       else setError(res.error ?? "Błąd");
     });
   };
@@ -408,16 +415,16 @@ function TeardownPanel({ jobId, items, pending, onDone, onProgress }: { jobId: s
       {error && <div className="mb-2"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
       {items.length > 0 ? (
         <div className="mb-3 flex flex-col gap-1.5">
-          {items.map((it) => {
-            const st = reported[it];
+          {items.map((it, idx) => {
+            const st = reported[idx];
             const ok = st === "OK";
             return (
-              <div key={it} className={`rounded-[10px] border px-2.5 py-2 ${ok ? "border-[#1d3a28] bg-[#12271b]" : st ? "border-[#3d3216] bg-[#241e10]" : "border-border bg-surface"}`}>
+              <div key={`${idx}-${it}`} className={`rounded-[10px] border px-2.5 py-2 ${ok ? "border-[#1d3a28] bg-[#12271b]" : st ? "border-[#3d3216] bg-[#241e10]" : "border-border bg-surface"}`}>
                 <div className="mb-1.5 text-[12.5px] font-semibold text-ink">{it}{st && <span className={`ml-1.5 text-[11px] font-bold ${ok ? "text-ok" : "text-warn"}`}>· {st}</span>}</div>
                 <div className="flex flex-wrap gap-1.5">
-                  <button onClick={() => applyStatus(it, "OK")} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold ${ok ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface-2 text-ink-2"}`}>OK</button>
+                  <button onClick={() => applyStatus(idx, "OK")} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold ${ok ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface-2 text-ink-2"}`}>OK</button>
                   {(["Czyszczenie", "Uszkodzony", "Brak"] as EqStatus[]).map((s) => (
-                    <button key={s} onClick={() => report(it, s)} disabled={busy} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold ${st === s ? "border-warn bg-[#332814] text-warn" : "border-border bg-surface-2 text-ink-2"}`}>{s}</button>
+                    <button key={s} onClick={() => report(idx, it, s)} disabled={busy} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold ${st === s ? "border-warn bg-[#332814] text-warn" : "border-border bg-surface-2 text-ink-2"}`}>{s}</button>
                   ))}
                 </div>
               </div>
@@ -498,13 +505,15 @@ function PhotosPanel({ jobId, ctx, pending, onDone, onProgress }: { jobId: strin
   const PHOTO_TARGET = 3; // sugerowana liczba zdjęć gotowego ustawienia
   const shownCount = ctx.photos.length + localPreviews.length;
 
+  const bump = () => onProgress(Math.min(1, (shownCount + 1) / PHOTO_TARGET));
+
   const onPick = async (file: File | null) => {
     if (!file) return;
     setError(null);
-    onProgress(Math.min(1, (shownCount + 1) / PHOTO_TARGET));
     // Tryb demo (brak Supabase): tylko podgląd lokalny.
     if (!ctx.canUpload) {
       setLocalPreviews((p) => [URL.createObjectURL(file), ...p]);
+      bump();
       return;
     }
     setUploading(true);
@@ -519,6 +528,7 @@ function PhotosPanel({ jobId, ctx, pending, onDone, onProgress }: { jobId: strin
       const res = await createJobPhotoAction(jobId, path);
       if (!res.ok) throw new Error(res.error ?? "Nie udało się zapisać.");
       uploaded = false; // sukces — plik ma już wiersz w job_photos
+      bump(); // §pasek: postęp podnosimy DOPIERO po udanym zapisie
       router.refresh();
     } catch (e) {
       // Rollback: usuń osierocony plik, gdy zapis metadanych zawiódł (best-effort).

@@ -232,8 +232,10 @@ export async function recomputeJobStatus(jobId: string): Promise<void> {
   const { data: job } = await supabase.from("jobs").select("status").eq("id", jobId).maybeSingle();
   const cur = (job as { status: JobStatus } | null)?.status;
   if (!cur || cur === "CANCELLED" || cur === "DONE") return;
-  const { data } = await supabase.from("job_stages").select("status").eq("job_id", jobId);
-  const stages = (data ?? []) as { status: string }[];
+  const { data } = await supabase.from("job_stages").select("status, stage_key").eq("job_id", jobId);
+  // Pakowanie odbywa się DZIEŃ WCZEŚNIEJ — nie oznacza jeszcze „W realizacji". Liczymy postęp
+  // z etapów właściwej realizacji (bez PACKING), żeby status nie skakał przedwcześnie.
+  const stages = ((data ?? []) as { status: string; stage_key: string }[]).filter((s) => s.stage_key !== "PACKING");
   if (stages.length === 0) return;
   const next: JobStatus = stages.some((s) => s.status === "DONE") ? "IN_PROGRESS" : "PLANNED";
   if (cur === next) return;

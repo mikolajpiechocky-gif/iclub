@@ -66,7 +66,9 @@ export async function assignEmployee(jobId: string, profileId: string, isLead = 
 // (do pominięcia powiadomienia, gdy prośba w międzyczasie zniknęła — wyścig).
 export async function approveAssignment(id: string): Promise<boolean> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("job_assignments").update({ status: "APPROVED" }).eq("id", id).select("id");
+  // Tylko realne przejście REQUESTED→APPROVED zwraca wiersz — dzięki temu ponowne kliknięcie
+  // „Akceptuj" (albo akceptacja już zatwierdzonej) nie wysyła drugiego powiadomienia/push.
+  const { data, error } = await supabase.from("job_assignments").update({ status: "APPROVED" }).eq("id", id).eq("status", "REQUESTED").select("id");
   if (error) throw new Error(error.message);
   return (data?.length ?? 0) > 0;
 }

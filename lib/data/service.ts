@@ -13,6 +13,7 @@ export interface ServiceInput {
   kind: string;
   description: string | null;
   due_date: string | null;
+  incident_id?: string | null; // powiązanie z zgłoszeniem źródłowym (identyfikowalność §18)
 }
 
 export async function listServiceTasks(): Promise<ServiceTaskRecord[]> {

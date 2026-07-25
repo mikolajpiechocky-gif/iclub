@@ -50,6 +50,10 @@ export async function createIncidentAction(v: IncidentFormValues): Promise<Actio
 
 export async function setIncidentStatusAction(id: string, status: IncidentStatus): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
+  // Zmiana statusu (zamknięcie/otwarcie) zgłoszenia to decyzja Szefa — RLS jest permisywny,
+  // więc autoryzację egzekwujemy tu (akcja to publiczny endpoint).
+  const p = await getCurrentProfile();
+  if (p?.role !== "OWNER") return { ok: false, error: "Tylko szef zmienia status zgłoszenia." };
   try {
     await setIncidentStatus(id, status);
     revalidatePath("/media");
@@ -81,7 +85,7 @@ export async function convertIncidentToServiceAction(id: string, equipment: stri
   // „Pomysł" → zadanie rozwojowe; „Czyszczenie" → czyszczenie; reszta → naprawa/serwis.
   const kind = category === "Pomysł" ? "Rozwój" : category === "Czyszczenie" ? "Czyszczenie" : "Naprawa";
   try {
-    await createServiceTask({ equipment, kind, description: description || category, due_date: null });
+    await createServiceTask({ equipment, kind, description: description || category, due_date: null, incident_id: id });
     await setIncidentStatus(id, "RESOLVED");
     revalidatePath("/media");
     revalidatePath("/service");
