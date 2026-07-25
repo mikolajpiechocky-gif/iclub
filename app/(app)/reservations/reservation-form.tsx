@@ -238,6 +238,9 @@ export function ReservationForm({
       ...v,
       setup_date: showCustomDates ? v.setup_date : "",
       teardown_date: showCustomDates ? v.teardown_date : "",
+      // §K2 Gdy „Wartość końcowa" nie jest wpisana ręcznie, zapisz WYLICZONĄ cenę (order.total),
+      // a nie puste pole — inaczej przychód/rentowność rezerwacji pokazywały 0 zł.
+      price: v.price.trim() !== "" ? v.price : String(order.total),
       discount_amount: String(order.discountAmount),
       deposit: depositValue,
       pricing_snapshot: JSON.stringify(snapshot),

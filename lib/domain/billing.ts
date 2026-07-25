@@ -27,10 +27,13 @@ export interface SettlementBreakdown {
 
 // Katalog dodatków: id → { nazwa, cena za sztukę }. Zwykle z listReservationAddons().
 export type AddonPriceMap = Map<string, { name: string; price: number }>;
+// Skład wybranego pakietu: equipmentId → ilość wliczona w pakiet (płatna tylko nadwyżka).
+export type PackageIncluded = Record<string, number>;
 
 export function settlementBreakdown(
   r: Pick<ReservationRecord, "addon_ids" | "addon_qty" | "transport_price" | "discount" | "deposit" | "price" | "pricing_snapshot"> & { package?: { name?: string | null } | null },
   addonPrice: AddonPriceMap,
+  included: PackageIncluded = {},
 ): SettlementBreakdown {
   const snap = r.pricing_snapshot;
   const transport = round2(numOr(r.transport_price ?? snap?.transport_price));
@@ -38,10 +41,14 @@ export function settlementBreakdown(
 
   const ids = r.addon_ids ?? [];
   const qty = r.addon_qty ?? {};
+  // §K1 Płatna tylko NADWYŻKA ponad ilość wliczoną w pakiet (jak billableOf w formularzu) —
+  // inaczej dodatek będący częścią pakietu byłby liczony podwójnie.
   const addons: SettlementLine[] = ids.map((id) => {
     const a = addonPrice.get(id);
     const n = Math.max(1, Math.round(numOr(qty[id], 1)));
-    return { name: a?.name ?? "Dodatek", price: round2(numOr(a?.price) * n) };
+    const inc = Math.max(0, Math.round(numOr(included[id])));
+    const billable = Math.max(0, n - inc);
+    return { name: a?.name ?? "Dodatek", price: round2(numOr(a?.price) * billable) };
   });
   const addonsTotal = round2(addons.reduce((s, a) => s + a.price, 0));
 
@@ -51,11 +58,24 @@ export function settlementBreakdown(
     ? round2(numOr(snap.package.price))
     : Math.max(0, round2(numOr(r.price) - transport - addonsTotal + discount));
 
-  const total = round2(packagePrice + addonsTotal + transport - discount);
+  const computedTotal = round2(packagePrice + addonsTotal + transport - discount);
+  // §K3 Szanuj ustaloną cenę końcową (r.price — może być ręcznie zaokrąglona); doliczaj tylko
+  // dosprzedaż dodatków dopiętą PO zapisie (różnica wartości dodatków względem snapshotu).
+  let total: number;
+  if (numOr(r.price) > 0) {
+    const snapAddons = round2((snap?.addons ?? []).reduce((s, a) => s + numOr(a.price), 0));
+    const dosprzedaz = Math.max(0, round2(addonsTotal - snapAddons));
+    total = round2(numOr(r.price) + dosprzedaz);
+  } else {
+    total = computedTotal;
+  }
 
-  const depositRaw = numOr(r.deposit);
-  const depositSuggested = !(depositRaw > 0);
-  const deposit = depositSuggested ? suggestedDeposit(transport) : round2(depositRaw);
+  // §S1 Zadatek: 0 zł to prawidłowa wartość (nie „brak"). Sugestię 300+transport stosujemy
+  // tylko gdy zadatku faktycznie nie podano (legacy null).
+  const depositRaw = numOr(r.deposit, NaN);
+  const hasDeposit = Number.isFinite(depositRaw);
+  const depositSuggested = !hasDeposit;
+  const deposit = hasDeposit ? round2(depositRaw) : suggestedDeposit(transport);
   const toPayOnSite = Math.max(0, round2(total - deposit));
 
   return { packageName, packagePrice, addons, addonsTotal, transport, discount, total, deposit, depositSuggested, toPayOnSite };

@@ -90,7 +90,10 @@ export default async function FieldRealizationPage({ params }: { params: Promise
 
   // §II.2 Rozbicie rozliczenia (pakiet/dodatki/transport/suma/zadatek/do zapłaty na miejscu).
   const addonPrice: AddonPriceMap = new Map(addonList.map((a) => [a.id, { name: a.name, price: Number(a.price ?? 0) }]));
-  const billing = r ? settlementBreakdown(r, addonPrice) : null;
+  // §K1 Skład pakietu (equipmentId → ilość w pakiecie) — do liczenia dodatków tylko od nadwyżki.
+  const included: Record<string, number> = {};
+  for (const it of packageItems) included[it.equipment_id] = Number(it.quantity ?? 0);
+  const billing = r ? settlementBreakdown(r, addonPrice, included) : null;
 
   const phone = customer?.phone ?? null;
   const address = r?.location || customer?.address || customer?.city || null;
