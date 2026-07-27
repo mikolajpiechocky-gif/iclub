@@ -161,7 +161,8 @@ function toInput(v: ReservationFormValues): ReservationInput {
     // §transport Odbiór własny → brak transportu (0). Inaczej cena transportu z formularza.
     self_pickup: v.self_pickup,
     transport_price: v.self_pickup ? 0 : toNumber(v.transport_price),
-    deposit: toNumber(v.deposit) ?? 0,
+    // Wypożyczalnia nie pobiera zadatku.
+    deposit: v.business_line === "EQUIPMENT_RENTAL" ? 0 : (toNumber(v.deposit) ?? 0),
     event_start_time: clean(v.event_start_time),
     assembly_time: clean(v.assembly_time),
     pricing_snapshot: parseSnapshot(v.pricing_snapshot),

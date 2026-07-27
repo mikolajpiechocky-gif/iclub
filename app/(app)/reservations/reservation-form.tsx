@@ -31,6 +31,84 @@ const nextDay = (iso: string): string => {
   return dt.toISOString().slice(0, 10);
 };
 
+// Klient jako pole tekstowe z klikalnymi podpowiedziami. Dokładne dopasowanie → istniejący
+// klient; inaczej nowy (utworzony przy zapisie). Zastępuje sztywną listę.
+function CustomerPicker({ customers, customerId, newName, newPhone, set }: {
+  customers: CustomerOption[]; customerId: string; newName: string; newPhone: string;
+  set: (k: "customer_id" | "new_customer_name" | "new_customer_phone", v: string) => void;
+}) {
+  const initName = customerId && customerId !== "__new__" ? (customers.find((c) => c.id === customerId)?.name ?? "") : newName;
+  const [query, setQuery] = useState(initName);
+  const [open, setOpen] = useState(false);
+  const ql = query.trim().toLowerCase();
+  const matches = ql.length >= 2 ? customers.filter((c) => c.name.toLowerCase().includes(ql)).slice(0, 6) : [];
+  const exact = customers.find((c) => c.name.trim().toLowerCase() === ql);
+
+  const onType = (val: string) => {
+    setQuery(val); setOpen(true);
+    const ex = customers.find((c) => c.name.trim().toLowerCase() === val.trim().toLowerCase());
+    if (ex) { set("customer_id", ex.id); set("new_customer_name", ""); }
+    else { set("customer_id", val.trim() ? "__new__" : ""); set("new_customer_name", val); }
+  };
+  const pick = (c: CustomerOption) => { setQuery(c.name); set("customer_id", c.id); set("new_customer_name", ""); setOpen(false); };
+
+  return (
+    <div className="relative">
+      <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Klient</label>
+      <input value={query} onChange={(e) => onType(e.target.value)} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder="Wpisz imię i nazwisko…" className="w-full rounded-field border border-border bg-surface-2 px-3.5 py-3 text-[14px] text-ink outline-none focus:border-accent" />
+      {open && matches.length > 0 && (
+        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-field border border-border bg-surface shadow-lg">
+          {matches.map((c) => (
+            <button key={c.id} type="button" onMouseDown={() => pick(c)} className="block w-full px-3.5 py-2 text-left text-[13px] text-ink hover:bg-surface-2">{c.name}{customerId === c.id ? " ✓" : ""}</button>
+          ))}
+        </div>
+      )}
+      {customerId === "__new__" && query.trim() && !exact && (
+        <div className="mt-2">
+          <div className="mb-1 text-[11.5px] text-ok">✚ Nowy klient „{query.trim()}” — dodamy przy zapisie.</div>
+          <input value={newPhone} onChange={(e) => set("new_customer_phone", e.target.value)} placeholder="Telefon (opcjonalnie)" inputMode="tel" className="w-full rounded-field border border-border bg-surface-2 px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-accent" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Wyszukiwarka sprzętu z magazynu (wypożyczalnia). Wybrane pozycje jako „tagi" → rental_items.
+function WarehousePicker({ items, value, onChange }: { items: ReservationAddon[]; value: string; onChange: (v: string) => void }) {
+  const [query, setQuery] = useState("");
+  const selected = value.split(",").map((s) => s.trim()).filter(Boolean);
+  const ql = query.trim().toLowerCase();
+  const results = ql ? items.filter((a) => a.name.toLowerCase().includes(ql) && !selected.includes(a.name)).slice(0, 8) : [];
+  const add = (name: string) => { if (!selected.includes(name)) onChange([...selected, name].join(", ")); setQuery(""); };
+  const remove = (name: string) => onChange(selected.filter((s) => s !== name).join(", "));
+  return (
+    <div>
+      <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Sprzęt z magazynu</label>
+      {selected.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {selected.map((n) => (
+            <span key={n} className="flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[12px] font-semibold text-ink">{n}<button type="button" onClick={() => remove(n)} className="text-[14px] leading-none text-bad">×</button></span>
+          ))}
+        </div>
+      )}
+      <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (query.trim()) add(query.trim()); } }} placeholder="Szukaj w magazynie…" className="w-full rounded-field border border-border bg-surface-2 px-3.5 py-3 text-[14px] text-ink outline-none focus:border-accent" />
+      {results.length > 0 && (
+        <div className="mt-1 flex flex-col gap-0.5 rounded-field border border-border bg-surface p-1">
+          {results.map((a) => (
+            <button key={a.id} type="button" onClick={() => add(a.name)} className="flex items-center justify-between rounded-[8px] px-2.5 py-1.5 text-left text-[13px] text-ink hover:bg-surface-2">
+              <span>{a.name}</span>
+              {a.available != null && <span className="text-[11px] text-ink-2">{a.available} szt.</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {query.trim() && results.length === 0 && !selected.includes(query.trim()) && (
+        <button type="button" onClick={() => add(query.trim())} className="mt-1.5 text-[12px] font-semibold text-accent-soft">+ Dodaj „{query.trim()}” (spoza magazynu)</button>
+      )}
+    </div>
+  );
+}
+
 export function ReservationForm({
   initial,
   customers,
@@ -282,17 +360,7 @@ export function ReservationForm({
               <option value="ICLUB">iClub</option>
               <option value="EQUIPMENT_RENTAL">Wypożyczalnia sprzętu</option>
             </SelectField>
-            <SelectField label="Klient" value={v.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
-              <option value="">— bez klienta —</option>
-              <option value="__new__">+ Nowy klient (wpisz)</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </SelectField>
-            {v.customer_id === "__new__" && (
-              <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2">
-                <TextField label="Imię i nazwisko klienta" placeholder="Jan Kowalski" value={v.new_customer_name} onChange={(e) => set("new_customer_name", e.target.value)} hint="Zostanie dodany do bazy klientów przy zapisie" />
-                <TextField label="Telefon (opcjonalnie)" inputMode="tel" placeholder="600 000 000" value={v.new_customer_phone} onChange={(e) => set("new_customer_phone", e.target.value)} />
-              </div>
-            )}
+            <CustomerPicker customers={customers} customerId={v.customer_id} newName={v.new_customer_name} newPhone={v.new_customer_phone} set={set} />
             {isEdit && (
               <SelectField label="Status" value={v.status} onChange={(e) => set("status", e.target.value as ReservationStatus)}>
                 {RESERVATION_STATUS_ORDER.map((s) => <option key={s} value={s}>{RESERVATION_STATUS_LABELS[s]}</option>)}
@@ -423,22 +491,15 @@ export function ReservationForm({
           </SectionCard>
         ) : (
           <SectionCard title="Sprzęt do wynajęcia" className="p-5">
-            <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <TextField
-                  label="Sprzęt (pozycje)"
-                  placeholder="Krzesła   —   albo:   Stoły, krzesła, parasole"
-                  value={v.rental_items}
-                  onChange={(e) => set("rental_items", e.target.value)}
-                  hint="Jedna pozycja → trafia w tytuł; kilka po przecinku → tytuł „Wynajem sprzętu”, szczegóły w opisie"
-                />
-              </div>
-              <SelectField label="Płatność" value={v.payment_upfront ? "UP" : "PICKUP"} onChange={(e) => set("payment_upfront", e.target.value === "UP")}>
-                <option value="PICKUP">Przy odbiorze</option>
-                <option value="UP">Opłacone z góry</option>
-              </SelectField>
+            <div className="flex flex-col gap-4 px-5 pb-5">
+              <WarehousePicker items={addons} value={v.rental_items} onChange={(val) => set("rental_items", val)} />
+              <label className="flex cursor-pointer items-center gap-2.5 text-[13px] font-semibold text-ink">
+                <input type="checkbox" checked={v.payment_upfront} onChange={(e) => set("payment_upfront", e.target.checked)} className="h-4 w-4 accent-accent" />
+                Opłacone z góry
+                <span className="text-[11.5px] font-normal text-ink-2">(inaczej: płatność przy odbiorze)</span>
+              </label>
               {/* §18 Forma rozliczenia pracownika: godzinowa domyślnie, ryczałt per zlecenie nadpisuje. */}
-              <div className="sm:col-span-2">
+              <div>
                 <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-ink">
                   <input type="checkbox" checked={v.rental_hourly} onChange={(e) => set("rental_hourly", e.target.checked)} className="h-4 w-4 accent-accent" />
                   Rozliczenie pracownika godzinowe (domyślne)
@@ -476,14 +537,25 @@ export function ReservationForm({
           </SectionCard>
         )}
 
-        <SectionCard title="Informacje dodatkowe" className="p-5">
-          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
-            <TextField label="Rodzaj imprezy" placeholder="Osiemnastka" value={v.event_type} onChange={(e) => set("event_type", e.target.value)} />
-            <TextField label="Liczba osób (opcjonalnie)" inputMode="numeric" placeholder="45" value={v.guests} onChange={(e) => set("guests", e.target.value)} error={errors.guests} hint="Nie blokuje zapisu rezerwacji" />
-          </div>
-        </SectionCard>
+        {v.business_line === "ICLUB" && (
+          <SectionCard title="Informacje dodatkowe" className="p-5">
+            <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
+              <TextField label="Rodzaj imprezy" placeholder="Osiemnastka" value={v.event_type} onChange={(e) => set("event_type", e.target.value)} />
+              <TextField label="Liczba osób (opcjonalnie)" inputMode="numeric" placeholder="45" value={v.guests} onChange={(e) => set("guests", e.target.value)} error={errors.guests} hint="Nie blokuje zapisu rezerwacji" />
+            </div>
+          </SectionCard>
+        )}
 
         <SectionCard title="Rozliczenie" className="p-5">
+          {/* Wypożyczalnia: odbiór własny jako czytelny, pełnej szerokości wiersz. */}
+          {v.business_line === "EQUIPMENT_RENTAL" && (
+            <div className="px-5 pb-3">
+              <label className="flex cursor-pointer items-center gap-2.5 text-[13px] font-semibold text-ink">
+                <input type="checkbox" checked={v.self_pickup} onChange={(e) => set("self_pickup", e.target.checked)} className="h-4 w-4 accent-accent" />
+                Odbiór własny — klient odbiera i zwraca sam (bez transportu)
+              </label>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-4 px-5 pb-2 sm:grid-cols-3">
             <div>
               <TextField label="Wartość końcowa (zł)" inputMode="numeric" placeholder="6800" value={v.price} onChange={(e) => set("price", e.target.value)} error={errors.price} />
@@ -493,25 +565,20 @@ export function ReservationForm({
                 </button>
               )}
             </div>
-            <div>
-              <label className="mb-1.5 flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-ink">
-                <input type="checkbox" checked={v.self_pickup} onChange={(e) => set("self_pickup", e.target.checked)} className="h-4 w-4 accent-accent" />
-                Odbiór własny (bez transportu)
-              </label>
-              {v.self_pickup ? (
-                <div className="rounded-field border border-border bg-surface-2 px-3.5 py-2.5 text-[12px] text-ink-2">Klient odbiera i zwraca we własnym zakresie — transport 0 zł.</div>
-              ) : (
-                <>
-                  <TextField label="Transport dla klienta (zł)" inputMode="decimal" placeholder="0" value={v.transport_price} onChange={(e) => set("transport_price", e.target.value)} error={errors.transport_price} />
-                  <button type="button" onClick={computeTransport} disabled={pending} className="mt-1.5 text-[12px] font-semibold text-accent-soft">Oblicz z adresu →</button>
-                  {transportMsg && <div className="mt-1 text-[11px] text-ink-2">{transportMsg}</div>}
-                </>
-              )}
-            </div>
-            <div>
-              <TextField label="Zadatek (zł)" inputMode="numeric" placeholder="300" value={depositValue} onChange={(e) => { setDepositTouched(true); set("deposit", e.target.value); }} error={errors.deposit} />
-              {!depositTouched && <div className="mt-1 text-[11px] text-ink-2">Sugestia: 300 zł + transport = {fmtPLN(suggestedDep)}</div>}
-            </div>
+            {!v.self_pickup && (
+              <div>
+                <TextField label="Transport dla klienta (zł)" inputMode="decimal" placeholder="0" value={v.transport_price} onChange={(e) => set("transport_price", e.target.value)} error={errors.transport_price} />
+                <button type="button" onClick={computeTransport} disabled={pending} className="mt-1.5 text-[12px] font-semibold text-accent-soft">Oblicz z adresu →</button>
+                {transportMsg && <div className="mt-1 text-[11px] text-ink-2">{transportMsg}</div>}
+              </div>
+            )}
+            {/* Zadatek tylko dla iClub — wypożyczalnia nie pobiera zadatku. */}
+            {v.business_line === "ICLUB" && (
+              <div>
+                <TextField label="Zadatek (zł)" inputMode="numeric" placeholder="300" value={depositValue} onChange={(e) => { setDepositTouched(true); set("deposit", e.target.value); }} error={errors.deposit} />
+                {!depositTouched && <div className="mt-1 text-[11px] text-ink-2">Sugestia: 300 zł + transport = {fmtPLN(suggestedDep)}</div>}
+              </div>
+            )}
             <SelectField label="Rabat" value={v.discount_type} onChange={(e) => set("discount_type", e.target.value === "PERCENT" ? "PERCENT" : "AMOUNT")}>
               <option value="AMOUNT">Kwotowy (zł)</option>
               <option value="PERCENT">Procentowy (%)</option>
@@ -552,9 +619,9 @@ export function ReservationForm({
             <span className="font-display text-[16px] font-bold text-accent-soft">{fmtPLN(finalPrice)}</span>
           </summary>
           <div className="flex flex-col gap-2 border-t border-border px-4 py-3.5 text-[13px]">
-            <div className="flex justify-between"><span className="text-ink-2">Pakiet</span><span className="font-semibold text-ink">{fmtPLN(packagePrice)}</span></div>
-            <div className="flex justify-between"><span className="text-ink-2">Dodatki</span><span className="font-semibold text-ink">{fmtPLN(addonsTotal)}</span></div>
-            <div className="flex justify-between"><span className="text-ink-2">Transport</span><span className="font-semibold text-ink">{fmtPLN(transportPrice)}</span></div>
+            {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Pakiet</span><span className="font-semibold text-ink">{fmtPLN(packagePrice)}</span></div>}
+            {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Dodatki</span><span className="font-semibold text-ink">{fmtPLN(addonsTotal)}</span></div>}
+            {!v.self_pickup && <div className="flex justify-between"><span className="text-ink-2">Transport</span><span className="font-semibold text-ink">{fmtPLN(transportPrice)}</span></div>}
             {order.discountAmount > 0 && (
               <div className="flex justify-between"><span className="text-ink-2">Rabat{v.discount_type === "PERCENT" ? ` (${discountValueNum}%)` : ""}</span><span className="font-semibold text-ok">− {fmtPLN(order.discountAmount)}</span></div>
             )}
@@ -562,8 +629,8 @@ export function ReservationForm({
             {Math.round(finalPrice) !== Math.round(order.total) && (
               <div className="flex justify-between text-[11px] text-ink-2"><span>Wyliczona (pakiet+dodatki+transport−rabat)</span><span>{fmtPLN(order.total)}</span></div>
             )}
-            <div className="flex justify-between"><span className="text-ink-2">Zadatek</span><span className="font-semibold text-ink">{fmtPLN(depositNum)}</span></div>
-            <div className="flex justify-between"><span className="text-ink-2">Pozostało</span><span className="font-bold text-warn">{fmtPLN(remaining)}</span></div>
+            {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Zadatek</span><span className="font-semibold text-ink">{fmtPLN(depositNum)}</span></div>}
+            {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Pozostało</span><span className="font-bold text-warn">{fmtPLN(remaining)}</span></div>}
             {depositOverValue && (
               <div className="rounded-[9px] border border-[#3a1c1f] bg-[#251215] px-2.5 py-1.5 text-[11.5px] font-semibold text-bad">Zadatek przekracza wartość rezerwacji — zmniejsz go, aby zapisać.</div>
             )}
