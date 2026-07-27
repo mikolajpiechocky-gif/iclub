@@ -247,9 +247,9 @@ async function ReservationOps({
   const isDone = job.status === "DONE";
   const farTrip = transportCalcs.some((c) => (c.one_way_km ?? 0) > 100);
   const earnCtx = jobEarningsCtx(job, settings, farTrip);
-  const buildEarnings = async (rate: EmployeeRate | null, profileId: string, snapshot: EarningsBreakdown | null): Promise<EarningsBreakdown | null> => {
+  const buildEarnings = async (rate: EmployeeRate | null, profileId: string, snapshot: EarningsBreakdown | null, isLead: boolean): Promise<EarningsBreakdown | null> => {
     if (isDone && snapshot) return snapshot; // rozliczenie zamrożone w chwili zakończenia
-    return buildAssignmentEarnings(earnCtx, rate, profileId);
+    return buildAssignmentEarnings(earnCtx, rate, profileId, isLead);
   };
 
   const assignmentViews: AssignmentView[] = await Promise.all(assignments.map(async (a) => ({
@@ -259,13 +259,14 @@ async function ReservationOps({
     avatar_url: a.employee?.avatar_url ?? null,
     is_lead: a.is_lead,
     status: a.status,
-    earnings: await buildEarnings(a.rate, a.profile_id, a.earnings_snapshot),
+    earnings: await buildEarnings(a.rate, a.profile_id, a.earnings_snapshot, a.is_lead),
   })));
   const assignedIds = new Set(assignments.map((a) => a.profile_id));
   const availableEmployees = employees.filter((e) => !assignedIds.has(e.id)).map((e) => ({ id: e.id, full_name: e.full_name || "—" }));
   const myRate = employees.find((e) => e.id === profile?.id)?.rate ?? null;
-  const mySnapshot = profile ? assignments.find((a) => a.profile_id === profile.id)?.earnings_snapshot ?? null : null;
-  const myEarnings = profile ? await buildEarnings(myRate, profile.id, mySnapshot) : null;
+  const myAssignment = profile ? assignments.find((a) => a.profile_id === profile.id) ?? null : null;
+  const mySnapshot = myAssignment?.earnings_snapshot ?? null;
+  const myEarnings = profile ? await buildEarnings(myRate, profile.id, mySnapshot, myAssignment?.is_lead ?? false) : null;
   const amIAssigned = profile ? assignments.some((a) => a.profile_id === profile.id && a.status === "APPROVED") : false;
   const amIRequested = profile ? assignments.some((a) => a.profile_id === profile.id && a.status === "REQUESTED") : false;
   const unavailableIds = await getUnavailableProfileIds(job.event_date);
@@ -286,7 +287,9 @@ async function ReservationOps({
   // Wynagrodzenia liczymy z rozliczenia zespołu (laborSum); koszty kategorii „Wynagrodzenie"/„Premia"
   // pomijamy, żeby nie odjąć tego samego dwa razy.
   const jobCosts = allCosts.filter((c) => c.job_id === job.id && c.category !== "Wynagrodzenie" && c.category !== "Premia");
-  const revenue = Number(job.reservation?.price ?? 0) || 0;
+  // §II.16 Potrącenie z kaucji za uszkodzenia = dodatkowy przychód realizacji.
+  const depositDeduction = Number(job.reservation?.deposit_deduction ?? 0) || 0;
+  const revenue = (Number(job.reservation?.price ?? 0) || 0) + depositDeduction;
   const costsVerified = jobCosts.filter((c) => c.status === "VERIFIED").reduce((s, c) => s + Number(c.amount || 0), 0);
   const costsPending = jobCosts.filter((c) => c.status === "PENDING").reduce((s, c) => s + Number(c.amount || 0), 0);
   const laborSum = assignmentViews.filter((a) => a.status === "APPROVED").reduce((s, a) => s + (a.earnings?.total ?? 0), 0);

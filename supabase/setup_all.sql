@@ -1477,3 +1477,9 @@ alter table public.job_stages add column if not exists done_at timestamptz;
 -- rezerwacji przez Szefa (client_confirmed). Inaczej telefon odhaczał się z automatu.
 alter table public.reservations add column if not exists phone_call_done boolean not null default false;
 
+-- ================= 0057: potrącenie z kaucji + wartość dosprzedaży (audyt) =================
+-- deposit_deduction: kwota zatrzymana z kaucji za uszkodzenia (przychód realizacji, §16).
+-- upsell_value: wartość dodatków dosprzedanych w telefonie (premia pracownika 15%, §12).
+alter table public.reservations add column if not exists deposit_deduction numeric not null default 0;
+alter table public.reservations add column if not exists upsell_value numeric not null default 0;
+

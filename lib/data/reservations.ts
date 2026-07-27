@@ -357,6 +357,7 @@ export async function saveCallDetails(id: string, input: {
   addonIds: string[];
   addonQty: Record<string, number>;
   skipGrass: boolean;
+  upsellValue?: number;
 }): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -366,6 +367,7 @@ export async function saveCallDetails(id: string, input: {
     addon_ids: input.addonIds,
     addon_qty: input.addonQty,
     skip_grass: input.skipGrass,
+    upsell_value: Math.max(0, Math.round((input.upsellValue ?? 0) * 100) / 100),
     // §II.12 Telefon do klienta ma WŁASNY znacznik — niezależny od potwierdzenia rezerwacji.
     phone_call_done: true,
     client_confirmed: true,
@@ -378,13 +380,21 @@ export async function saveCallDetails(id: string, input: {
   }
   let { error } = await supabase.from("reservations").update(patch).eq("id", id);
   // Odporność na brak migracji: jeśli nowych kolumn jeszcze nie ma w bazie, zapisz resztę
-  // (godziny, dodatki, potwierdzenie) — funkcje trawy/telefonu włączą się po uruchomieniu SQL.
-  if (error && /skip_grass|phone_call_done/i.test(error.message)) {
-    const { skip_grass, phone_call_done, ...safe } = patch;
-    void skip_grass; void phone_call_done;
+  // (godziny, dodatki, potwierdzenie) — funkcje trawy/telefonu/premii włączą się po uruchomieniu SQL.
+  if (error && /skip_grass|phone_call_done|upsell_value/i.test(error.message)) {
+    const { skip_grass, phone_call_done, upsell_value, ...safe } = patch;
+    void skip_grass; void phone_call_done; void upsell_value;
     ({ error } = await supabase.from("reservations").update(safe).eq("id", id));
   }
   if (error) throw new Error(error.message);
+}
+
+// §II.16 Zapis potrącenia z kaucji (przychód realizacji). Odporny na brak migracji 0057.
+export async function setDepositDeduction(id: string, amount: number): Promise<void> {
+  const supabase = await createClient();
+  const val = Math.max(0, Math.round((amount || 0) * 100) / 100);
+  const { error } = await supabase.from("reservations").update({ deposit_deduction: val }).eq("id", id);
+  if (error && !/deposit_deduction/i.test(error.message)) throw new Error(error.message);
 }
 
 // Potwierdzenie szczegółów przez klienta (§42) — osobno od edycji rezerwacji.

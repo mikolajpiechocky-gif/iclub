@@ -75,10 +75,10 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   let earnings: { baseLabel: string; total: number } | null = null;
   if (profile && job.business_line === "ICLUB") {
     const [settings, employee, assignments] = await Promise.all([getSettings(), getEmployee(profile.id), listJobAssignments(job.id)]);
-    const snap = assignments.find((a) => a.profile_id === profile.id)?.earnings_snapshot ?? null;
-    const eb = job.status === "DONE" && snap
-      ? snap
-      : await buildAssignmentEarnings(jobEarningsCtx(job, settings, (distanceKm ?? 0) > 100), employee?.rate ?? null, profile.id);
+    const mine = assignments.find((a) => a.profile_id === profile.id) ?? null;
+    const eb = job.status === "DONE" && mine?.earnings_snapshot
+      ? mine.earnings_snapshot
+      : await buildAssignmentEarnings(jobEarningsCtx(job, settings, (distanceKm ?? 0) > 100), employee?.rate ?? null, profile.id, mine?.is_lead ?? false);
     if (eb) earnings = { baseLabel: eb.baseLabel, total: eb.total };
   }
 
@@ -107,6 +107,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
   const paymentReported = payments.some((p) => p.job_id === job.id);
 
   const ctx: RealizationContext = {
+    reservationId: r?.id ?? "",
     navUrl,
     toPay,
     billing,

@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { setStageStatus, recomputeJobStatus } from "@/lib/data/jobs";
 import { createPayment } from "@/lib/data/payments";
 import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
-import { saveCallDetails } from "@/lib/data/reservations";
+import { saveCallDetails, setDepositDeduction } from "@/lib/data/reservations";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
 import type { StageStatus, PaymentMethod } from "@/lib/data/types";
 
@@ -17,6 +17,7 @@ export interface ClientCallInput {
   addonIds: string[];
   addonQty: Record<string, number>;
   skipGrass: boolean;
+  upsellValue: number; // §II.12 wartość dodatków dosprzedanych w rozmowie (premia 15%)
 }
 
 export interface ActionResult {
@@ -51,9 +52,24 @@ export async function saveClientCallAction(reservationId: string, jobId: string,
       addonIds: input.addonIds,
       addonQty: input.addonQty,
       skipGrass: input.skipGrass,
+      upsellValue: input.upsellValue,
     });
     // §S3 Po telefonie (ustalono zakres/dodatki) wygeneruj checklistę pakowania, jeśli jej nie ma.
     await generateChecklistForJob(jobId, { onlyIfEmpty: true }).catch(() => {});
+    revalidatePath(`/field/${jobId}`);
+    revalidatePath(`/reservations/${reservationId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
+  }
+}
+
+// §II.16 Zapis potrącenia z kaucji przy demontażu (wchodzi w przychód/rentowność realizacji).
+export async function saveDepositDeductionAction(reservationId: string, jobId: string, amount: number): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
+  if (!reservationId) return { ok: true }; // brak rezerwacji — nic do zapisania
+  try {
+    await setDepositDeduction(reservationId, amount);
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/reservations/${reservationId}`);
     return { ok: true };

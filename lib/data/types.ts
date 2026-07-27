@@ -237,6 +237,8 @@ export interface ReservationRecord {
   client_confirmed_at: string | null;
   skip_grass: boolean; // §II.12 klient rezygnuje ze sztucznej trawy (mimo pakietu)
   phone_call_done: boolean; // §II.12 zadanie „Telefon do klienta" wykonane (osobno od potwierdzenia)
+  deposit_deduction: number; // §II.16 potrącenie z kaucji za uszkodzenia (przychód realizacji)
+  upsell_value: number;      // §II.12 wartość dodatków dosprzedanych w telefonie (premia 15%)
   invoice_issued: boolean;
   invoice_issued_at: string | null;
   invoice_number: string | null;

@@ -359,8 +359,11 @@ export async function markRealizationDoneAction(reservationId: string): Promise<
       const ctx = jobEarningsCtx(job, settings, farTrip);
       for (const a of assignments) {
         if (a.status !== "APPROVED") continue;
-        const eb = await buildAssignmentEarnings(ctx, a.rate, a.profile_id);
-        if (eb) await setAssignmentEarningsSnapshot(a.id, eb);
+        // §II.12 premia od dosprzedaży trafia do prowadzącego (is_lead).
+        const eb = await buildAssignmentEarnings(ctx, a.rate, a.profile_id, a.is_lead);
+        // §M2 Zamrażamy snapshot ZAWSZE dla przypisanego — także przy braku stawki (placeholder 0 zł),
+        // żeby późniejsze ustawienie stawki nie zmieniało wstecznie zamkniętej realizacji.
+        await setAssignmentEarningsSnapshot(a.id, eb ?? { base: 0, baseLabel: "Brak stawki", ownerBonus: 0, total: 0, possibleBonuses: [] });
       }
     } catch (e) {
       console.error("Zamrożenie rozliczeń nie powiodło się:", e);

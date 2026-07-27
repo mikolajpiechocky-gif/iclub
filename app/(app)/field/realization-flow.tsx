@@ -16,7 +16,7 @@ import type { JobStageRecord, PaymentMethod } from "@/lib/data/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/data/types";
 import type { SettlementBreakdown } from "@/lib/domain/billing";
 import { REALIZATIONS_BUCKET } from "@/lib/config/storage";
-import { advanceStageAction, reportFieldPaymentAction } from "./actions";
+import { advanceStageAction, reportFieldPaymentAction, saveDepositDeductionAction } from "./actions";
 import { createJobPhotoAction } from "./photo-actions";
 import { reportEquipmentStatusAction, addIssueAction, type EqStatus, type IssueType } from "./protocol-actions";
 
@@ -118,6 +118,7 @@ export function PackingBlock({
 
 /* ------------------------ Blok: Realizacja --------------------------- */
 export interface RealizationContext {
+  reservationId: string; // §II.16 do zapisu potrącenia z kaucji
   navUrl: string | null;
   toPay: number | null;
   billing: SettlementBreakdown | null; // §II.2 rozbicie rozliczenia (pakiet/dodatki/transport/zadatek)
@@ -322,7 +323,7 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobI
       return <RentalPanel jobId={jobId} pending={pending} onDone={onDone} />;
 
     case "TEARDOWN":
-      return <TeardownPanel jobId={jobId} items={ctx.teardownItems} pending={pending} onDone={onDone} onProgress={onProgress} />;
+      return <TeardownPanel jobId={jobId} reservationId={ctx.reservationId} items={ctx.teardownItems} pending={pending} onDone={onDone} onProgress={onProgress} />;
 
     default:
       return <DoneButton pending={pending} onClick={onDone} label="Gotowe" block />;
@@ -378,7 +379,7 @@ function RentalPanel({ jobId, pending, onDone }: { jobId: string; pending: boole
 
 // §II.8 Demontaż: kontrola sprzętu po tej samej checkliście. Dla każdej pozycji: OK
 // (nic nie klikasz) / Czyszczenie / Uszkodzony / Brak → zgłoszenie serwisowe.
-function TeardownPanel({ jobId, items, pending, onDone, onProgress }: { jobId: string; items: string[]; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
+function TeardownPanel({ jobId, reservationId, items, pending, onDone, onProgress }: { jobId: string; reservationId: string; items: string[]; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
   const [busy, startBusy] = useTransition();
   const [error, setError] = useState<string | null>(null);
   // Klucz po INDEKSIE pozycji (etykiety mogą się powtarzać między kategoriami → inaczej
@@ -445,9 +446,15 @@ function TeardownPanel({ jobId, items, pending, onDone, onProgress }: { jobId: s
         <div className="mt-1.5 flex items-center justify-between text-[12px] font-bold"><span className="text-ink">Do zwrotu klientowi</span><span className="text-ok">{fmtPLN(Math.max(0, 1000 - deducted))}</span></div>
       </div>
 
-      <DoneButton pending={pending} onClick={onDone} label="Zakończone — sprzęt w bazie" block />
+      <DoneButton pending={pending || busy} onClick={finish} label="Zakończone — sprzęt w bazie" block />
     </div>
   );
+
+  function finish() {
+    // §II.16 Zapisz potrącenie z kaucji (przychód realizacji) i zakończ demontaż.
+    if (deducted > 0 && reservationId) startBusy(async () => { await saveDepositDeductionAction(reservationId, jobId, deducted); onDone(); });
+    else onDone();
+  }
 }
 
 function DoneButton({ pending, onClick, label, block }: { pending: boolean; onClick: () => void; label: string; block?: boolean }) {

@@ -18,6 +18,7 @@ export interface JobEarningsCtx {
   rentalFlat: number | null;
   ownerBonus: number;
   hours: number;
+  upsellPremium: number; // §II.12 premia 15% od dosprzedaży (dla osoby prowadzącej realizację)
 }
 
 export function jobEarningsCtx(job: JobWithReservation, settings: AppSettings, farTrip: boolean): JobEarningsCtx {
@@ -31,6 +32,7 @@ export function jobEarningsCtx(job: JobWithReservation, settings: AppSettings, f
     rentalFlat: job.reservation?.rental_settlement_flat != null ? Number(job.reservation.rental_settlement_flat) : null,
     ownerBonus: Number(job.owner_bonus ?? 0) || 0,
     hours: settings.iclub_hours,
+    upsellPremium: Math.round((Number(job.reservation?.upsell_value ?? 0) || 0) * 0.15 * 100) / 100,
   };
 }
 
@@ -38,6 +40,7 @@ export async function buildAssignmentEarnings(
   ctx: JobEarningsCtx,
   rate: EmployeeRate | null,
   profileId: string,
+  isLead = false, // §II.12 premia od dosprzedaży należy się osobie prowadzącej realizację
 ): Promise<EarningsBreakdown | null> {
   // Wypożyczalnia: ryczałt per zlecenie (nadrzędny) albo model stawki.
   if (!ctx.iclub) {
@@ -56,12 +59,15 @@ export async function buildAssignmentEarnings(
   if (!rate) return null;
   const priorCount = ctx.monthPrefix ? await countDoneIclubRealizations(profileId, ctx.monthPrefix) : 0;
   const s = settlementForRealization(ctx.rules, priorCount, { farTrip: ctx.farTrip, hasGastro: ctx.hasGastro, rate });
-  const guaranteed = s.guaranteed.map((b) => b.label).join(" + ");
+  const upsell = isLead ? ctx.upsellPremium : 0; // premia od dosprzedaży tylko dla prowadzącego
+  const labels = s.guaranteed.map((b) => b.label);
+  if (upsell > 0) labels.push("Dosprzedaż");
+  const guaranteed = labels.join(" + ");
   return {
     base: s.baseValue,
     baseLabel: guaranteed ? `${s.baseLabel} + ${guaranteed}` : s.baseLabel,
     ownerBonus: ctx.ownerBonus,
-    total: Math.round((s.total + ctx.ownerBonus) * 100) / 100,
+    total: Math.round((s.total + ctx.ownerBonus + upsell) * 100) / 100,
     possibleBonuses: s.possible,
   };
 }
