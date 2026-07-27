@@ -20,6 +20,21 @@ import {
   messageTypeIsMine,
 } from "@/lib/integrations/olx/extract";
 
+// Normalizacja znacznika czasu OLX do ISO (kolumny timestamptz). OLX bywa: ISO, epoch (s/ms),
+// napis numeryczny. Bez tego epoch wywalał INSERT/UPDATE („invalid input syntax for timestamptz")
+// i psuł sortowanie wiadomości (leksykograficzne mieszanie epoch/ISO).
+function toIso(v: string | null | undefined): string | null {
+  if (!v) return null;
+  const str = String(v).trim();
+  if (/^\d{9,}$/.test(str)) {
+    const n = Number(str);
+    const d = new Date(n < 1e12 ? n * 1000 : n); // sekundy → ms
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 export interface OlxSyncResult {
   ok: boolean;
   imported: number;
@@ -28,7 +43,14 @@ export interface OlxSyncResult {
 }
 
 export async function syncOlxThreads(): Promise<OlxSyncResult> {
-  const token = await getValidAccessToken();
+  // §OLX Pozyskanie/odświeżenie tokenu w try — wygasły refresh_token nie może wywalić 500
+  // (cron oczekuje 200 + {ok:false}); zwracamy czytelny błąd zamiast rzucać.
+  let token: string | null;
+  try {
+    token = await getValidAccessToken();
+  } catch (e) {
+    return { ok: false, imported: 0, updated: 0, error: e instanceof Error ? e.message : "Nie udało się odświeżyć tokenu OLX." };
+  }
   if (!token) return { ok: false, imported: 0, updated: 0, error: "OLX niepołączone — najpierw kliknij „Połącz OLX”." };
 
   const s = createAdminClient();
@@ -102,7 +124,7 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
         for (const m of rawMsgs) {
           const text = extractMessageText(m);
           if (!text) continue;
-          const at = extractMessageTime(m);
+          const at = toIso(extractMessageTime(m)); // normalizacja epoch/ISO → ISO (poprawne sort + zapis)
           // Kierunek: najpierw po id autora vs własne id, potem po polu type.
           const authorId = extractMessageAuthorId(m);
           let mine: boolean;
@@ -129,14 +151,14 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
         // Analiza całej rozmowy — czy oferta faktycznie domknięta.
         const analysis = analyzeConversation(msgs, `${name}\n${advert}`);
         const lastMsg = msgs.length ? msgs[msgs.length - 1].text : null;
-        const lastAt = msgs.length ? msgs[msgs.length - 1].at : (pick(th, "updated_at") ?? null) as string | null;
+        const lastAt = msgs.length ? msgs[msgs.length - 1].at : toIso(pick(th, "updated_at") as string | null);
         const notes = [`OLX: ${name}`, advert && `Ogłoszenie: ${advert}`, advLoc && `Lokalizacja: ${advLoc}`, lastMsg && `„${lastMsg}”`].filter(Boolean).join("\n");
 
         // Sample surowych danych do diagnostyki mapowania (ograniczony rozmiar).
         const olxRaw = { thread: th, messages: rawMsgs.slice(0, 4), me_id: myId };
 
-        const { data: existing } = await s.from("inquiries").select("id, status, reactivation_count, location, contract_signal").eq("olx_thread_id", threadId).maybeSingle();
-        const ex = existing as { id: string; status: string; reactivation_count: number; location: string | null; contract_signal: boolean } | null;
+        const { data: existing } = await s.from("inquiries").select("id, status, reactivation_count, location, contract_signal, olx_last_message_at").eq("olx_thread_id", threadId).maybeSingle();
+        const ex = existing as { id: string; status: string; reactivation_count: number; location: string | null; contract_signal: boolean; olx_last_message_at: string | null } | null;
 
         // Dane z OLX (nick, mail, historia, sygnał) aktualizujemy zawsze — to nie są ręczne
         // dane CRM (status, klient, notatki), które pozostają nietknięte.
@@ -148,14 +170,19 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
           olx_last_message: lastMsg,
           olx_last_message_at: lastAt,
           olx_raw: olxRaw,
-          last_activity_at: new Date().toISOString(),
+          // §OLX Realny czas ostatniej wiadomości (a NIE czas synchronizacji) — inaczej auto-zamykanie
+          // po 21 dniach nigdy nie zachodziło (każdy sync odświeżał aktywność na „teraz").
+          last_activity_at: lastAt ?? new Date().toISOString(),
         };
 
         if (ex) {
           const patch = { ...olxData };
           // Lokalizację uzupełniamy tylko gdy pusta — nie kasujemy ręcznej edycji CRM.
           if (advLoc && !ex.location) patch.location = advLoc;
-          if (ex.status === "LOST") {
+          // §OLX Reheat LOST→REHEATED TYLKO gdy pojawiła się NOWA wiadomość od ostatniego syncu
+          // (lastAt nowszy niż zapisany) — inaczej cron cofał ręczne oznaczenie „przegrany".
+          const newMessage = Boolean(lastAt && ex.olx_last_message_at && lastAt > ex.olx_last_message_at);
+          if (ex.status === "LOST" && newMessage) {
             patch.status = "REHEATED";
             patch.previous_status = "LOST";
             patch.reactivation_count = (ex.reactivation_count ?? 0) + 1;
@@ -174,8 +201,9 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
             olx_thread_id: threadId,
             ...olxData,
           });
-          if (error) { if (!firstError) firstError = error.message; }
-          else { imported++; newNames.push(name); if (analysis.signal) closedNames.push(name); }
+          // 23505 = ten wątek utworzył równoległy sync (ręczny + cron) — to nie błąd (indeks chroni dedup).
+          if (error && (error as { code?: string }).code !== "23505") { if (!firstError) firstError = error.message; }
+          else if (!error) { imported++; newNames.push(name); if (analysis.signal) closedNames.push(name); }
         }
       }
 

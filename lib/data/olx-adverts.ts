@@ -68,32 +68,39 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
 
         let views = 0;
         let phones = 0;
+        let statsOk = false;
         try {
           const st = (await getAdvertStatistics(token, olxId)) as Record<string, unknown>;
           views = num(pick(st, "data", "views") ?? pick(st, "views") ?? pick(st, "data", "impressions"));
           phones = num(pick(st, "data", "phones") ?? pick(st, "phones") ?? pick(st, "data", "phone_views") ?? pick(st, "phone_views"));
+          statsOk = true;
         } catch {
-          /* ogłoszenie bez statystyk — zostają zera */
+          /* chwilowy błąd statystyk — NIE nadpisujemy realnych wartości zerami */
         }
 
         const { data: prev } = await s.from("olx_adverts").select("views, phones, last_synced_at").eq("olx_id", olxId).maybeSingle();
         const p = prev as { views: number; phones: number; last_synced_at: string } | null;
 
-        await s.from("olx_adverts").upsert({
+        const row: Record<string, unknown> = {
           olx_id: olxId,
           title: (pick(a, "title") as string) ?? null,
           status: (pick(a, "status") as string) ?? null,
           url: (pick(a, "url") as string) ?? null,
           valid_to: (pick(a, "valid_to") ?? pick(a, "expires_at") ?? pick(a, "date_end") ?? null) as string | null,
           olx_created_at: (pick(a, "created_at") ?? null) as string | null,
-          views,
-          phones,
-          prev_views: p?.views ?? null,
-          prev_phones: p?.phones ?? null,
-          prev_synced_at: p?.last_synced_at ?? null,
           last_synced_at: new Date().toISOString(),
           raw: a,
-        });
+        };
+        // §OLX Wyświetlenia/telefony i historię prev_* aktualizujemy TYLKO przy udanym pomiarze —
+        // chwilowy błąd API nie skasuje realnych metryk (i nie zafałszuje rankingu skokiem ±).
+        if (statsOk) {
+          row.views = views;
+          row.phones = phones;
+          row.prev_views = p?.views ?? null;
+          row.prev_phones = p?.phones ?? null;
+          row.prev_synced_at = p?.last_synced_at ?? null;
+        }
+        await s.from("olx_adverts").upsert(row);
         synced++;
       }
 
