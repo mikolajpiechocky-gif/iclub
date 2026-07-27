@@ -57,9 +57,11 @@ export async function checkTentOverbooking(
     all = (data ?? []) as ReservationWithRefs[];
   }
 
+  const nowIso = new Date().toISOString();
   const overlapping = all.filter((r) => {
     if (r.id === excludeId) return false;
     if (r.status !== "TEMPORARY" && r.status !== "CONFIRMED") return false;
+    if (isStaleHold(r, nowIso)) return false;
     const rg = reservationRange(r);
     return rangesOverlap(startDate, end, rg.start, rg.end);
   });
@@ -125,13 +127,15 @@ export async function checkAddonOverbooking(
 
   const { data } = await supabase
     .from("reservations")
-    .select("id, addon_ids, addon_qty, package_id, setup_date, teardown_date, event_date, status")
+    .select("id, addon_ids, addon_qty, package_id, setup_date, teardown_date, event_date, status, expires_at")
     .in("status", ["TEMPORARY", "CONFIRMED"]);
-  const rows = (data ?? []) as { id: string; addon_ids: string[] | null; addon_qty: Record<string, number> | null; package_id: string | null; setup_date: string | null; teardown_date: string | null; event_date: string | null }[];
+  const rows = (data ?? []) as { id: string; addon_ids: string[] | null; addon_qty: Record<string, number> | null; package_id: string | null; setup_date: string | null; teardown_date: string | null; event_date: string | null; status: string; expires_at: string | null }[];
 
+  const nowIso = new Date().toISOString();
   const used = new Map<string, number>();
   for (const r of rows) {
     if (r.id === excludeId) continue;
+    if (isStaleHold(r, nowIso)) continue;
     const rg = reservationRange(r);
     if (!rangesOverlap(startDate, end, rg.start, rg.end)) continue;
     for (const [eq, q] of usageFor(r.addon_ids, r.addon_qty, r.package_id)) {
@@ -171,14 +175,16 @@ export async function checkHeatingAvailability(
   // Ile nagrzewnic zajmują inne rezerwacje z ogrzewaniem w nakładającym się terminie.
   const { data } = await supabase
     .from("reservations")
-    .select("id, setup_date, teardown_date, event_date, status")
+    .select("id, setup_date, teardown_date, event_date, status, expires_at")
     .eq("heating", true)
     .in("status", ["TEMPORARY", "CONFIRMED"]);
-  const rows = (data ?? []) as { id: string; setup_date: string | null; teardown_date: string | null; event_date: string | null }[];
+  const rows = (data ?? []) as { id: string; setup_date: string | null; teardown_date: string | null; event_date: string | null; status: string; expires_at: string | null }[];
 
+  const nowIso = new Date().toISOString();
   let used = 0;
   for (const r of rows) {
     if (r.id === excludeId) continue;
+    if (isStaleHold(r, nowIso)) continue;
     const rg = reservationRange(r);
     if (rangesOverlap(startDate, end, rg.start, rg.end)) used += 1;
   }
@@ -419,6 +425,25 @@ export async function setInvoiceIssued(id: string, issued: boolean, invoiceNumbe
     })
     .eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+// §overbooking Wygasła blokada tymczasowa (status TEMPORARY, expires_at < teraz) NIE zajmuje już
+// zasobu — inaczej martwy hold blokowałby namiot/dodatek/nagrzewnicę w nieskończoność.
+function isStaleHold(r: { status?: string | null; expires_at?: string | null }, nowIso: string): boolean {
+  return r.status === "TEMPORARY" && !!r.expires_at && r.expires_at < nowIso;
+}
+
+// Zmiana przeterminowanych blokad tymczasowych na EXPIRED (dla spójności list/dashboardu).
+export async function expireStaleHolds(): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reservations")
+    .update({ status: "EXPIRED" })
+    .eq("status", "TEMPORARY")
+    .lt("expires_at", new Date().toISOString())
+    .select("id");
+  return data?.length ?? 0;
 }
 
 // --- Dostępność / konflikty namiotu (§8, §15) ---

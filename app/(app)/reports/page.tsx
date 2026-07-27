@@ -49,7 +49,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   }
   const costByJob = new Map<string, number>();
   for (const c of costs) {
-    if (!c.job_id) continue;
+    if (!c.job_id || c.status === "REJECTED") continue; // odrzucone koszty nie liczą się (spójnie z Koszty/rentownością)
     costByJob.set(c.job_id, (costByJob.get(c.job_id) ?? 0) + Number(c.amount || 0));
   }
 
@@ -78,7 +78,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // realizacji; zwrot liczony z zysku narastająco (przychód − koszty bieżące).
   const invested = investments.reduce((s, i) => s + Number(i.amount || 0), 0);
   const allRevenue = payments.filter((p) => p.status === "PAID").reduce((s, p) => s + Number(p.amount || 0), 0);
-  const allOpCost = costs.reduce((s, c) => s + Number(c.amount || 0), 0);
+  const allOpCost = costs.filter((c) => c.status !== "REJECTED").reduce((s, c) => s + Number(c.amount || 0), 0);
   const cumProfit = allRevenue - allOpCost;
   const returned = Math.max(0, cumProfit);
   const paybackPct = invested > 0 ? Math.min(100, Math.round((returned / invested) * 100)) : 0;

@@ -25,6 +25,13 @@ export async function runNotificationsSweep(): Promise<{ ok: boolean; sent: Reco
   const tomorrow = ymd(1);
   const in2 = ymd(2);
 
+  // 0. Wygaś przeterminowane blokady tymczasowe (TEMPORARY, expires_at < teraz) → EXPIRED.
+  // Zwalnia namiot/zasób w listach i overbookingu (martwy hold nie blokuje już rezerwacji).
+  try {
+    const { data } = await s.from("reservations").update({ status: "EXPIRED" }).eq("status", "TEMPORARY").lt("expires_at", new Date().toISOString()).select("id");
+    if (data?.length) sent.expired = data.length;
+  } catch { /* pomiń */ }
+
   // 1. Przypomnienie o cenach paliwa (≥14 dni od aktualizacji).
   try {
     const { data } = await s.from("app_settings").select("fuel_updated_at").eq("id", true).maybeSingle();
