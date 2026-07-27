@@ -155,9 +155,12 @@ export async function syncReservationToCalendar(reservationId: string, opts: { a
       if (result === "error") return; // błąd przejściowy — nie duplikuj, ponowimy przy edycji
       // result === "gone" — wydarzenie skasowano w kalendarzu.
     }
-    // Nowe wydarzenia tylko przy zakładaniu rezerwacji w apce; stare/importowane
-    // (bez gcal_event_id) NIE trafiają do kalendarza — nawet przy edycji.
+    // Nowe wydarzenia przy zakładaniu rezerwacji ORAZ przy zapisie edycji (backfill), gdy
+    // rezerwacja nie ma jeszcze wydarzenia. Przeszłych (zakończonych) NIE dotwarzamy, żeby
+    // nie zaśmiecać kalendarza historią.
     if (!allowCreate) return;
+    const todayWarsaw = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Warsaw" });
+    if (endInclusive < todayWarsaw) return;
     const id = await createCalendarEvent(event);
     if (id) await supabase.from("reservations").update({ gcal_event_id: id }).eq("id", reservationId);
   } catch {

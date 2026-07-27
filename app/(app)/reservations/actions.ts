@@ -419,7 +419,9 @@ export async function updateReservationAction(id: string, values: ReservationFor
   try {
     const resolved = await resolveNewCustomer(values);
     await updateReservation(id, toInput(resolved));
-    try { await syncReservationToCalendar(id); } catch {}
+    // §kalendarz Zapis edycji aktualizuje istniejące wydarzenie, a gdy go brak — dotwarza je
+    // (backfill aktywnych rezerwacji; przeszłych nie dotwarzamy).
+    try { await syncReservationToCalendar(id, { allowCreate: true }); } catch (e) { console.error("Kalendarz: sync przy edycji nie powiódł się", e); }
     // Zmiana szczegółów → push do przypisanych (APPROVED) pracowników.
     try {
       const job = await getJobByReservation(id);
