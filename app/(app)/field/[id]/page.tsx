@@ -40,7 +40,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
 
   // §II.15 Samonaprawianie: dołóż brakujące etapy (np. „Wynajem trwa") do starszych
   // zleceń bez odtwarzania rezerwacji. Po zmianie przeładuj listę w prawidłowej kolejności.
-  const stagesChanged = await syncJobStages(job.id, job.business_line, stagesRaw).catch(() => false);
+  const stagesChanged = await syncJobStages(job.id, job.business_line, stagesRaw, job.reservation?.self_pickup ?? false).catch(() => false);
   const stages = stagesChanged ? await getJobStages(id) : stagesRaw;
 
   const r = job.reservation;
@@ -200,31 +200,37 @@ export default async function FieldRealizationPage({ params }: { params: Promise
           />
         )}
 
-        {/* Blok: Pakowanie (osobny etap, dzień przed) */}
-        <PackingBlock
-          jobId={job.id}
-          stage={packing}
-          checklistHref={`/field/${job.id}/checklist`}
-          progress={{ done: checklist.filter((i) => i.done).length, total: checklist.length }}
-        />
+        {/* Blok: Pakowanie (iClub — osobny etap, dzień przed) */}
+        {job.business_line === "ICLUB" && (
+          <PackingBlock
+            jobId={job.id}
+            stage={packing}
+            checklistHref={`/field/${job.id}/checklist`}
+            progress={{ done: checklist.filter((i) => i.done).length, total: checklist.length }}
+          />
+        )}
 
-        {/* §II.14 Pojazd realizacji (wymagany do rozpoczęcia) */}
-        <FieldVehicle
-          jobId={job.id}
-          assigned={jobVehicles.map((jv) => ({ id: jv.id, name: jv.vehicle?.name ?? "—", registration: jv.vehicle?.registration ?? null }))}
-          available={vehicles.filter((v) => !assignedVehicleIds.has(v.id)).map((v) => ({ id: v.id, name: v.name }))}
-        />
+        {/* Pojazd realizacji — iClub oraz wypożyczalnia z transportem (nie przy odbiorze własnym) */}
+        {!(job.business_line === "EQUIPMENT_RENTAL" && r?.self_pickup) && (
+          <FieldVehicle
+            jobId={job.id}
+            assigned={jobVehicles.map((jv) => ({ id: jv.id, name: jv.vehicle?.name ?? "—", registration: jv.vehicle?.registration ?? null }))}
+            available={vehicles.filter((v) => !assignedVehicleIds.has(v.id)).map((v) => ({ id: v.id, name: v.name }))}
+          />
+        )}
 
         {/* Blok: Realizacja (kroki z własnymi czynnościami) */}
         <RealizationFlow jobId={job.id} steps={flowSteps} ctx={ctx} />
 
-        {/* Blok: Rozpakowanie i protokół (koszty + sprzęt do czyszczenia/naprawy) */}
-        <ProtocolBlock
-          jobId={job.id}
-          costs={jobCosts.map((c) => ({ id: c.id, category: c.category, amount: Number(c.amount), note: c.note, status: c.status }))}
-          incidents={jobIncidents.map((i) => ({ id: i.id, category: i.category, equipment: i.equipment, priority: i.priority, status: i.status }))}
-          summary={{ distanceKm, transportCost, costsTotal }}
-        />
+        {/* Blok: Rozpakowanie i protokół (iClub — koszty + sprzęt do czyszczenia/naprawy) */}
+        {job.business_line === "ICLUB" && (
+          <ProtocolBlock
+            jobId={job.id}
+            costs={jobCosts.map((c) => ({ id: c.id, category: c.category, amount: Number(c.amount), note: c.note, status: c.status }))}
+            incidents={jobIncidents.map((i) => ({ id: i.id, category: i.category, equipment: i.equipment, priority: i.priority, status: i.status }))}
+            summary={{ distanceKm, transportCost, costsTotal }}
+          />
+        )}
 
         {/* Akcje stałe */}
         <div className="mt-3.5 flex gap-2.5">

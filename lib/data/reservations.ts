@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { ReservationRecord, ReservationWithRefs, ReservationStatus, BusinessLine, TentRecord, PricingSnapshot } from "./types";
 import { DEMO_RESERVATIONS } from "./demo-resources";
-import { stagesForBusinessLine } from "@/lib/domain/stages";
+import { stagesForReservation } from "@/lib/domain/stages";
 import { listTents } from "./resources";
 import { tentSizeCode } from "@/lib/domain/calendar";
 import { type TentSlots, type TentCapacities, type TentChoice, sumSlots, exceededPools, choiceFromTent } from "@/lib/domain/tents";
@@ -300,7 +300,7 @@ export async function createReservation(input: ReservationInput): Promise<{ id: 
     .single();
   if (jErr) throw new Error(jErr.message);
 
-  const stages = stagesForBusinessLine(input.business_line).map((s, i) => ({
+  const stages = stagesForReservation(input.business_line, input.self_pickup ?? false).map((s, i) => ({
     job_id: job.id,
     stage_key: s.key,
     title: s.title,
@@ -335,7 +335,7 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
       .select("id")
       .single();
     if (jErr) throw new Error(jErr.message);
-    const stages = stagesForBusinessLine(input.business_line).map((s, i) => ({ job_id: (job as { id: string }).id, stage_key: s.key, title: s.title, sort: i }));
+    const stages = stagesForReservation(input.business_line, input.self_pickup ?? false).map((s, i) => ({ job_id: (job as { id: string }).id, stage_key: s.key, title: s.title, sort: i }));
     const { error: sErr } = await supabase.from("job_stages").insert(stages);
     if (sErr) throw new Error(sErr.message);
   }

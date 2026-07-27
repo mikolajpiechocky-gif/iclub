@@ -25,20 +25,36 @@ export const ICLUB_STAGES: StageTemplate[] = [
   { key: "TEARDOWN", title: "Demontaż i powrót" },
 ];
 
-// Wypożyczalnia z dostawą (§28) — użyjemy przy module wypożyczalni (Faza 11).
-export const EQUIPMENT_DELIVERY_STAGES: StageTemplate[] = [
-  { key: "PREP", title: "Przygotowanie" },
-  { key: "CLEANING", title: "Czyszczenie" },
-  { key: "PACKING", title: "Pakowanie" },
-  { key: "DELIVERY", title: "Dostawa" },
-  { key: "UNLOAD", title: "Rozładunek" },
-  { key: "RETURN_TRIP", title: "Powrót" },
-  { key: "PICKUP", title: "Odbiór" },
-  { key: "CHECK", title: "Kontrola" },
-  { key: "CLEANING2", title: "Czyszczenie" },
-  { key: "PUTAWAY", title: "Odłożenie" },
+// Wypożyczalnia — ODBIÓR WŁASNY (klient sam odbiera i zwraca): jedno zadanie w realizacji.
+export const RENTAL_SELF_STAGES: StageTemplate[] = [
+  { key: "R_START", title: "Rozpocznij" },
+  { key: "R_CLEAN_PRE", title: "Kontrola czystości" },
+  { key: "R_READY", title: "Przygotowane" },
+  { key: "R_RETURN", title: "Klient zwraca" },
+  { key: "R_CLEAN_POST", title: "Czyszczenie" },
+  { key: "R_CHECK", title: "Kontrola stanu po wynajmie" },
 ];
 
+// Wypożyczalnia — TRANSPORT po naszej stronie: dwa zadania (dostawa + odbiór) w jednej realizacji.
+export const RENTAL_TRANSPORT_STAGES: StageTemplate[] = [
+  // Zadanie 1 — dostawa
+  { key: "D_START", title: "Rozpocznij dostawę" },
+  { key: "D_CLEAN_PRE", title: "Kontrola czystości" },
+  { key: "D_TRANSPORT", title: "Transport do klienta" },
+  { key: "D_DONE", title: "Dostawa zakończona" },
+  // Zadanie 2 — odbiór
+  { key: "P_START", title: "Rozpocznij odbiór" },
+  { key: "P_CHECK", title: "Kontrola stanu po wynajmie" },
+  { key: "P_CLEAN_PUT", title: "Czyszczenie i odłożenie" },
+];
+
+// Etapy zależą od linii i (dla wypożyczalni) od trybu odbioru własnego.
+export function stagesForReservation(line: BusinessLine, selfPickup = false): StageTemplate[] {
+  if (line === "ICLUB") return ICLUB_STAGES;
+  return selfPickup ? RENTAL_SELF_STAGES : RENTAL_TRANSPORT_STAGES;
+}
+
+// Zgodność wstecz (bez trybu odbioru) — wypożyczalnia domyślnie z transportem.
 export function stagesForBusinessLine(line: BusinessLine): StageTemplate[] {
-  return line === "ICLUB" ? ICLUB_STAGES : EQUIPMENT_DELIVERY_STAGES;
+  return stagesForReservation(line, false);
 }

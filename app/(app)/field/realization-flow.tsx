@@ -248,8 +248,18 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
           const isDone = s.status === "DONE";
           const isCurrent = i === currentIndex;
           const fill = stepFill(i, isDone);
+          // §wypożyczalnia Nagłówek zadania (Dostawa/Odbiór), gdy się zmienia — rozdziela dwa zadania.
+          const task = RENTAL_STEP_INFO[s.stage_key]?.task;
+          const prevTask = i > 0 ? RENTAL_STEP_INFO[steps[i - 1].stage_key]?.task : undefined;
           return (
-            <div key={s.id} className="flex gap-3">
+            <div key={s.id}>
+            {task && task !== prevTask && (
+              <div className="mb-1.5 mt-1 flex items-center gap-2">
+                <span className="rounded-full bg-[#271b3f] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.5px] text-[#e9d5ff]">Zadanie · {task}</span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            )}
+            <div className="flex gap-3">
               {/* Oś kroków */}
               <div className="flex flex-none flex-col items-center">
                 <span
@@ -281,6 +291,7 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
                 )}
               </div>
             </div>
+            </div>
           );
         })}
       </div>
@@ -288,8 +299,70 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
   );
 }
 
+// §wypożyczalnia Kroki realizacji wypożyczalni (odbiór własny R_*, transport D_*/P_*).
+// task = etykieta zadania (Dostawa/Odbiór) do rozdzielenia dwóch zadań w jednej realizacji.
+const RENTAL_STEP_INFO: Record<string, { desc: string; issues?: boolean; transport?: boolean; task?: string }> = {
+  // Odbiór własny — jedno zadanie
+  R_START: { desc: "Rozpocznij realizację wypożyczenia." },
+  R_CLEAN_PRE: { desc: "Sprawdź czystość sprzętu przed wydaniem klientowi." },
+  R_READY: { desc: "Sprzęt przygotowany i gotowy do wydania." },
+  R_RETURN: { desc: "Klient zwrócił sprzęt." },
+  R_CLEAN_POST: { desc: "Wyczyść sprzęt po zwrocie." },
+  R_CHECK: { desc: "Sprawdź stan sprzętu po wynajmie — zgłoś ewentualne usterki.", issues: true },
+  // Transport — zadanie 1: dostawa
+  D_START: { desc: "Rozpocznij dostawę do klienta.", task: "Dostawa" },
+  D_CLEAN_PRE: { desc: "Sprawdź czystość sprzętu przed wydaniem.", task: "Dostawa" },
+  D_TRANSPORT: { desc: "Dostarcz sprzęt do klienta.", transport: true, task: "Dostawa" },
+  D_DONE: { desc: "Dostawa zakończona — sprzęt u klienta.", task: "Dostawa" },
+  // Transport — zadanie 2: odbiór
+  P_START: { desc: "Rozpocznij odbiór sprzętu od klienta.", task: "Odbiór" },
+  P_CHECK: { desc: "Sprawdź stan sprzętu po wynajmie — zgłoś ewentualne usterki.", issues: true, task: "Odbiór" },
+  P_CLEAN_PUT: { desc: "Wyczyść sprzęt i odłóż na miejsce w magazynie.", task: "Odbiór" },
+};
+
+// Panel pojedynczego kroku wypożyczalni: opis + (transport: nawigacja) + (kontrola: zgłoszenia) + gotowe.
+function RentalStepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: string; stageKey: string; ctx: RealizationContext; pending: boolean; onDone: () => void }) {
+  const info = RENTAL_STEP_INFO[stageKey];
+  const [busy, startBusy] = useTransition();
+  const [type, setType] = useState<IssueType>("Incydent");
+  const [desc, setDesc] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const TYPES: IssueType[] = ["Uwaga", "Incydent", "Pomysł"];
+  const add = () => {
+    if (!desc.trim()) { setError("Opisz usterkę lub uwagę."); return; }
+    setError(null);
+    startBusy(async () => { const r = await addIssueAction(jobId, type, desc); if (r.ok) { setDesc(""); setSaved(true); } else setError(r.error ?? "Błąd"); });
+  };
+  return (
+    <div>
+      <p className="mb-3 text-[12.5px] text-ink-2">{info.desc}</p>
+      {info.transport && (
+        <div className="mb-3">
+          {!ctx.hasVehicle && <div className="mb-2"><Alert tone="warn" title="Przypisz pojazd">Bez pojazdu nie policzymy paliwa z faktycznych km.</Alert></div>}
+          {ctx.navUrl && <a href={ctx.navUrl} target="_blank" rel="noopener noreferrer" className="block rounded-[11px] border border-border bg-surface-2 py-2.5 text-center text-[12.5px] font-bold text-ink">Nawiguj do klienta</a>}
+        </div>
+      )}
+      {info.issues && (
+        <div className="mb-3 rounded-[11px] border border-border bg-surface px-3 py-2.5">
+          <div className="mb-2 text-[12px] font-bold text-ink">Zgłoś usterkę / uwagę</div>
+          <div className="mb-2 flex gap-1.5">
+            {TYPES.map((t) => <button key={t} onClick={() => setType(t)} className={`flex-1 rounded-[9px] px-2 py-1.5 text-[12px] font-bold ${type === t ? "bg-brand text-white" : "border border-border bg-surface-2 text-ink-2"}`}>{t}</button>)}
+          </div>
+          <input value={desc} onChange={(e) => { setDesc(e.target.value); setSaved(false); }} placeholder="Opis (uszkodzenie, brak, zabrudzenie…)" className="w-full rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-[13px] text-ink outline-none focus:border-accent" />
+          {error && <div className="mt-2"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
+          {saved && <div className="mt-2 text-[11.5px] font-semibold text-ok">✓ Zgłoszenie zapisane — Szef zostanie powiadomiony.</div>}
+          <button onClick={add} disabled={busy} className="mt-2 w-full rounded-[10px] bg-[#271b3f] py-2 text-[12.5px] font-bold text-[#e0c8ff]">{busy ? "Zapisywanie…" : "Dodaj zgłoszenie"}</button>
+        </div>
+      )}
+      <DoneButton pending={pending} onClick={onDone} label="Krok gotowy" block />
+    </div>
+  );
+}
+
 /* ------------------- Panel czynności dla danego kroku ---------------- */
 function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobId: string; stageKey: string; ctx: RealizationContext; pending: boolean; onDone: (reason?: string) => void; onProgress: (frac: number) => void }) {
+  if (RENTAL_STEP_INFO[stageKey]) return <RentalStepPanel jobId={jobId} stageKey={stageKey} ctx={ctx} pending={pending} onDone={onDone} />;
   switch (stageKey) {
     case "TRAVEL":
       return (

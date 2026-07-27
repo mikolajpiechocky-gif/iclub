@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { JobWithReservation, JobStageRecord, JobStatus, StageStatus, BusinessLine } from "./types";
 import { DEMO_RESERVATIONS } from "./demo-resources";
-import { ICLUB_STAGES, stagesForBusinessLine } from "@/lib/domain/stages";
+import { ICLUB_STAGES, stagesForReservation } from "@/lib/domain/stages";
 import { warsawTodayISO } from "@/lib/domain/dates";
 
 const RESV_SELECT =
@@ -159,9 +159,9 @@ export async function getJobStages(jobId: string): Promise<JobStageRecord[]> {
 // §II.15 Samonaprawianie etapów: dokłada do istniejącego zlecenia kroki, których brakuje
 // względem aktualnego szablonu (np. dodany później „Wynajem trwa"), i porządkuje kolejność.
 // Dzięki temu stare rezerwacje dostają nowe kroki BEZ odtwarzania. Zwraca true, gdy coś zmieniono.
-export async function syncJobStages(jobId: string, businessLine: BusinessLine, existing: JobStageRecord[]): Promise<boolean> {
+export async function syncJobStages(jobId: string, businessLine: BusinessLine, existing: JobStageRecord[], selfPickup = false): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
-  const template = stagesForBusinessLine(businessLine);
+  const template = stagesForReservation(businessLine, selfPickup);
   if (template.length === 0) return false;
   const existingKeys = new Set(existing.map((s) => s.stage_key));
   const missing = template.filter((t) => !existingKeys.has(t.key));
