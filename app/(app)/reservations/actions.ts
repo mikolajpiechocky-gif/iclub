@@ -307,7 +307,7 @@ export async function createReservationAction(values: ReservationFormValues): Pr
     const resolved = await resolveNewCustomer(values);
     const { id } = await createReservation(toInput(resolved));
     // Nowa rezerwacja z apki → wolno utworzyć wydarzenie w kalendarzu.
-    try { await syncReservationToCalendar(id, { allowCreate: true }); } catch {}
+    try { await syncReservationToCalendar(id, { allowCreate: true }); } catch (e) { console.error("Kalendarz: sync rezerwacji nie powiódł się", e); }
     // Nowe zlecenie iClub „do zgarnięcia" → push do pracowników.
     if (values.business_line === "ICLUB") {
       await sendPushToEmployees({ title: "Nowe zlecenie do zgarnięcia", body: [values.event_type || "Realizacja iClub", values.event_date, values.location].filter(Boolean).join(" · "), url: "/me", tag: "claimable" }).catch(() => {});

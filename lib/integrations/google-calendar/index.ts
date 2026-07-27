@@ -32,12 +32,13 @@ async function getAccessToken(): Promise<string | null> {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) { console.error("GCal token HTTP", res.status, (await res.text()).slice(0, 300)); return null; }
     const json = await res.json();
-    if (!json.access_token) return null;
+    if (!json.access_token) { console.error("GCal token: brak access_token", JSON.stringify(json).slice(0, 300)); return null; }
     cached = { token: json.access_token, exp: now + (json.expires_in ?? 3600) };
     return cached.token;
-  } catch {
+  } catch (e) {
+    console.error("GCal token wyjątek (klucz prywatny?)", e instanceof Error ? e.message : e);
     return null;
   }
 }
@@ -78,10 +79,11 @@ export async function createCalendarEvent(e: CalendarEvent): Promise<string | nu
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(eventBody(e)),
     });
-    if (!res.ok) return null;
+    if (!res.ok) { console.error("GCal create HTTP", res.status, (await res.text()).slice(0, 300)); return null; }
     const json = await res.json();
     return json.id ?? null;
-  } catch {
+  } catch (e) {
+    console.error("GCal create wyjątek", e instanceof Error ? e.message : e);
     return null;
   }
 }
