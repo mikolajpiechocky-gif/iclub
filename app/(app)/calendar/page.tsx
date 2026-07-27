@@ -6,6 +6,7 @@ import { Icon } from "@/components/icons";
 import { listReservations } from "@/lib/data/reservations";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { reservationCalendarTitle } from "@/lib/domain/calendar";
+import { warsawTodayISO } from "@/lib/domain/dates";
 import { getEventWeather, WEATHER_KIND_STYLE, WEATHER_OK_COLOR, type EventWeather } from "@/lib/integrations/weather";
 import { RESERVATION_STATUS_META, type ReservationStatus } from "@/lib/data/types";
 import { MobileCalendar, type CalEvent } from "./mobile-calendar";
@@ -23,10 +24,13 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const { month: monthParam } = await searchParams;
-  const now = new Date();
+  // §strefa „Dziś" w Europe/Warsaw (nie UTC) — kotwiczymy datę i liczymy arytmetykę na UTC,
+  // żeby uniknąć przesunięcia doby po lokalnej północy i problemów z DST.
+  const todayStr = warsawTodayISO();
+  const base = new Date(todayStr + "T00:00:00Z");
 
-  let year = now.getFullYear();
-  let month0 = now.getMonth(); // 0-based
+  let year = base.getUTCFullYear();
+  let month0 = base.getUTCMonth(); // 0-based
   if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
     const [y, m] = monthParam.split("-").map(Number);
     year = y;
@@ -49,24 +53,27 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       rentalItems: r.rental_items,
     });
 
-  // „Dziś" i poniedziałek bieżącego tygodnia (lokalnie) dla widoku mobilnego.
-  const todayStr = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
-  const dow = (now.getDay() + 6) % 7; // Pon=0
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - dow);
-  const weekStartStr = `${monday.getFullYear()}-${pad2(monday.getMonth() + 1)}-${pad2(monday.getDate())}`;
+  // „Dziś" i poniedziałek bieżącego tygodnia (strefa Warszawa) dla widoku mobilnego.
+  const dow = (base.getUTCDay() + 6) % 7; // Pon=0
+  const monday = new Date(base);
+  monday.setUTCDate(base.getUTCDate() - dow);
+  const weekStartStr = monday.toISOString().slice(0, 10);
 
   // Pogoda dla rezerwacji w wyświetlanym miesiącu ORAZ w oknie prognozy (~16 dni),
   // aby mobilny widok tygodnia też miał ikony. getEventWeather zwraca null poza
   // oknem prognozy BEZ odpytywania API (brak kosztu dla dalszych terminów).
-  const forecastEnd = (() => { const d = new Date(now); d.setDate(now.getDate() + 16); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; })();
+  const forecastEnd = (() => { const d = new Date(base); d.setUTCDate(base.getUTCDate() + 16); return d.toISOString().slice(0, 10); })();
   const needWeather = reservations.filter(
     (r) => r.event_date && r.location && (r.event_date.startsWith(monthPrefix) || (r.event_date >= todayStr && r.event_date <= forecastEnd)),
   );
-  const weatherEntries = await Promise.all(
-    needWeather.map(async (r) => [r.id, await getEventWeather(r.location!, r.event_date!)] as const),
-  );
-  const weatherById = new Map<string, EventWeather | null>(weatherEntries);
+  // §pogoda Deduplikacja po (lokalizacja|data) — jedno płatne zapytanie geocodingu na unikalny
+  // adres+dzień zamiast na każdą rezerwację (kilka realizacji pod tym samym adresem = 1 zapytanie).
+  const uniqWeather = new Map<string, { loc: string; date: string }>();
+  for (const r of needWeather) uniqWeather.set(`${r.location}|${r.event_date}`, { loc: r.location!, date: r.event_date! });
+  const weatherByKey = new Map<string, EventWeather | null>();
+  await Promise.all([...uniqWeather.entries()].map(async ([k, v]) => { weatherByKey.set(k, await getEventWeather(v.loc, v.date)); }));
+  const weatherById = new Map<string, EventWeather | null>();
+  for (const r of needWeather) weatherById.set(r.id, weatherByKey.get(`${r.location}|${r.event_date}`) ?? null);
 
   // Rezerwacje w tym miesiącu, pogrupowane po dniu (siatka desktop).
   const byDay = new Map<number, { id: string; label: string; status: ReservationStatus }[]>();
@@ -95,7 +102,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   // Siatka miesiąca
   const firstWeekday = (new Date(year, month0, 1).getDay() + 6) % 7; // Pon=0
   const daysInMonth = new Date(year, month0 + 1, 0).getDate();
-  const todayDay = now.getFullYear() === year && now.getMonth() === month0 ? now.getDate() : -1;
+  const todayDay = base.getUTCFullYear() === year && base.getUTCMonth() === month0 ? base.getUTCDate() : -1;
 
   const cells: { day: number | null; today: boolean }[] = [];
   for (let i = 0; i < firstWeekday; i++) cells.push({ day: null, today: false });

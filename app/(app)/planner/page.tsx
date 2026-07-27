@@ -4,6 +4,7 @@ import { Alert } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { listVehicles } from "@/lib/data/vehicles";
 import { isGoogleMapsConfigured } from "@/lib/integrations/google-maps/config";
+import { warsawTodayISO } from "@/lib/domain/dates";
 import { PlannerView } from "./planner-view";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export default async function PlannerPage() {
   }
 
   const vehicles = await listVehicles();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = warsawTodayISO();
 
   return (
     <div className="mx-auto max-w-[900px] px-5 py-6 md:px-8">

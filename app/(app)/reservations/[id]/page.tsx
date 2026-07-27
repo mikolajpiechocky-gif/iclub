@@ -269,7 +269,8 @@ async function ReservationOps({
   const myEarnings = profile ? await buildEarnings(myRate, profile.id, mySnapshot, myAssignment?.is_lead ?? false) : null;
   const amIAssigned = profile ? assignments.some((a) => a.profile_id === profile.id && a.status === "APPROVED") : false;
   const amIRequested = profile ? assignments.some((a) => a.profile_id === profile.id && a.status === "REQUESTED") : false;
-  const unavailableIds = await getUnavailableProfileIds(job.event_date);
+  // §dostępność Sprawdzamy całe okno pracy: montaż → demontaż (nie tylko dzień imprezy).
+  const unavailableIds = await getUnavailableProfileIds(job.reservation?.setup_date ?? job.event_date, job.reservation?.teardown_date ?? job.event_date);
 
   const [vehicles, jobVehicles] = await Promise.all([listVehicles(), listJobVehicles(job.id)]);
   const assignedVehicles: JobVehicleView[] = jobVehicles.map((jv) => ({ id: jv.id, vehicle_id: jv.vehicle_id, name: jv.vehicle?.name ?? "—", registration: jv.vehicle?.registration ?? null }));

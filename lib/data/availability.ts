@@ -46,16 +46,19 @@ export async function removeAvailability(id: string): Promise<void> {
 }
 
 // Zbiór profili niedostępnych w danym dniu (do ostrzeżeń przy przypisaniu).
-export async function getUnavailableProfileIds(dateStr: string | null): Promise<string[]> {
+// Niedostępni w OKNIE pracy [dateStr..toStr] (montaż..demontaż). Pojedynczy dzień: toStr = dateStr.
+export async function getUnavailableProfileIds(dateStr: string | null, toStr?: string | null): Promise<string[]> {
   if (!dateStr) return [];
+  const to = toStr || dateStr;
+  // Nakładanie okna niedostępności [start,end] z oknem pracy [dateStr,to]: start<=to AND end>=dateStr.
   if (!isSupabaseConfigured()) {
-    return DEMO_AVAIL.filter((a) => a.start_date <= dateStr && a.end_date >= dateStr).map((a) => a.profile_id);
+    return DEMO_AVAIL.filter((a) => a.start_date <= to && a.end_date >= dateStr).map((a) => a.profile_id);
   }
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("employee_availability")
     .select("profile_id")
-    .lte("start_date", dateStr)
+    .lte("start_date", to)
     .gte("end_date", dateStr);
   if (error) return [];
   return ((data ?? []) as { profile_id: string }[]).map((r) => r.profile_id);

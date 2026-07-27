@@ -36,7 +36,7 @@ export async function optimizeRouteAction(date: string, vehicleId: string): Prom
   const [reservations, vehicles, settings] = await Promise.all([listReservations(), listVehicles(), getSettings()]);
 
   const dayStops = reservations.filter(
-    (r) => r.event_date === date && (r.location ?? "").trim() && r.status !== "CANCELLED",
+    (r) => r.event_date === date && (r.location ?? "").trim() && r.status !== "CANCELLED" && r.status !== "EXPIRED",
   );
   if (dayStops.length === 0) return { ok: false, error: "Brak realizacji z adresem w tym dniu." };
   if (dayStops.length === 1) return { ok: false, error: "Tylko jedna realizacja tego dnia — optymalizacja niepotrzebna." };

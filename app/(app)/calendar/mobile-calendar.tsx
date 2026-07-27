@@ -48,8 +48,10 @@ export function MobileCalendar({ events, weekStart, today }: { events: CalEvent[
     return `${d1} ${MONTHS[m - 1]} – ${d2} ${MONTHS[m2 - 1]}`;
   };
 
-  const goPrev = () => { const s = addDaysIso(start, -7); setStart(s); };
-  const goNext = () => { const s = addDaysIso(start, 7); setStart(s); };
+  // Zmiana tygodnia ustawia też wybrany dzień na poniedziałek nowego tygodnia — inaczej agenda
+  // i podświetlenie zostawały na dniu spoza widocznego paska.
+  const goPrev = () => { const s = addDaysIso(start, -7); setStart(s); setSelected(s); };
+  const goNext = () => { const s = addDaysIso(start, 7); setStart(s); setSelected(s); };
   const goToday = () => { setStart(weekStart); setSelected(today); setMode("week"); };
 
   const weekendDays = days.slice(4); // Pt, Sb, Nd

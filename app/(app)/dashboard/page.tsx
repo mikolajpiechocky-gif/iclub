@@ -14,10 +14,9 @@ import { listOlxAdverts } from "@/lib/data/olx-adverts";
 import { analyzeFleet } from "@/lib/domain/olx-adverts";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { RESERVATION_STATUS_META, inquiryDisplayName } from "@/lib/data/types";
+import { warsawTodayISO } from "@/lib/domain/dates";
 
 export const dynamic = "force-dynamic";
-
-const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : "—";
 
@@ -46,14 +45,15 @@ export default async function DashboardPage() {
   const demo = !isSupabaseConfigured();
   const isOwner = profile?.role === "OWNER";
 
-  const now = new Date();
-  const todayStr = isoDay(now);
-  const plus7 = new Date(now);
-  plus7.setDate(now.getDate() + 7);
-  const plus7Str = isoDay(plus7);
+  // §strefa Dziś liczone w Europe/Warsaw (nie UTC) — inaczej po lokalnej północy okno „nadchodzące"
+  // i faktury przesuwały się o dzień.
+  const todayStr = warsawTodayISO();
+  const plus7 = new Date(todayStr + "T00:00:00Z");
+  plus7.setUTCDate(plus7.getUTCDate() + 7);
+  const plus7Str = plus7.toISOString().slice(0, 10);
 
   const upcoming = reservations
-    .filter((r) => r.event_date && r.event_date >= todayStr && r.status !== "CANCELLED")
+    .filter((r) => r.event_date && r.event_date >= todayStr && r.status !== "CANCELLED" && r.status !== "EXPIRED")
     .sort((a, b) => (a.event_date! < b.event_date! ? -1 : 1));
 
   const near7 = upcoming.filter((r) => r.event_date! <= plus7Str).length;
@@ -99,7 +99,7 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-[1280px] px-5 py-6 md:px-8">
       <PageHeader
         title="Pulpit"
-        subtitle={now.toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        subtitle={new Date(todayStr + "T00:00:00Z").toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}
         actions={
           <>
             <Link href="/reservations/new"><SecondaryButton>Nowa rezerwacja</SecondaryButton></Link>
