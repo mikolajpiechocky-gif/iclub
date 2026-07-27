@@ -16,6 +16,7 @@ export interface CostInput {
   amount: number;
   spent_on: string | null;
   note: string | null;
+  status?: CostStatus; // domyślnie PENDING (baza); auto-koszty (np. robocizna) → VERIFIED
 }
 
 export async function listCosts(): Promise<CostWithJob[]> {

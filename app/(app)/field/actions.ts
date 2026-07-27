@@ -3,8 +3,10 @@
 // zgłoszenie odbioru płatności na miejscu (krok „Rozliczenie”).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { setStageStatus, recomputeJobStatus, getJob, setJobStatus } from "@/lib/data/jobs";
+import { setStageStatus, recomputeJobStatus, getJob, getJobStages, setJobStatus } from "@/lib/data/jobs";
 import { createPayment, markJobPlannedPaid } from "@/lib/data/payments";
+import { createCost, listCosts } from "@/lib/data/costs";
+import { rentalWorkMs, rentalLabor } from "@/lib/domain/rental";
 import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
 import { saveCallDetails, setDepositDeduction } from "@/lib/data/reservations";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
@@ -31,6 +33,32 @@ export interface ActionResult {
   error?: string;
 }
 
+// Wypożyczalnia: gdy wszystkie kroki zrobione — policz wynagrodzenie (ryczałt albo czas × stawka),
+// dodaj je jako zatwierdzony koszt „Robocizna" (raz), oznacz PLANOWANE płatności i zamknij zlecenie.
+async function finalizeRentalIfDone(jobId: string): Promise<void> {
+  const job = await getJob(jobId);
+  if (!job || job.business_line !== "EQUIPMENT_RENTAL" || job.status === "DONE") return;
+  const stages = await getJobStages(jobId);
+  if (!stages.length || stages.some((s) => s.status !== "DONE")) return;
+  try {
+    const settings = await getSettings();
+    const flat = job.reservation?.rental_settlement_flat != null ? Number(job.reservation.rental_settlement_flat) : null;
+    const labor = rentalLabor(rentalWorkMs(stages), { flat, hourlyRate: Number(settings.iclub_hourly_rate ?? 0) });
+    const costs = await listCosts();
+    const already = costs.some((c) => c.job_id === jobId && c.category === "Robocizna");
+    if (!already && labor.amount > 0) {
+      await createCost({
+        job_id: jobId, category: "Robocizna", amount: labor.amount,
+        spent_on: new Date().toISOString().slice(0, 10),
+        note: labor.isFlat ? "Ryczałt za realizację" : `Czas pracy ${labor.hours} h × stawka`,
+        status: "VERIFIED",
+      });
+    }
+  } catch (e) { console.error("Wypożyczalnia: koszt robocizny nie powiódł się", e); }
+  await setJobStatus(jobId, "DONE");
+  await markJobPlannedPaid(jobId);
+}
+
 export async function advanceStageAction(stageId: string, jobId: string, status: StageStatus, reason?: string): Promise<ActionResult> {
   if (!isSupabaseConfigured())
     return { ok: false, error: "Tryb demo: skonfiguruj Supabase, aby zapisywać postęp." };
@@ -40,8 +68,10 @@ export async function advanceStageAction(stageId: string, jobId: string, status:
     if (status === "DONE" && reason && reason.trim().length >= 3) {
       await createIncident({ job_id: jobId, category: "Uwaga", description: `Krok zakończony mimo braków: ${reason.trim()}`, equipment: null, priority: "LOW" }).catch(() => {});
     }
-    // §II.11/§II.15 Zaktualizuj status zlecenia wg postępu etapów (Zaplanowane → W realizacji → Zakończone).
+    // §II.11/§II.15 Zaktualizuj status zlecenia wg postępu etapów (Zaplanowane → W realizacji).
     await recomputeJobStatus(jobId);
+    // Wypożyczalnia: po ostatnim kroku domknij realizację (koszt robocizny + status Zakończone).
+    await finalizeRentalIfDone(jobId).catch(() => {});
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath(`/field`);

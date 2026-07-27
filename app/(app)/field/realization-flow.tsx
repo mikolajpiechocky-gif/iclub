@@ -18,7 +18,7 @@ import type { SettlementBreakdown } from "@/lib/domain/billing";
 import { REALIZATIONS_BUCKET } from "@/lib/config/storage";
 import { advanceStageAction, reportFieldPaymentAction, saveDepositDeductionAction } from "./actions";
 import { createJobPhotoAction } from "./photo-actions";
-import { reportEquipmentStatusAction, addIssueAction, type EqStatus, type IssueType } from "./protocol-actions";
+import { reportEquipmentStatusAction, addIssueAction, saveActualKmAction, type EqStatus, type IssueType } from "./protocol-actions";
 
 const fmtPLN = (v: number | null) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
@@ -144,6 +144,11 @@ function workMsFromSteps(steps: JobStageRecord[]): number {
     const x = at(a), y = at(b);
     return x != null && y != null && y > x ? y - x : 0;
   };
+  // Wypożyczalnia — odbiór własny: przygotowanie + (po okresie wynajmu) zwrot/czyszczenie/kontrola.
+  if (steps.some((s) => s.stage_key.startsWith("R_"))) return seg("R_START", "R_READY") + seg("R_RETURN", "R_CHECK");
+  // Wypożyczalnia — transport: zadanie dostawy + zadanie odbioru (bez okresu wynajmu pomiędzy).
+  if (steps.some((s) => s.stage_key.startsWith("D_"))) return seg("D_START", "D_DONE") + seg("P_START", "P_CLEAN_PUT");
+  // iClub: montaż (przyjazd→rozliczenie) + demontaż (koniec wynajmu→sprzęt w bazie).
   return seg("TRAVEL", "SETTLEMENT") + seg("RENTAL", "TEARDOWN");
 }
 
@@ -328,7 +333,10 @@ function RentalStepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: str
   const [desc, setDesc] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [km, setKm] = useState("");
+  const [kmSaved, setKmSaved] = useState(false);
   const TYPES: IssueType[] = ["Uwaga", "Incydent", "Pomysł"];
+  const saveKm = () => { setError(null); startBusy(async () => { const r = await saveActualKmAction(jobId, km); if (r.ok) { setKmSaved(true); } else setError(r.error ?? "Błąd"); }); };
   const add = () => {
     if (!desc.trim()) { setError("Opisz usterkę lub uwagę."); return; }
     setError(null);
@@ -340,7 +348,16 @@ function RentalStepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: str
       {info.transport && (
         <div className="mb-3">
           {!ctx.hasVehicle && <div className="mb-2"><Alert tone="warn" title="Przypisz pojazd">Bez pojazdu nie policzymy paliwa z faktycznych km.</Alert></div>}
-          {ctx.navUrl && <a href={ctx.navUrl} target="_blank" rel="noopener noreferrer" className="block rounded-[11px] border border-border bg-surface-2 py-2.5 text-center text-[12.5px] font-bold text-ink">Nawiguj do klienta</a>}
+          {ctx.navUrl && <a href={ctx.navUrl} target="_blank" rel="noopener noreferrer" className="mb-2 block rounded-[11px] border border-border bg-surface-2 py-2.5 text-center text-[12.5px] font-bold text-ink">Nawiguj do klienta</a>}
+          {/* Faktyczny przejazd z licznika → koszt paliwa z realnych km. */}
+          <div className="rounded-[10px] border border-border bg-surface px-3 py-2.5">
+            <div className="mb-1 text-[11.5px] font-semibold text-ink-2">Faktyczny przejazd (licznik)</div>
+            <div className="flex gap-2">
+              <input inputMode="numeric" value={km} onChange={(e) => { setKm(e.target.value); setKmSaved(false); }} placeholder="km" className="w-24 rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-[13px] text-ink outline-none focus:border-accent" />
+              <button onClick={saveKm} disabled={busy} className="flex-1 rounded-[10px] bg-[#271b3f] px-3 py-2 text-[12.5px] font-bold text-[#e0c8ff]">{busy ? "Zapisywanie…" : "Przelicz koszt paliwa"}</button>
+            </div>
+            {kmSaved && <div className="mt-1 text-[11px] font-semibold text-ok">✓ Koszt paliwa przeliczony.</div>}
+          </div>
         </div>
       )}
       {info.issues && (

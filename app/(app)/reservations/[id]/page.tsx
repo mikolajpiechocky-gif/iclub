@@ -293,7 +293,9 @@ async function ReservationOps({
   const revenue = (Number(job.reservation?.price ?? 0) || 0) + depositDeduction;
   const costsVerified = jobCosts.filter((c) => c.status === "VERIFIED").reduce((s, c) => s + Number(c.amount || 0), 0);
   const costsPending = jobCosts.filter((c) => c.status === "PENDING").reduce((s, c) => s + Number(c.amount || 0), 0);
-  const laborSum = assignmentViews.filter((a) => a.status === "APPROVED").reduce((s, a) => s + (a.earnings?.total ?? 0), 0);
+  // iClub: wynagrodzenia z rozliczenia zespołu. Wypożyczalnia: robocizna jest osobnym kosztem
+  // „Robocizna" (liczonym w costsVerified) — więc tu jej nie dubluje­my.
+  const laborSum = job.business_line === "ICLUB" ? assignmentViews.filter((a) => a.status === "APPROVED").reduce((s, a) => s + (a.earnings?.total ?? 0), 0) : 0;
   const transportSum = transportCalcs.reduce((s, t) => s + Number(t.fuel_cost || 0) + Number(t.amortization || 0), 0);
   const profit = Math.round((revenue - costsVerified - laborSum - transportSum) * 100) / 100;
   const margin = revenue > 0 ? profit / revenue : null;
