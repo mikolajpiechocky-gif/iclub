@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { JobWithReservation, JobStageRecord, JobStatus, StageStatus, BusinessLine } from "./types";
 import { DEMO_RESERVATIONS } from "./demo-resources";
 import { ICLUB_STAGES, stagesForBusinessLine } from "@/lib/domain/stages";
+import { warsawTodayISO } from "@/lib/domain/dates";
 
 const RESV_SELECT =
   "*, reservation:reservations(*, customer:customers(id,name), tent:tents!tent_id(id,name), package:packages(id,name))";
@@ -80,7 +81,7 @@ export async function listAssignedJobs(profileId: string): Promise<JobWithReserv
 export async function listClaimableJobs(profileId: string): Promise<JobWithReservation[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = warsawTodayISO();
   const { data, error } = await supabase
     .from("jobs")
     .select(RESV_SELECT)

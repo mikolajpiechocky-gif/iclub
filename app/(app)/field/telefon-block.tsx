@@ -103,7 +103,7 @@ export function TelefonBlock({
     setErr(null);
     startTransition(async () => {
       const res = await saveClientCallAction(reservationId, jobId, {
-        assemblyTime: asm, startTime: start, addonIds: chosen, addonQty: selected, skipGrass: !grass, upsellValue: upsell,
+        assemblyTime: asm, startTime: start, addonIds: chosen, addonQty: selected, skipGrass: !grass, upsellValue: upsell, reason: allDone ? undefined : reason,
       });
       if (res.ok) { setOpen(false); router.refresh(); }
       else setErr(res.error ?? "Błąd");

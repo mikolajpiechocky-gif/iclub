@@ -12,6 +12,7 @@ import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/as
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
 import { getSettings } from "@/lib/data/settings";
 import { listTransportCalcs } from "@/lib/data/transport";
+import { createIncident } from "@/lib/data/incidents";
 import type { StageStatus, PaymentMethod } from "@/lib/data/types";
 
 // §II.12 Ustalenia z telefonu do klienta przekazywane z formularza.
@@ -22,6 +23,7 @@ export interface ClientCallInput {
   addonQty: Record<string, number>;
   skipGrass: boolean;
   upsellValue: number; // §II.12 wartość dodatków dosprzedanych w rozmowie (premia 15%)
+  reason?: string;     // §II.9 powód, gdy zapisano mimo niepotwierdzenia wszystkich punktów
 }
 
 export interface ActionResult {
@@ -29,11 +31,15 @@ export interface ActionResult {
   error?: string;
 }
 
-export async function advanceStageAction(stageId: string, jobId: string, status: StageStatus): Promise<ActionResult> {
+export async function advanceStageAction(stageId: string, jobId: string, status: StageStatus, reason?: string): Promise<ActionResult> {
   if (!isSupabaseConfigured())
     return { ok: false, error: "Tryb demo: skonfiguruj Supabase, aby zapisywać postęp." };
   try {
     await setStageStatus(stageId, status);
+    // §II.9 Zakończenie kroku mimo braków z powodem → zapisz powód jako Uwagę (Szef go zobaczy).
+    if (status === "DONE" && reason && reason.trim().length >= 3) {
+      await createIncident({ job_id: jobId, category: "Uwaga", description: `Krok zakończony mimo braków: ${reason.trim()}`, equipment: null, priority: "LOW" }).catch(() => {});
+    }
     // §II.11/§II.15 Zaktualizuj status zlecenia wg postępu etapów (Zaplanowane → W realizacji → Zakończone).
     await recomputeJobStatus(jobId);
     revalidatePath(`/field/${jobId}`);
@@ -58,6 +64,10 @@ export async function saveClientCallAction(reservationId: string, jobId: string,
       skipGrass: input.skipGrass,
       upsellValue: input.upsellValue,
     });
+    // §II.9 Powód, gdy nie potwierdzono wszystkich punktów rozmowy → Uwaga dla Szefa.
+    if (input.reason && input.reason.trim().length >= 3) {
+      await createIncident({ job_id: jobId, category: "Uwaga", description: `Telefon do klienta zapisany mimo braków: ${input.reason.trim()}`, equipment: null, priority: "LOW" }).catch(() => {});
+    }
     // §S3 Po telefonie (ustalono zakres/dodatki) wygeneruj checklistę pakowania, jeśli jej nie ma.
     await generateChecklistForJob(jobId, { onlyIfEmpty: true }).catch(() => {});
     revalidatePath(`/field/${jobId}`);

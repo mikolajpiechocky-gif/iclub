@@ -189,10 +189,10 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
 
   const stepFill = (i: number, isDone: boolean) => (isDone ? 1 : i === currentIndex ? curFrac : 0);
 
-  const setStatus = (stageId: string, status: "DONE" | "TODO") => {
+  const setStatus = (stageId: string, status: "DONE" | "TODO", reason?: string) => {
     setError(null);
     startTransition(async () => {
-      const res = await advanceStageAction(stageId, jobId, status);
+      const res = await advanceStageAction(stageId, jobId, status, reason);
       if (res.ok) router.refresh();
       else setError(res.error ?? "Błąd");
     });
@@ -276,7 +276,7 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
 
                 {isCurrent && (
                   <div className="mt-2 rounded-[13px] border border-[#2a2340] bg-[#181423] p-3.5">
-                    <StepPanel jobId={jobId} stageKey={s.stage_key} ctx={ctx} pending={pending} onDone={() => setStatus(s.id, "DONE")} onProgress={(frac) => setCurProg({ step: i, frac })} />
+                    <StepPanel jobId={jobId} stageKey={s.stage_key} ctx={ctx} pending={pending} onDone={(reason) => setStatus(s.id, "DONE", reason)} onProgress={(frac) => setCurProg({ step: i, frac })} />
                   </div>
                 )}
               </div>
@@ -289,7 +289,7 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
 }
 
 /* ------------------- Panel czynności dla danego kroku ---------------- */
-function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobId: string; stageKey: string; ctx: RealizationContext; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
+function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobId: string; stageKey: string; ctx: RealizationContext; pending: boolean; onDone: (reason?: string) => void; onProgress: (frac: number) => void }) {
   switch (stageKey) {
     case "TRAVEL":
       return (
@@ -467,7 +467,7 @@ function DoneButton({ pending, onClick, label, block }: { pending: boolean; onCl
 
 // §II.15 Panel checklisty kroku (montaż / szkolenie). §II.9 Zakończenie wymaga
 // odhaczenia wszystkiego ALBO podania powodu. §II.21 Pasek postępu punktów.
-function CheckPanel({ points, title, doneLabel, pending, onDone, onProgress }: { points: string[]; title: string; doneLabel: string; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
+function CheckPanel({ points, title, doneLabel, pending, onDone, onProgress }: { points: string[]; title: string; doneLabel: string; pending: boolean; onDone: (reason?: string) => void; onProgress: (frac: number) => void }) {
   const [checked, setChecked] = useState<boolean[]>(points.map(() => false));
   const [reason, setReason] = useState("");
   const doneCount = checked.filter(Boolean).length;
@@ -498,7 +498,7 @@ function CheckPanel({ points, title, doneLabel, pending, onDone, onProgress }: {
       {!allDone && (
         <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Nie wszystko odhaczone — podaj powód, aby zakończyć" className="mb-2.5 w-full rounded-[10px] border border-[#3d3216] bg-[#241e10] px-3 py-2 text-[12.5px] text-ink outline-none focus:border-accent" />
       )}
-      <DoneButton pending={pending || !canFinish} onClick={onDone} label={`${doneLabel}${!allDone ? ` (${doneCount}/${points.length})` : ""}`} block />
+      <DoneButton pending={pending || !canFinish} onClick={() => onDone(allDone ? undefined : reason)} label={`${doneLabel}${!allDone ? ` (${doneCount}/${points.length})` : ""}`} block />
     </div>
   );
 }

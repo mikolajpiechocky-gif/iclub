@@ -9,6 +9,7 @@ import { getEmployee } from "@/lib/data/employees";
 import { countDoneIclubRealizations } from "@/lib/data/jobs";
 import { rulesFromSettings, settlementForRealization, type RealizationSettlement } from "@/lib/domain/iclub-settlement";
 import { geocode, routeLeg } from "@/lib/integrations/google-maps";
+import { warsawTodayISO } from "@/lib/domain/dates";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { JOB_STATUS_META, type JobWithReservation } from "@/lib/data/types";
 
@@ -29,7 +30,7 @@ export default async function EmployeeDashboardPage() {
     : [[], []];
   const demo = !isSupabaseConfigured();
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = warsawTodayISO();
   const upcoming = jobs
     .filter((j) => j.event_date && j.event_date >= todayStr)
     .sort((a, b) => (a.event_date! < b.event_date! ? -1 : 1));
