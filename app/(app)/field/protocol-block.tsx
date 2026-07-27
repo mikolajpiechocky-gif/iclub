@@ -8,6 +8,7 @@ import { useState, useTransition } from "react";
 import { Icon } from "@/components/icons";
 import { Alert } from "@/components/ui";
 import { addProtocolCostAction, addIssueAction, saveActualKmAction, type IssueType } from "./protocol-actions";
+import { finishRealizationAction } from "./actions";
 
 const fmtPLN = (v: number | null | undefined) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 2 }).format(v);
@@ -67,6 +68,8 @@ export function ProtocolBlock({
   const addCost = () => run(() => addProtocolCostAction(jobId, name, amount, comment), () => { setName(""); setAmount(""); setComment(""); });
   const addIssue = () => run(() => addIssueAction(jobId, issueType, issueDesc), () => setIssueDesc(""));
   const saveKm = () => run(() => saveActualKmAction(jobId, actualKm), () => setActualKm(""));
+  // §II.17 Ostatni krok domyka zlecenie (rozliczenie + status Zakończone).
+  const finalize = () => run(() => finishRealizationAction(jobId), () => check(STEPS.length - 1));
 
   return (
     <div className="mt-3.5 rounded-[18px] border border-border bg-surface p-4">
@@ -174,9 +177,13 @@ export function ProtocolBlock({
                     ) : (
                       <>
                         <p className="mb-3 text-[12.5px] text-ink-2">
-                          {s === "Rozpocznij" ? "Rozpocznij rozładunek po powrocie do bazy." : s === "Sprzęt rozpakowany" ? "Wypakuj cały sprzęt z auta i odłóż na miejsce." : s === "Samochód posprzątany" ? "Uprzątnij samochód po rozładunku." : "Potwierdź zakończenie całej realizacji."}
+                          {s === "Rozpocznij" ? "Rozpocznij rozładunek po powrocie do bazy." : s === "Sprzęt rozpakowany" ? "Wypakuj cały sprzęt z auta i odłóż na miejsce." : s === "Samochód posprzątany" ? "Uprzątnij samochód po rozładunku." : "Domknij realizację — rozliczenie zostanie zamknięte, a zlecenie oznaczone jako Zakończone."}
                         </p>
-                        <button onClick={() => check(i)} className="w-full rounded-[11px] bg-[#22c55e] py-2.5 text-[12.5px] font-bold text-[#08170d]">{s} ✓</button>
+                        {s === "Zakończ realizację" ? (
+                          <button onClick={finalize} disabled={pending} className="w-full rounded-[11px] bg-[#22c55e] py-2.5 text-[12.5px] font-bold text-[#08170d] disabled:opacity-60">{pending ? "Zamykanie…" : "Zakończ realizację ✓"}</button>
+                        ) : (
+                          <button onClick={() => check(i)} className="w-full rounded-[11px] bg-[#22c55e] py-2.5 text-[12.5px] font-bold text-[#08170d]">{s} ✓</button>
+                        )}
                       </>
                     )}
                   </div>

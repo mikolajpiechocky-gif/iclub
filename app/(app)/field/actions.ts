@@ -3,11 +3,15 @@
 // zgłoszenie odbioru płatności na miejscu (krok „Rozliczenie”).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { setStageStatus, recomputeJobStatus } from "@/lib/data/jobs";
-import { createPayment } from "@/lib/data/payments";
+import { setStageStatus, recomputeJobStatus, getJob, setJobStatus } from "@/lib/data/jobs";
+import { createPayment, markJobPlannedPaid } from "@/lib/data/payments";
 import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
 import { saveCallDetails, setDepositDeduction } from "@/lib/data/reservations";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
+import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
+import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
+import { getSettings } from "@/lib/data/settings";
+import { listTransportCalcs } from "@/lib/data/transport";
 import type { StageStatus, PaymentMethod } from "@/lib/data/types";
 
 // §II.12 Ustalenia z telefonu do klienta przekazywane z formularza.
@@ -61,6 +65,33 @@ export async function saveClientCallAction(reservationId: string, jobId: string,
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
+  }
+}
+
+// §II.17 „Zakończ realizację" z rozładunku — domyka zlecenie: zamraża rozliczenie zarobków
+// (z premią za dosprzedaż dla prowadzącego), oznacza PLANOWANE płatności jako opłacone i ustawia DONE.
+export async function finishRealizationAction(jobId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
+  try {
+    const job = await getJob(jobId);
+    if (!job) return { ok: false, error: "Brak zlecenia." };
+    try {
+      const [settings, assignments, transportCalcs] = await Promise.all([getSettings(), listJobAssignments(jobId), listTransportCalcs(jobId)]);
+      const ctx = jobEarningsCtx(job, settings, transportCalcs.some((c) => (c.one_way_km ?? 0) > 100));
+      for (const a of assignments) {
+        if (a.status !== "APPROVED") continue;
+        const eb = await buildAssignmentEarnings(ctx, a.rate, a.profile_id, a.is_lead);
+        await setAssignmentEarningsSnapshot(a.id, eb ?? { base: 0, baseLabel: "Brak stawki", ownerBonus: 0, total: 0, possibleBonuses: [] });
+      }
+    } catch (e) { console.error("snapshot", e); }
+    await setJobStatus(jobId, "DONE");
+    await markJobPlannedPaid(jobId);
+    revalidatePath(`/field/${jobId}`);
+    revalidatePath(`/reservations/${job.reservation_id ?? ""}`);
+    revalidatePath(`/field`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zakończyć realizacji." };
   }
 }
 
