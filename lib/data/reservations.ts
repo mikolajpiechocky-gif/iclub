@@ -218,6 +218,7 @@ export interface ReservationInput {
   discount_type?: string;         // §13.4 AMOUNT | PERCENT
   discount_value?: number | null; // wartość wprowadzona (% lub zł)
   transport_price?: number | null; // §13.3 cena transportu dla klienta
+  self_pickup?: boolean;            // odbiór własny (klient odbiera sam — bez transportu)
   deposit?: number;
   event_start_time?: string | null; // §9.1 godzina rozpoczęcia imprezy
   assembly_time?: string | null;    // §9.3 ustalona (ręcznie) godzina montażu

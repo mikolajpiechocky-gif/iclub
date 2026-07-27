@@ -60,6 +60,9 @@ export function ReservationForm({
   const [v, setV] = useState<ReservationFormValues>({
     business_line: initial?.business_line ?? "ICLUB",
     customer_id: initial?.customer_id ?? "",
+    new_customer_name: "",
+    new_customer_phone: "",
+    self_pickup: initial?.self_pickup ?? false,
     event_type: initial?.event_type ?? "",
     event_date: initial?.event_date ?? "",
     setup_date: initial?.setup_date ?? "",
@@ -190,7 +193,7 @@ export function ReservationForm({
   const packagePrice = Number(selectedPackage?.base_price ?? 0);
   // §9 Sugerowane godziny montażu (start imprezy − pakiet − dodatki − gastro − bufor).
   const setupTimes = computeSetupTimes(v.event_start_time, selectedPackage?.assembly_minutes ?? 0, v.addon_ids.length, v.tent_extra === "GASTRO", assemblyConfig);
-  const transportPrice = Number(v.transport_price.replace(",", ".")) || 0;
+  const transportPrice = v.self_pickup ? 0 : (Number(v.transport_price.replace(",", ".")) || 0); // odbiór własny → 0
   const discountValueNum = Number(v.discount_value.replace(",", ".")) || 0;
   const order = computeOrderPrice({ packagePrice, addonsTotal, transportPrice, discountType: v.discount_type, discountValue: discountValueNum });
   // §21: ręcznie ustawiona wartość końcowa ma priorytet; inaczej używamy wyliczonej.
@@ -281,8 +284,15 @@ export function ReservationForm({
             </SelectField>
             <SelectField label="Klient" value={v.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
               <option value="">— bez klienta —</option>
+              <option value="__new__">+ Nowy klient (wpisz)</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </SelectField>
+            {v.customer_id === "__new__" && (
+              <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2">
+                <TextField label="Imię i nazwisko klienta" placeholder="Jan Kowalski" value={v.new_customer_name} onChange={(e) => set("new_customer_name", e.target.value)} hint="Zostanie dodany do bazy klientów przy zapisie" />
+                <TextField label="Telefon (opcjonalnie)" inputMode="tel" placeholder="600 000 000" value={v.new_customer_phone} onChange={(e) => set("new_customer_phone", e.target.value)} />
+              </div>
+            )}
             {isEdit && (
               <SelectField label="Status" value={v.status} onChange={(e) => set("status", e.target.value as ReservationStatus)}>
                 {RESERVATION_STATUS_ORDER.map((s) => <option key={s} value={s}>{RESERVATION_STATUS_LABELS[s]}</option>)}
@@ -484,9 +494,19 @@ export function ReservationForm({
               )}
             </div>
             <div>
-              <TextField label="Transport dla klienta (zł)" inputMode="decimal" placeholder="0" value={v.transport_price} onChange={(e) => set("transport_price", e.target.value)} error={errors.transport_price} />
-              <button type="button" onClick={computeTransport} disabled={pending} className="mt-1.5 text-[12px] font-semibold text-accent-soft">Oblicz z adresu →</button>
-              {transportMsg && <div className="mt-1 text-[11px] text-ink-2">{transportMsg}</div>}
+              <label className="mb-1.5 flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-ink">
+                <input type="checkbox" checked={v.self_pickup} onChange={(e) => set("self_pickup", e.target.checked)} className="h-4 w-4 accent-accent" />
+                Odbiór własny (bez transportu)
+              </label>
+              {v.self_pickup ? (
+                <div className="rounded-field border border-border bg-surface-2 px-3.5 py-2.5 text-[12px] text-ink-2">Klient odbiera i zwraca we własnym zakresie — transport 0 zł.</div>
+              ) : (
+                <>
+                  <TextField label="Transport dla klienta (zł)" inputMode="decimal" placeholder="0" value={v.transport_price} onChange={(e) => set("transport_price", e.target.value)} error={errors.transport_price} />
+                  <button type="button" onClick={computeTransport} disabled={pending} className="mt-1.5 text-[12px] font-semibold text-accent-soft">Oblicz z adresu →</button>
+                  {transportMsg && <div className="mt-1 text-[11px] text-ink-2">{transportMsg}</div>}
+                </>
+              )}
             </div>
             <div>
               <TextField label="Zadatek (zł)" inputMode="numeric" placeholder="300" value={depositValue} onChange={(e) => { setDepositTouched(true); set("deposit", e.target.value); }} error={errors.deposit} />

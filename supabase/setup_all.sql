@@ -1483,3 +1483,6 @@ alter table public.reservations add column if not exists phone_call_done boolean
 alter table public.reservations add column if not exists deposit_deduction numeric not null default 0;
 alter table public.reservations add column if not exists upsell_value numeric not null default 0;
 
+-- ================= 0058: odbiór własny (klient odbiera sam — bez transportu) =================
+alter table public.reservations add column if not exists self_pickup boolean not null default false;
+

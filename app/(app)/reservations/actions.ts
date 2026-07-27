@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, checkHeatingAvailability, type ReservationInput, type AddonShortage, type HeatingAvailability } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
+import { createCustomer } from "@/lib/data/customers";
 import { markJobPlannedPaid } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { syncReservationToCalendar, removeReservationFromCalendar } from "@/lib/data/calendar-sync";
@@ -23,7 +24,10 @@ import type { ReservationStatus, BusinessLine, PricingSnapshot } from "@/lib/dat
 
 export interface ReservationFormValues {
   business_line: BusinessLine;
-  customer_id: string;
+  customer_id: string;            // id z listy, "" = bez klienta, "__new__" = nowy wpisany z ręki
+  new_customer_name: string;      // §klient nowy klient wpisany w formularzu rezerwacji
+  new_customer_phone: string;
+  self_pickup: boolean;           // §transport odbiór własny (klient odbiera sam — bez transportu)
   event_type: string;
   event_date: string;
   setup_date: string;
@@ -154,7 +158,9 @@ function toInput(v: ReservationFormValues): ReservationInput {
     discount: toNumber(v.discount_amount) ?? 0, // faktyczna kwota rabatu wyliczona w formularzu
     discount_type: v.discount_type === "PERCENT" ? "PERCENT" : "AMOUNT",
     discount_value: toNumber(v.discount_value),
-    transport_price: toNumber(v.transport_price),
+    // §transport Odbiór własny → brak transportu (0). Inaczej cena transportu z formularza.
+    self_pickup: v.self_pickup,
+    transport_price: v.self_pickup ? 0 : toNumber(v.transport_price),
     deposit: toNumber(v.deposit) ?? 0,
     event_start_time: clean(v.event_start_time),
     assembly_time: clean(v.assembly_time),
@@ -282,6 +288,15 @@ export async function computeReservationTransportAction(location: string): Promi
   return { ok: true, km, price: clientTransportPrice(km), farTrip: tripClass(km) === "far" };
 }
 
+// §klient Nowy klient wpisany z ręki (customer_id="__new__") → utwórz go i podmień id.
+async function resolveNewCustomer(values: ReservationFormValues): Promise<ReservationFormValues> {
+  if (values.customer_id !== "__new__") return values;
+  const name = values.new_customer_name.trim();
+  if (!name) return { ...values, customer_id: "" }; // brak nazwy → traktuj jak „bez klienta"
+  const { id } = await createCustomer({ type: "PRIVATE", name, phone: values.new_customer_phone.trim() || null });
+  return { ...values, customer_id: id };
+}
+
 export async function createReservationAction(values: ReservationFormValues): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
   const fieldErrors = validate(values);
@@ -289,7 +304,8 @@ export async function createReservationAction(values: ReservationFormValues): Pr
   const block = await overbookingBlock(values);
   if (block) return { ok: false, error: block };
   try {
-    const { id } = await createReservation(toInput(values));
+    const resolved = await resolveNewCustomer(values);
+    const { id } = await createReservation(toInput(resolved));
     // Nowa rezerwacja z apki → wolno utworzyć wydarzenie w kalendarzu.
     try { await syncReservationToCalendar(id, { allowCreate: true }); } catch {}
     // Nowe zlecenie iClub „do zgarnięcia" → push do pracowników.
@@ -401,7 +417,8 @@ export async function updateReservationAction(id: string, values: ReservationFor
   const block = await overbookingBlock(values, id);
   if (block) return { ok: false, error: block };
   try {
-    await updateReservation(id, toInput(values));
+    const resolved = await resolveNewCustomer(values);
+    await updateReservation(id, toInput(resolved));
     try { await syncReservationToCalendar(id); } catch {}
     // Zmiana szczegółów → push do przypisanych (APPROVED) pracowników.
     try {
