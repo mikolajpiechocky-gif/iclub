@@ -100,9 +100,11 @@ export async function listReservationAddons(): Promise<ReservationAddon[]> {
 }
 
 // --- Cennik (§51): edycja cen pakietów i dodatków. Zapis tylko OWNER (RLS). ---
-export async function updatePackagePrice(id: string, base_price: number): Promise<void> {
+// §cennik Ceny pakietu zależne od wielkości namiotu (mały / duży). base_price trzymamy
+// zsynchronizowane z ceną małego (zgodność wsteczna dla ewentualnych starszych odczytów).
+export async function updatePackagePrice(id: string, priceSmall: number, priceBig: number): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.from("packages").update({ base_price }).eq("id", id);
+  const { error } = await supabase.from("packages").update({ price_small: priceSmall, price_big: priceBig, base_price: priceSmall }).eq("id", id);
   if (error) throw new Error(error.message);
 }
 

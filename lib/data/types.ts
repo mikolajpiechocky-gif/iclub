@@ -144,6 +144,8 @@ export interface PackageRecord {
   name: string;
   description: string | null;
   base_price: number;
+  price_small: number | null; // §cennik cena dla małego namiotu
+  price_big: number | null;   // §cennik cena dla dużego namiotu
   active: boolean;
   sort: number;
   assembly_minutes: number; // §9.2 standardowy czas montażu pakietu (minuty)

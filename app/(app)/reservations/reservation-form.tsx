@@ -311,7 +311,11 @@ export function ReservationForm({
 
   // §13 Kalkulacja na żywo: pakiet + dodatki + transport − rabat = razem; zadatek; pozostało.
   const selectedPackage = packages.find((p) => p.id === v.package_id);
-  const packagePrice = Number(selectedPackage?.base_price ?? 0);
+  // §cennik Cena pakietu zależna od wielkości namiotu głównego: „D"/„D_BACKDOOR" = duży, inaczej mały.
+  const isBigTent = v.tent_main === "D" || v.tent_main === "D_BACKDOOR";
+  const packagePrice = Number(
+    (isBigTent ? selectedPackage?.price_big : selectedPackage?.price_small) ?? selectedPackage?.base_price ?? 0,
+  );
   // §9 Sugerowane godziny montażu (start imprezy − pakiet − dodatki − gastro − bufor).
   const setupTimes = computeSetupTimes(v.event_start_time, selectedPackage?.assembly_minutes ?? 0, v.addon_ids.length, v.tent_extra === "GASTRO", assemblyConfig);
   const transportPrice = v.self_pickup ? 0 : (Number(v.transport_price.replace(",", ".")) || 0); // odbiór własny → 0

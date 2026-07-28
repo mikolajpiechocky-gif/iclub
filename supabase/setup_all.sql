@@ -1520,3 +1520,9 @@ alter table public.service_tasks add column if not exists recurrence text;
 -- Na ile dób (24h) klient wynajmuje sprzęt — do rozliczenia i podsumowania wynajmu.
 alter table public.reservations add column if not exists rental_days integer;
 
+-- ================= 0064: cena pakietu zależna od wielkości namiotu (mały / duży) =================
+-- Każdy pakiet ma inną cenę dla małego i dużego namiotu. Backfill z dotychczasowej base_price.
+alter table public.packages add column if not exists price_small numeric(10,2);
+alter table public.packages add column if not exists price_big numeric(10,2);
+update public.packages set price_small = coalesce(price_small, base_price), price_big = coalesce(price_big, base_price);
+
