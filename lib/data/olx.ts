@@ -50,6 +50,18 @@ export async function getValidAccessToken(): Promise<string | null> {
   return t.access_token;
 }
 
+// Rozłączenie konta OLX + usunięcie zaimportowanych danych (ogłoszenia + leady z OLX).
+// Naprawa podpięcia złego konta: czyścimy tokeny i kasujemy zaimportowane rekordy.
+export async function disconnectAndClearOlx(): Promise<{ adverts: number; leads: number }> {
+  const s = createAdminClient();
+  await s.from("olx_integration").update({
+    access_token: null, refresh_token: null, access_expires_at: null, olx_user_id: null, connected_at: null,
+  }).eq("id", true);
+  const { data: adv } = await s.from("olx_adverts").delete().not("olx_id", "is", null).select("olx_id");
+  const { data: leads } = await s.from("inquiries").delete().eq("source", "OLX").select("id");
+  return { adverts: adv?.length ?? 0, leads: leads?.length ?? 0 };
+}
+
 export async function markOlxSynced(): Promise<void> {
   const s = createAdminClient();
   await s.from("olx_integration").update({ last_sync_at: new Date().toISOString() }).eq("id", true);
