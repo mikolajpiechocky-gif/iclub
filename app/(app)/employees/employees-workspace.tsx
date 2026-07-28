@@ -63,8 +63,8 @@ export function EmployeesWorkspace({ employees, settlements }: { employees: Empl
                 <div className="text-[12px] font-semibold text-ink-2">Model rozliczenia, stawki i rozliczenia</div>
               </div>
             </div>
-            <RateForm employee={selected} embedded />
-            <EmployeeSettlements profileId={selected.id} rows={settlements[selected.id] ?? []} />
+            <RateForm key={selected.id} employee={selected} embedded />
+            <EmployeeSettlements key={`s-${selected.id}`} profileId={selected.id} rows={settlements[selected.id] ?? []} />
           </div>
         ) : (
           <div className="flex h-full min-h-[300px] flex-col items-center justify-center rounded-card-lg border border-border bg-surface text-center">

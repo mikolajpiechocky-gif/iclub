@@ -3,9 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { PageHeader } from "@/components/layout";
-import { SectionCard, TextField, SelectField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
+import { SectionCard, TextField, PrimaryButton, SecondaryButton, Alert } from "@/components/ui";
 import type { EmployeeWithRate } from "@/lib/data/types";
-import { ICLUB_SETTLEMENT_MODE_LABELS, type IclubSettlementMode } from "@/lib/data/types";
 import { saveEmployeeRateAction, type RateFormValues } from "./actions";
 
 const str = (v: number | null | undefined) => (v == null ? "" : String(v));
@@ -58,16 +57,13 @@ export function RateForm({ employee, embedded = false }: { employee: EmployeeWit
       <form onSubmit={submit}>
         <SectionCard title="Model rozliczenia i stawki" className="p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-2 sm:grid-cols-2">
-            <SelectField label="Rozliczenie iClub" value={v.iclub_settlement_mode} onChange={(e) => set("iclub_settlement_mode", e.target.value as IclubSettlementMode)}>
-              {(Object.keys(ICLUB_SETTLEMENT_MODE_LABELS) as IclubSettlementMode[]).map((m) => <option key={m} value={m}>{ICLUB_SETTLEMENT_MODE_LABELS[m]}</option>)}
-            </SelectField>
             <TextField
               label="Ile realizacji obejmuje umowa (N)"
               inputMode="numeric"
               placeholder="4"
               value={v.iclub_threshold}
               onChange={(e) => set("iclub_threshold", e.target.value)}
-              hint="Pierwsze N realizacji w miesiącu = dzień wolny; kolejne = ryczałt. Działa w trybie „Czas wolny za pierwsze N”."
+              hint="Pierwsze N realizacji iClub w miesiącu = czas wolny (godziny × stawka niżej); kolejne = ryczałt. N = 0 → ryczałt od pierwszej realizacji."
             />
             <TextField
               label="Czas wolny — godziny za realizację"
