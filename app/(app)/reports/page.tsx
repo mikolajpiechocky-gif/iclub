@@ -25,8 +25,11 @@ const CAT_COLOR: Record<string, string> = { Pojazd: "#e11d74", Sprzęt: "#14b8c4
 // Rok realizacji zlecenia: z daty zlecenia, w razie braku z rezerwacji.
 const jobYear = (j: JobWithReservation): string =>
   (j.event_date ?? j.reservation?.event_date ?? "").slice(0, 4);
+const jobMonthNum = (j: JobWithReservation): string =>
+  (j.event_date ?? j.reservation?.event_date ?? "").slice(5, 7);
+const MONTHS_PL = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
 
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ year?: string; month?: string }> }) {
   const profile = await getCurrentProfile();
   if (profile && profile.role !== "OWNER") {
     return (
@@ -42,8 +45,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   // Dostępne lata (malejąco) + wybór z URL; domyślnie „Wszystko".
   const years = Array.from(new Set(jobs.map(jobYear).filter(Boolean))).sort().reverse();
-  const { year: yearParam } = await searchParams;
+  const { year: yearParam, month: monthParam } = await searchParams;
   const selectedYear = yearParam && years.includes(yearParam) ? yearParam : "all";
+  // Miesiące z danymi w wybranym roku + wybór miesiąca (tylko gdy rok jest wybrany).
+  const monthsInYear = selectedYear === "all"
+    ? []
+    : Array.from(new Set(jobs.filter((j) => jobYear(j) === selectedYear).map(jobMonthNum).filter(Boolean))).sort();
+  const selectedMonth = selectedYear !== "all" && monthParam && monthsInYear.includes(monthParam) ? monthParam : "";
 
   const paidByJob = new Map<string, number>();
   for (const p of payments) {
@@ -61,7 +69,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   }
 
   const rows = jobs
-    .filter((j) => selectedYear === "all" || jobYear(j) === selectedYear)
+    .filter((j) => (selectedYear === "all" || jobYear(j) === selectedYear) && (!selectedMonth || jobMonthNum(j) === selectedMonth))
     .map((j) => {
       const rev = paidByJob.get(j.id) ?? 0;
       const cost = costByJob.get(j.id) ?? 0;
@@ -94,7 +102,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   for (const i of investments) invByCat.set(i.category, (invByCat.get(i.category) ?? 0) + Number(i.amount || 0));
   const invCats = [...invByCat.entries()].sort((a, b) => b[1] - a[1]);
 
-  const scopeLabel = selectedYear === "all" ? "od początku" : `rok ${selectedYear}`;
+  const scopeLabel = selectedYear === "all" ? "od początku" : selectedMonth ? `${MONTHS_PL[Number(selectedMonth) - 1]} ${selectedYear}` : `rok ${selectedYear}`;
   const tabs = [{ k: "all", label: "Wszystko" }, ...years.map((y) => ({ k: y, label: y }))];
 
   // §B4 Ranking „co najlepiej się wypożycza": przychód i liczba wypożyczeń per dodatek.
@@ -104,6 +112,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   for (const r of reservations) {
     if (r.status === "TEMPORARY") continue;
     if (selectedYear !== "all" && (r.event_date ?? "").slice(0, 4) !== selectedYear) continue;
+    if (selectedMonth && (r.event_date ?? "").slice(5, 7) !== selectedMonth) continue;
     for (const id of r.addon_ids ?? []) {
       const a = addonById.get(id);
       if (!a) continue;
@@ -129,7 +138,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       )}
 
       {/* Filtr roku */}
-      <div className="mb-5 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap gap-2">
         {tabs.map((t) => {
           const active = selectedYear === t.k;
           const href = t.k === "all" ? "/reports" : `/reports?year=${t.k}`;
@@ -146,6 +155,21 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           );
         })}
       </div>
+
+      {/* Filtr miesiąca (gdy wybrany rok) */}
+      {selectedYear !== "all" && monthsInYear.length > 0 && (
+        <div className="mb-5 flex flex-wrap gap-1.5">
+          <a href={`/reports?year=${selectedYear}`} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition-colors ${!selectedMonth ? "bg-accent text-white" : "border border-border bg-surface text-ink-2 hover:text-white"}`}>Cały rok</a>
+          {monthsInYear.map((m) => {
+            const active = selectedMonth === m;
+            return (
+              <a key={m} href={`/reports?year=${selectedYear}&month=${m}`} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition-colors ${active ? "bg-accent text-white" : "border border-border bg-surface text-ink-2 hover:text-white"}`}>
+                {MONTHS_PL[Number(m) - 1]}
+              </a>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mb-5 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
         <MetricCard label="Przychód" value={fmtPLN(totalRev)} tone="ok" />
