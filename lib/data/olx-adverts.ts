@@ -6,10 +6,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getValidAccessToken } from "./olx";
 import { getAdverts, getAdvertStatistics } from "@/lib/integrations/olx";
+import { extractLocation } from "@/lib/integrations/olx/extract";
 
 export interface OlxAdvert {
   olx_id: string;
   title: string | null;
+  city: string | null;
   status: string | null;
   url: string | null;
   valid_to: string | null;
@@ -49,6 +51,43 @@ export async function listOlxAdverts(): Promise<OlxAdvert[]> {
   return (data ?? []) as OlxAdvert[];
 }
 
+// §B3 Sezonowość rok-do-roku: z dziennych snapshotów (kumulatywne wartości OLX) liczymy
+// PRZYROST dzień-do-dnia per ogłoszenie i sumujemy po miesiącach każdego roku. Ujemne skoki
+// (ogłoszenie wystawione od nowa → licznik od zera) obcinamy do 0.
+export interface OlxSeasonalityYear { year: number; views: number[]; phones: number[] } // po 12 wartości (Sty…Gru)
+
+export async function getOlxSeasonality(): Promise<{ series: OlxSeasonalityYear[]; hasData: boolean }> {
+  if (!isSupabaseConfigured()) return { series: [], hasData: false };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("olx_advert_stats")
+    .select("olx_id, captured_on, views, phones")
+    .order("olx_id", { ascending: true })
+    .order("captured_on", { ascending: true });
+  if (error || !data) return { series: [], hasData: false };
+
+  const buckets = new Map<number, { views: number[]; phones: number[] }>();
+  const ensure = (y: number) => {
+    let b = buckets.get(y);
+    if (!b) { b = { views: Array(12).fill(0), phones: Array(12).fill(0) }; buckets.set(y, b); }
+    return b;
+  };
+  let prev: { olx_id: string; views: number; phones: number } | null = null;
+  for (const row of data as { olx_id: string; captured_on: string; views: number; phones: number }[]) {
+    const cur = { olx_id: row.olx_id, views: Number(row.views || 0), phones: Number(row.phones || 0) };
+    if (prev && prev.olx_id === cur.olx_id) {
+      const d = new Date(row.captured_on);
+      const b = ensure(d.getUTCFullYear());
+      b.views[d.getUTCMonth()] += Math.max(0, cur.views - prev.views);
+      b.phones[d.getUTCMonth()] += Math.max(0, cur.phones - prev.phones);
+    }
+    prev = cur;
+  }
+  const series = [...buckets.keys()].sort().map((year) => ({ year, views: buckets.get(year)!.views, phones: buckets.get(year)!.phones }));
+  const hasData = series.some((s) => s.views.some((v) => v > 0) || s.phones.some((p) => p > 0));
+  return { series, hasData };
+}
+
 export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
   const token = await getValidAccessToken();
   if (!token) return { ok: false, synced: 0, error: "OLX niepołączone — najpierw „Połącz OLX” w Ustawieniach." };
@@ -84,6 +123,7 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
         const row: Record<string, unknown> = {
           olx_id: olxId,
           title: (pick(a, "title") as string) ?? null,
+          city: extractLocation(a), // §B3 miasto ogłoszenia — rozróżnianie ofert po lokalizacji
           status: (pick(a, "status") as string) ?? null,
           url: (pick(a, "url") as string) ?? null,
           valid_to: (pick(a, "valid_to") ?? pick(a, "expires_at") ?? pick(a, "date_end") ?? null) as string | null,
@@ -101,6 +141,12 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
           row.prev_synced_at = p?.last_synced_at ?? null;
         }
         await s.from("olx_adverts").upsert(row);
+        // §B3 Dzienny snapshot statystyk (do wykresu sezonowości rok-do-roku). Jeden wpis na dzień
+        // (upsert po olx_id+captured_on) — kilka synchronizacji dziennie nadpisuje najnowszą wartością.
+        if (statsOk) {
+          const today = new Date().toISOString().slice(0, 10);
+          await s.from("olx_advert_stats").upsert({ olx_id: olxId, captured_on: today, views, phones }, { onConflict: "olx_id,captured_on" }).then(() => {}, () => {});
+        }
         synced++;
       }
 

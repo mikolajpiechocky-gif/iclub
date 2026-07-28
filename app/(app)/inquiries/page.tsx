@@ -13,7 +13,16 @@ export const dynamic = "force-dynamic";
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : "—";
 
-export default async function InquiriesPage({ searchParams }: { searchParams: Promise<{ status?: string; signal?: string }> }) {
+// §B3 Czy lead OLX mieści się w oknie 30 dni. Pure — „teraz" jako parametr (spójnie z lib/domain),
+// żeby nie wołać Date.now() w renderze. Dla źródeł innych niż OLX zawsze true.
+const THIRTY_MS = 30 * 24 * 60 * 60 * 1000;
+function isRecentOlx(q: { source: string | null; last_activity_at: string | null; created_at: string }, now = Date.now()): boolean {
+  if (q.source !== "OLX") return true;
+  const t = q.last_activity_at ?? q.created_at;
+  return t ? now - new Date(t).getTime() <= THIRTY_MS : true;
+}
+
+export default async function InquiriesPage({ searchParams }: { searchParams: Promise<{ status?: string; signal?: string; all?: string }> }) {
   const [all, profile, sp] = await Promise.all([listInquiries(), getCurrentProfile(), searchParams]);
   const demo = !isSupabaseConfigured();
   const isOwner = profile?.role === "OWNER";
@@ -22,7 +31,25 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
   const activeStatus = sp.status && sp.status in INQUIRY_STATUS_LABELS ? (sp.status as InquiryStatus) : null;
   const signalOnly = sp.signal === "1";
   const signalCount = all.filter((q) => q.contract_signal).length;
-  const inquiries = all.filter((q) => (activeStatus ? q.status === activeStatus : true) && (signalOnly ? q.contract_signal : true));
+
+  // §B3 Domyślnie wiadomości OLX z ostatnich 30 dni; starsze do filtrowania („Pokaż wszystkie").
+  // last_activity_at leada OLX = czas ostatniej wiadomości (ustawiany przy synchronizacji).
+  const showAllTime = sp.all === "1";
+  const hiddenOlder = all.filter((q) => q.source === "OLX" && !isRecentOlx(q)).length;
+
+  const inquiries = all.filter((q) =>
+    (activeStatus ? q.status === activeStatus : true) &&
+    (signalOnly ? q.contract_signal : true) &&
+    (showAllTime || isRecentOlx(q))
+  );
+
+  // Zachowanie pozostałych filtrów w linku przełącznika okna czasu.
+  const baseParams = new URLSearchParams();
+  if (activeStatus) baseParams.set("status", activeStatus);
+  if (signalOnly) baseParams.set("signal", "1");
+  const withAll = new URLSearchParams(baseParams); withAll.set("all", "1");
+  const allHref = `/inquiries?${withAll.toString()}`;
+  const recentHref = baseParams.toString() ? `/inquiries?${baseParams.toString()}` : "/inquiries";
 
   return (
     <div className="mx-auto max-w-[1280px] px-5 py-6 md:px-8">
@@ -50,6 +77,19 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
         <div className="mb-4">
           <Link href="/inquiries?signal=1" className="inline-flex items-center gap-2 rounded-card border border-[#1e4a2c] bg-[#16301f] px-4 py-2.5 text-[12.5px] font-semibold text-ok">
             {signalCount} {signalCount === 1 ? "lead wygląda na domknięty" : "leadów wygląda na domknięte"} → pokaż
+          </Link>
+        </div>
+      )}
+
+      {/* §B3 Okno czasu wiadomości OLX: domyślnie 30 dni, starsze do filtrowania */}
+      {(showAllTime || hiddenOlder > 0) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface-2 px-4 py-2.5 text-[12.5px]">
+          <span className="font-semibold text-ink">
+            {showAllTime ? "Wszystkie wiadomości OLX" : "Wiadomości OLX z ostatnich 30 dni"}
+          </span>
+          {!showAllTime && <span className="text-ink-2">· {hiddenOlder} starszych ukrytych</span>}
+          <Link href={showAllTime ? recentHref : allHref} className="ml-auto font-semibold text-accent-soft">
+            {showAllTime ? "Tylko 30 dni" : "Pokaż wszystkie →"}
           </Link>
         </div>
       )}

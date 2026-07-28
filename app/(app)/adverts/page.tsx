@@ -4,10 +4,11 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout";
 import { MetricCard, Alert, Pill } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { listOlxAdverts } from "@/lib/data/olx-adverts";
+import { listOlxAdverts, getOlxSeasonality } from "@/lib/data/olx-adverts";
 import { getOlxIntegration } from "@/lib/data/olx";
 import { analyzeFleet } from "@/lib/domain/olx-adverts";
 import { AdvertsSyncButton } from "./sync-button";
+import { SeasonalityChart } from "./seasonality-chart";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function AdvertsPage() {
     );
   }
 
-  const [adverts, integration] = await Promise.all([listOlxAdverts(), getOlxIntegration()]);
+  const [adverts, integration, seasonality] = await Promise.all([listOlxAdverts(), getOlxIntegration(), getOlxSeasonality()]);
   const connected = Boolean(integration?.refresh_token);
   const { insights, summary } = analyzeFleet(adverts);
   const toReact = insights.filter((i) => i.expired || i.expiringSoon).sort((a, b) => b.priority - a.priority);
@@ -68,6 +69,17 @@ export default async function AdvertsPage() {
             <MetricCard label="Skuteczność" value={pct(summary.avgConversion)} sub="telefony / wyświetlenia" />
           </div>
 
+          {/* §B3 Sezonowość rok-do-roku */}
+          <div className="mb-6">
+            {seasonality.hasData ? (
+              <SeasonalityChart series={seasonality.series} />
+            ) : (
+              <div className="rounded-card border border-border bg-surface px-4 py-4 text-[12.5px] text-ink-2">
+                <span className="font-bold text-ink">Sezonowość</span> — wykres zbiera dane od pierwszej synchronizacji (dzienny przyrost wyświetleń i telefonów). Porównanie rok-do-roku pojawi się po roku działania.
+              </div>
+            )}
+          </div>
+
           {/* Do reakcji */}
           <h2 className="mb-3 font-display text-[15px] font-bold text-white">Do reakcji {toReact.length > 0 && <span className="text-warn">({toReact.length})</span>}</h2>
           {toReact.length === 0 ? (
@@ -77,7 +89,10 @@ export default async function AdvertsPage() {
               {toReact.map((i) => (
                 <div key={i.advert.olx_id} className="rounded-card-lg border border-[#3d3216] bg-[#241e10] p-4">
                   <div className="mb-1 flex items-start gap-2">
-                    <div className="min-w-0 flex-1 truncate text-[14px] font-bold text-ink">{i.advert.title ?? "Ogłoszenie"}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[14px] font-bold text-ink">{i.advert.title ?? "Ogłoszenie"}</div>
+                      {i.advert.city && <div className="truncate text-[11.5px] font-semibold text-ink-2">📍 {i.advert.city}</div>}
+                    </div>
                     {expiryPill(i.daysToExpiry, i.expired)}
                   </div>
                   <div className="mb-2 text-[12px] text-ink-2">👁 {i.advert.views.toLocaleString("pl-PL")}{delta(i.deltaViews)} · 📞 {i.advert.phones.toLocaleString("pl-PL")}{delta(i.deltaPhones)} · skuteczność {pct(i.conversion)}</div>
@@ -126,6 +141,7 @@ export default async function AdvertsPage() {
                     <td className="px-4 py-3 text-[15px]">{medal(i.rank)}</td>
                     <td className="px-4 py-3">
                       <div className="max-w-[240px] truncate text-[13px] font-bold text-ink">{i.advert.title ?? "Ogłoszenie"}</div>
+                      {i.advert.city && <div className="max-w-[240px] truncate text-[11px] font-semibold text-ink-2">📍 {i.advert.city}</div>}
                       {i.advert.url && <a href={i.advert.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-ink-2 underline">otwórz →</a>}
                     </td>
                     <td className="px-4 py-3">

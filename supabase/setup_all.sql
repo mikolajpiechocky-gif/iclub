@@ -1492,3 +1492,23 @@ alter table public.reservations add column if not exists self_pickup boolean not
 alter table public.job_assignments add column if not exists settled_at timestamptz;
 alter table public.job_assignments add column if not exists settled_by uuid references public.profiles(id) on delete set null;
 
+-- ================= 0060: miasto ogłoszenia OLX (rozróżnianie ofert po lokalizacji) =================
+alter table public.olx_adverts add column if not exists city text;
+
+-- ================= 0061: historia statystyk OLX (wykres sezonowości rok-do-roku) =================
+-- Dzienny snapshot wyświetleń/telefonów per ogłoszenie — do trendu i porównania rok do roku.
+create table if not exists public.olx_advert_stats (
+  id uuid primary key default gen_random_uuid(),
+  olx_id text not null,
+  captured_on date not null,
+  views integer not null default 0,
+  phones integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (olx_id, captured_on)
+);
+create index if not exists idx_olx_stats_day on public.olx_advert_stats (captured_on);
+alter table public.olx_advert_stats enable row level security;
+drop policy if exists olx_stats_owner on public.olx_advert_stats;
+create policy olx_stats_owner on public.olx_advert_stats for all to authenticated
+  using (public.is_owner()) with check (public.is_owner());
+
