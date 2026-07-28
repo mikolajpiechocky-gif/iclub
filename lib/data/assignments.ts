@@ -98,3 +98,54 @@ export async function setAssignmentEarningsSnapshot(id: string, snapshot: Earnin
   const { error } = await supabase.from("job_assignments").update({ earnings_snapshot: snapshot }).eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+// §24 Rozliczenia pracownika: zakończone realizacje z zamrożonym wynagrodzeniem + status wypłaty.
+export interface EmployeeSettlementRow {
+  assignmentId: string;
+  jobId: string;
+  reservationId: string | null;
+  title: string;
+  eventDate: string | null;
+  amount: number;
+  settledAt: string | null;
+}
+
+interface RawSettlementRow {
+  id: string;
+  earnings_snapshot: EarningsBreakdown | null;
+  settled_at: string | null;
+  job: { id: string; title: string | null; status: string; event_date: string | null; reservation: { id: string; event_type: string | null; customer: { name: string | null } | null } | null } | null;
+}
+
+export async function listEmployeeSettlements(profileId: string): Promise<EmployeeSettlementRow[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("job_assignments")
+    .select("id, earnings_snapshot, settled_at, status, job:jobs(id, title, status, event_date, reservation:reservations(id, event_type, customer:customers(name)))")
+    .eq("profile_id", profileId)
+    .eq("status", "APPROVED");
+  const rows = (data ?? []) as unknown as RawSettlementRow[];
+  return rows
+    .filter((r) => r.job?.status === "DONE")
+    .map((r) => ({
+      assignmentId: r.id,
+      jobId: r.job!.id,
+      reservationId: r.job!.reservation?.id ?? null,
+      title: r.job!.reservation?.customer?.name ?? r.job!.reservation?.event_type ?? r.job!.title ?? "Realizacja",
+      eventDate: r.job!.event_date ?? null,
+      amount: Number(r.earnings_snapshot?.total ?? 0),
+      settledAt: r.settled_at ?? null,
+    }))
+    .sort((a, b) => ((a.eventDate ?? "") < (b.eventDate ?? "") ? 1 : -1));
+}
+
+export async function setAssignmentSettled(id: string, settled: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from("job_assignments")
+    .update({ settled_at: settled ? new Date().toISOString() : null, settled_by: settled ? (user?.id ?? null) : null })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}

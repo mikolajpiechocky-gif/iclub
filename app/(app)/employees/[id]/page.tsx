@@ -4,7 +4,9 @@ import { PageHeader } from "@/components/layout";
 import { Alert } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { getEmployee } from "@/lib/data/employees";
+import { listEmployeeSettlements } from "@/lib/data/assignments";
 import { RateForm } from "../rate-form";
+import { EmployeeSettlements } from "../employee-settlements";
 
 export const dynamic = "force-dynamic";
 
@@ -23,5 +25,13 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
 
   const employee = await getEmployee(id);
   if (!employee) notFound();
-  return <RateForm employee={employee} />;
+  const settlements = await listEmployeeSettlements(id);
+  return (
+    <>
+      <RateForm employee={employee} />
+      <div className="mx-auto max-w-[820px] px-5 pb-10 md:px-8">
+        <EmployeeSettlements profileId={id} rows={settlements} />
+      </div>
+    </>
+  );
 }

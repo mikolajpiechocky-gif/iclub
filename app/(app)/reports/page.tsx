@@ -48,9 +48,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     paidByJob.set(p.job_id, (paidByJob.get(p.job_id) ?? 0) + Number(p.amount || 0));
   }
   const costByJob = new Map<string, number>();
+  const costItemsByJob = new Map<string, { category: string; note: string | null; amount: number; status: string }[]>();
   for (const c of costs) {
     if (!c.job_id || c.status === "REJECTED") continue; // odrzucone koszty nie liczą się (spójnie z Koszty/rentownością)
     costByJob.set(c.job_id, (costByJob.get(c.job_id) ?? 0) + Number(c.amount || 0));
+    const arr = costItemsByJob.get(c.job_id) ?? [];
+    arr.push({ category: c.category, note: c.note, amount: Number(c.amount || 0), status: c.status });
+    costItemsByJob.set(c.job_id, arr);
   }
 
   const rows = jobs
@@ -213,32 +217,45 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </div>
       )}
 
-      {/* Per zlecenie */}
-      <h2 className="mb-3 mt-8 font-display text-[15px] font-bold text-white">Rentowność zleceń</h2>
-      <div className="overflow-x-auto rounded-card border border-border bg-surface">
-        <table className="w-full text-left">
-          <thead className="border-b border-border bg-[#12131a] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">
-            <tr>{["Zlecenie", "Status", "Przychód", "Koszty", "Zysk", "Marża"].map((h) => <th key={h} className="px-4 py-3 font-bold">{h}</th>)}</tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-[13px] text-ink-2">Brak zleceń w wybranym okresie.</td></tr>
-            )}
-            {rows.map((r) => {
-              const m = JOB_STATUS_META[r.job.status];
-              return (
-                <tr key={r.job.id} className="border-b border-border-soft last:border-0">
-                  <td className="px-4 py-3 text-[13px] font-bold text-ink">{r.job.reservation?.customer?.name ?? r.job.title ?? "Zlecenie"}</td>
-                  <td className="px-4 py-3"><Pill label={m.label} fg={m.fg} bg={m.bg} /></td>
-                  <td className="px-4 py-3 text-[13px] text-ok">{fmtPLN(r.rev)}</td>
-                  <td className="px-4 py-3 text-[13px] text-warn">{fmtPLN(r.cost)}</td>
-                  <td className="px-4 py-3 text-[13px] font-bold" style={{ color: r.profit >= 0 ? "#5fd68b" : "#f58585" }}>{fmtPLN(r.profit)}</td>
-                  <td className="px-4 py-3 text-[13px] text-ink-2">{pct(r.profit, r.rev)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Per zlecenie — każda realizacja z sumą kosztów; po rozwinięciu rozbicie na pozycje */}
+      <h2 className="mb-1 mt-8 font-display text-[15px] font-bold text-white">Rentowność zleceń</h2>
+      <p className="mb-3 text-[12px] text-ink-2">Kliknij realizację, aby zobaczyć rozbicie kosztów (wynagrodzenia, paliwo, pozostałe).</p>
+      <div className="flex flex-col gap-2">
+        {rows.length === 0 && (
+          <div className="rounded-card border border-border bg-surface px-4 py-6 text-center text-[13px] text-ink-2">Brak zleceń w wybranym okresie.</div>
+        )}
+        {rows.map((r) => {
+          const m = JOB_STATUS_META[r.job.status];
+          const items = costItemsByJob.get(r.job.id) ?? [];
+          const name = r.job.reservation?.customer?.name ?? r.job.title ?? "Zlecenie";
+          return (
+            <details key={r.job.id} className="overflow-hidden rounded-card border border-border bg-surface">
+              <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                <span className="min-w-[120px] flex-1 truncate text-[13.5px] font-bold text-ink">{name}</span>
+                <Pill label={m.label} fg={m.fg} bg={m.bg} />
+                <span className="text-[12px] text-ok">{fmtPLN(r.rev)}</span>
+                <span className="text-[12px] text-warn">− {fmtPLN(r.cost)}</span>
+                <span className="text-[13px] font-bold" style={{ color: r.profit >= 0 ? "#5fd68b" : "#f58585" }}>{fmtPLN(r.profit)}</span>
+                <span className="w-12 text-right text-[11.5px] text-ink-2">{pct(r.profit, r.rev)}</span>
+              </summary>
+              <div className="border-t border-border px-4 py-3">
+                <div className="mb-1.5 flex items-center justify-between text-[12px] font-semibold"><span className="text-ink-2">Przychód (zapłacone)</span><span className="text-ok">{fmtPLN(r.rev)}</span></div>
+                {items.length ? (
+                  <ul className="flex flex-col gap-1">
+                    {items.map((it, i) => (
+                      <li key={i} className="flex items-center justify-between text-[12px]">
+                        <span className="min-w-0 truncate pr-2 text-ink-2">{it.category}{it.note ? ` · ${it.note}` : ""}{it.status === "PENDING" ? " · do weryfikacji" : ""}</span>
+                        <span className="flex-none font-semibold text-ink">− {fmtPLN(it.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="text-[12px] text-ink-2">Brak zapisanych kosztów dla tej realizacji.</p>}
+                <div className="mt-2 flex items-center justify-between border-t border-border-soft pt-2 text-[12.5px] font-bold"><span className="text-ink">Zysk</span><span style={{ color: r.profit >= 0 ? "#5fd68b" : "#f58585" }}>{fmtPLN(r.profit)}</span></div>
+                <a href={`/reservations/${r.job.reservation_id ?? ""}`} className="mt-2 inline-block text-[12px] font-semibold text-accent-soft">Otwórz realizację →</a>
+              </div>
+            </details>
+          );
+        })}
       </div>
     </div>
   );

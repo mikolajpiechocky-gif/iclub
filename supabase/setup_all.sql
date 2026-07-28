@@ -1486,3 +1486,9 @@ alter table public.reservations add column if not exists upsell_value numeric no
 -- ================= 0058: odbiór własny (klient odbiera sam — bez transportu) =================
 alter table public.reservations add column if not exists self_pickup boolean not null default false;
 
+-- ================= 0059: rozliczenie wynagrodzenia pracownika (wypłacone) =================
+-- Znacznik wypłaty wynagrodzenia za realizację (per przypisanie). Saldo „do wypłaty" =
+-- suma zamrożonych zarobków zakończonych realizacji, gdzie settled_at IS NULL.
+alter table public.job_assignments add column if not exists settled_at timestamptz;
+alter table public.job_assignments add column if not exists settled_by uuid references public.profiles(id) on delete set null;
+
