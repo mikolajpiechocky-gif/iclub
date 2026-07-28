@@ -37,7 +37,7 @@ export async function listEmployees(): Promise<EmployeeWithRate[]> {
 
   const supabase = await createClient();
   const [{ data: profiles }, { data: rates }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, role").order("full_name"),
+    supabase.from("profiles").select("id, full_name, role, avatar_url").order("full_name"),
     supabase.from("employee_rates").select("*"),
   ]);
 

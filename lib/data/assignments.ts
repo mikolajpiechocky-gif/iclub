@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { EmployeeRate } from "./types";
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
+import { getSettings } from "./settings";
+import { settlementForRealization, rulesFromSettings } from "@/lib/domain/iclub-settlement";
 
 export type AssignmentStatus = "REQUESTED" | "APPROVED";
 
@@ -116,40 +118,71 @@ export interface EmployeeSettlementRow {
 
 interface RawSettlementRow {
   id: string;
+  is_lead: boolean | null;
   earnings_snapshot: EarningsBreakdown | null;
   settled_at: string | null;
   review_given: boolean | null;
   reel_given: boolean | null;
   reel_link: string | null;
   fuel_amount: number | string | null;
-  job: { id: string; title: string | null; status: string; event_date: string | null; reservation: { id: string; event_type: string | null; customer: { name: string | null } | null } | null } | null;
+  job: { id: string; title: string | null; status: string; business_line: string; event_date: string | null; owner_bonus: number | string | null; reservation: { id: string; event_type: string | null; tent_extra: string | null; rental_settlement_flat: number | string | null; customer: { name: string | null } | null } | null } | null;
 }
 
 export async function listEmployeeSettlements(profileId: string): Promise<EmployeeSettlementRow[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("job_assignments")
-    .select("id, earnings_snapshot, settled_at, status, review_given, reel_given, reel_link, fuel_amount, job:jobs(id, title, status, event_date, reservation:reservations(id, event_type, customer:customers(name)))")
-    .eq("profile_id", profileId)
-    .eq("status", "APPROVED");
-  const rows = (data ?? []) as unknown as RawSettlementRow[];
-  return rows
+  const [{ data }, { data: rateData }, settings] = await Promise.all([
+    supabase
+      .from("job_assignments")
+      .select("id, is_lead, earnings_snapshot, settled_at, status, review_given, reel_given, reel_link, fuel_amount, job:jobs(id, title, status, business_line, event_date, owner_bonus, reservation:reservations(id, event_type, tent_extra, rental_settlement_flat, customer:customers(name)))")
+      .eq("profile_id", profileId)
+      .eq("status", "APPROVED"),
+    supabase.from("employee_rates").select("*").eq("profile_id", profileId).maybeSingle(),
+    getSettings(),
+  ]);
+  const rate = (rateData as EmployeeRate) ?? null;
+  const rules = rulesFromSettings(settings);
+
+  const done = ((data ?? []) as unknown as RawSettlementRow[])
     .filter((r) => r.job?.status === "DONE")
-    .map((r) => ({
+    .sort((a, b) => ((a.job!.event_date ?? "") < (b.job!.event_date ?? "") ? -1 : 1)); // rosnąco → indeks miesiąca
+
+  // §rozliczenie Gdy brak zamrożonego wynagrodzenia (realizacja domknięta źle/starym trybem albo
+  // bez snapshotu) — liczymy na żywo, żeby dało się rozliczyć. Indeks miesiąca z kolejności realizacji.
+  const monthIdx = new Map<string, number>();
+  const out = done.map((r) => {
+    const month = (r.job!.event_date ?? "").slice(0, 7);
+    const priorCount = monthIdx.get(month) ?? 0;
+    monthIdx.set(month, priorCount + 1);
+
+    const snapTotal = Number(r.earnings_snapshot?.total ?? 0);
+    let amount = snapTotal;
+    if (!(snapTotal > 0)) {
+      const ownerBonus = Number(r.job!.owner_bonus ?? 0) || 0;
+      if (r.job!.business_line === "EQUIPMENT_RENTAL") {
+        const flat = r.job!.reservation?.rental_settlement_flat != null ? Number(r.job!.reservation.rental_settlement_flat) : null;
+        amount = flat != null ? Math.round((flat + ownerBonus) * 100) / 100 : ownerBonus; // godzinowa = bez dodatkowej wypłaty
+      } else if (rate) {
+        const s = settlementForRealization(rules, priorCount, { hasGastro: r.job!.reservation?.tent_extra === "GASTRO", rate });
+        amount = Math.round((s.total + ownerBonus) * 100) / 100;
+      }
+    }
+
+    return {
       assignmentId: r.id,
       jobId: r.job!.id,
       reservationId: r.job!.reservation?.id ?? null,
       title: r.job!.reservation?.customer?.name ?? r.job!.reservation?.event_type ?? r.job!.title ?? "Realizacja",
       eventDate: r.job!.event_date ?? null,
-      amount: Number(r.earnings_snapshot?.total ?? 0),
+      amount,
       settledAt: r.settled_at ?? null,
       reviewGiven: Boolean(r.review_given),
       reelGiven: Boolean(r.reel_given),
       reelLink: r.reel_link ?? null,
       fuelAmount: Number(r.fuel_amount ?? 0) || 0,
-    }))
-    .sort((a, b) => ((a.eventDate ?? "") < (b.eventDate ?? "") ? 1 : -1));
+    };
+  });
+  return out.sort((a, b) => ((a.eventDate ?? "") < (b.eventDate ?? "") ? 1 : -1)); // wyświetlanie malejąco
 }
 
 // §rozliczenie Zaznaczenie premii/zwrotów rozliczanych per realizacja (opinia/rolka/paliwo).

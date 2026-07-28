@@ -70,10 +70,14 @@ export default async function DashboardPage() {
   const newInquiries = inquiries.filter((q) => q.status === "NEW" && (q.created_at ?? "").slice(0, 10) >= days14Str).length;
   const plannedJobs = jobs.filter((j) => j.status === "PLANNED").length;
 
-  // §pulpit Zysk w tym miesiącu = przychód (zapłacone płatności) − koszty (bez odrzuconych), wg miesiąca.
+  // §pulpit Zysk w tym miesiącu = przychód − koszty realizacji, których DATA (event_date) wypada
+  // w tym miesiącu. Po dacie realizacji (a nie wpisania płatności) — inaczej świeżo wprowadzone
+  // dane z całego okresu wpadały do „tego miesiąca".
   const monthPrefix = todayStr.slice(0, 7);
-  const revenueMonth = payments.filter((p) => p.status === "PAID" && (p.created_at ?? "").slice(0, 7) === monthPrefix).reduce((s, p) => s + Number(p.amount || 0), 0);
-  const costsMonth = costs.filter((c) => c.status !== "REJECTED" && (c.spent_on ?? "").slice(0, 7) === monthPrefix).reduce((s, c) => s + Number(c.amount || 0), 0);
+  const jobMonth = new Map<string, string>();
+  for (const j of jobs) jobMonth.set(j.id, (j.event_date ?? j.reservation?.event_date ?? "").slice(0, 7));
+  const revenueMonth = payments.filter((p) => p.status === "PAID" && p.job_id && jobMonth.get(p.job_id) === monthPrefix).reduce((s, p) => s + Number(p.amount || 0), 0);
+  const costsMonth = costs.filter((c) => c.status !== "REJECTED" && c.job_id && jobMonth.get(c.job_id) === monthPrefix).reduce((s, c) => s + Number(c.amount || 0), 0);
   const profitMonth = Math.round((revenueMonth - costsMonth) * 100) / 100;
   const monthName = new Date(todayStr + "T00:00:00Z").toLocaleDateString("pl-PL", { month: "long" });
 

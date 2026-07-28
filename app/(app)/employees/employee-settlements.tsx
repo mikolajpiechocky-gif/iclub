@@ -29,18 +29,16 @@ export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus }:
   const saldo = unpaid.reduce((s, r) => s + rowTotal(r), 0);
   const paid = rows.filter((r) => r.settledAt).reduce((s, r) => s + rowTotal(r), 0);
 
+  // Zapisujemy TYLKO zmienione pole (akcja robi patch), bez router.refresh — inaczej odświeżenie
+  // i onBlur innych inputów nadpisywały odznaczenie (np. rolki „nie dało się odkliknąć").
   const saveExtras = (id: string, patch: Partial<{ reviewGiven: boolean; reelGiven: boolean; reelLink: string; fuelAmount: string }>) => {
     setExtras((x) => ({ ...x, [id]: { ...x[id], ...patch } }));
-    const next = { ...extras[id], ...patch };
-    start(async () => {
-      await setAssignmentExtrasAction(id, profileId, {
-        reviewGiven: next.reviewGiven,
-        reelGiven: next.reelGiven,
-        reelLink: next.reelLink,
-        fuelAmount: Number((next.fuelAmount || "").replace(",", ".")) || 0,
-      });
-      router.refresh();
-    });
+    const payload: { reviewGiven?: boolean; reelGiven?: boolean; reelLink?: string; fuelAmount?: number } = {};
+    if (patch.reviewGiven !== undefined) payload.reviewGiven = patch.reviewGiven;
+    if (patch.reelGiven !== undefined) payload.reelGiven = patch.reelGiven;
+    if (patch.reelLink !== undefined) payload.reelLink = patch.reelLink;
+    if (patch.fuelAmount !== undefined) payload.fuelAmount = Number((patch.fuelAmount || "").replace(",", ".")) || 0;
+    void setAssignmentExtrasAction(id, profileId, payload);
   };
 
   const settle = (id: string, settled: boolean) => start(async () => { await settleAssignmentAction(id, settled, profileId); router.refresh(); });
@@ -94,10 +92,10 @@ export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus }:
 
                 {/* Premie i zwroty rozliczane per realizacja */}
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  <button onClick={() => saveExtras(r.assignmentId, { reviewGiven: !e.reviewGiven })} disabled={pending || settled} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold disabled:opacity-60 ${e.reviewGiven ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface text-ink-2"}`}>
+                  <button type="button" onClick={() => saveExtras(r.assignmentId, { reviewGiven: !e.reviewGiven })} disabled={settled} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold disabled:opacity-60 ${e.reviewGiven ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface text-ink-2"}`}>
                     Opinia +{zl(reviewBonus)}
                   </button>
-                  <button onClick={() => saveExtras(r.assignmentId, { reelGiven: !e.reelGiven })} disabled={pending || settled} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold disabled:opacity-60 ${e.reelGiven ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface text-ink-2"}`}>
+                  <button type="button" onClick={() => saveExtras(r.assignmentId, { reelGiven: !e.reelGiven })} disabled={settled} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold disabled:opacity-60 ${e.reelGiven ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface text-ink-2"}`}>
                     Rolka +{zl(reelBonus)}
                   </button>
                   <div className="flex items-center gap-1 text-[11px] text-ink-2">
