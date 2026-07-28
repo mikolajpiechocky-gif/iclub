@@ -1512,3 +1512,7 @@ drop policy if exists olx_stats_owner on public.olx_advert_stats;
 create policy olx_stats_owner on public.olx_advert_stats for all to authenticated
   using (public.is_owner()) with check (public.is_owner());
 
+-- ================= 0062: cykliczne zadania serwisowe (np. cotygodniowy przegląd) =================
+-- recurrence = 'WEEKLY' → po oznaczeniu „Zrobione" tworzy kolejne wystąpienie za 7 dni.
+alter table public.service_tasks add column if not exists recurrence text;
+

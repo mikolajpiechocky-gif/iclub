@@ -8,10 +8,10 @@ import { createServiceTaskAction, setServiceStatusAction, type ServiceFormValues
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : null);
 
-export function ServiceManager({ tasks }: { tasks: ServiceTaskRecord[] }) {
+export function ServiceManager({ tasks, overdueDays = {} }: { tasks: ServiceTaskRecord[]; overdueDays?: Record<string, number> }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [v, setV] = useState<ServiceFormValues>({ kind: "Sprawdzenie", equipment: "", description: "", due_date: "" });
+  const [v, setV] = useState<ServiceFormValues>({ kind: "Sprawdzenie", equipment: "", description: "", due_date: "", weekly: false });
   const [error, setError] = useState<string | null>(null);
 
   const set = <K extends keyof ServiceFormValues>(k: K, val: ServiceFormValues[K]) => setV((s) => ({ ...s, [k]: val }));
@@ -21,7 +21,7 @@ export function ServiceManager({ tasks }: { tasks: ServiceTaskRecord[] }) {
     setError(null);
     startTransition(async () => {
       const res = await createServiceTaskAction(v);
-      if (res.ok) { setV({ kind: "Sprawdzenie", equipment: "", description: "", due_date: "" }); router.refresh(); return; }
+      if (res.ok) { setV({ kind: "Sprawdzenie", equipment: "", description: "", due_date: "", weekly: false }); router.refresh(); return; }
       setError(res.error ?? "Błąd");
     });
   };
@@ -46,6 +46,10 @@ export function ServiceManager({ tasks }: { tasks: ServiceTaskRecord[] }) {
           <TextField label="Sprzęt / namiot" placeholder="Np. Namiot 6×8 Żółty" value={v.equipment} onChange={(e) => set("equipment", e.target.value)} />
           <TextField label="Termin (opcjonalnie)" type="date" value={v.due_date} onChange={(e) => set("due_date", e.target.value)} />
           <div className="sm:col-span-2"><TextField label="Opis" placeholder="Co zrobić" value={v.description} onChange={(e) => set("description", e.target.value)} /></div>
+          <label className="sm:col-span-2 flex cursor-pointer items-center gap-2.5 text-[13px] font-semibold text-ink">
+            <input type="checkbox" checked={Boolean(v.weekly)} onChange={(e) => set("weekly", e.target.checked)} className="h-4 w-4 accent-brand" />
+            Powtarzaj co tydzień <span className="text-[11.5px] font-normal text-ink-2">— po „Zrobione” utworzy kolejne za 7 dni</span>
+          </label>
           <div className="sm:col-span-2 flex justify-end"><PrimaryButton type="submit" icon="plus" disabled={pending}>{pending ? "Zapisywanie…" : "Dodaj zadanie"}</PrimaryButton></div>
         </form>
       </SectionCard>
@@ -57,10 +61,16 @@ export function ServiceManager({ tasks }: { tasks: ServiceTaskRecord[] }) {
           {tasks.map((t) => {
             const m = SERVICE_STATUS_META[t.status];
             const due = fmt(t.due_date);
+            const overdue = overdueDays[t.id] ?? 0;
+            const weekly = t.recurrence === "WEEKLY";
             return (
-              <div key={t.id} className="flex flex-wrap items-center gap-3 border-b border-border-soft px-4 py-3.5 last:border-0">
+              <div key={t.id} className={`flex flex-wrap items-center gap-3 border-b border-border-soft px-4 py-3.5 last:border-0 ${overdue > 0 ? "bg-[#1f1113]" : ""}`}>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13.5px] font-bold text-ink">{t.kind}{t.equipment ? ` · ${t.equipment}` : ""}</div>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[13.5px] font-bold text-ink">
+                    {t.kind}{t.equipment ? ` · ${t.equipment}` : ""}
+                    {weekly && <span className="rounded-[6px] bg-[#1b2a3f] px-1.5 py-0.5 text-[10px] font-bold text-[#7fa8f5]">co tydzień</span>}
+                    {overdue > 0 && <span className="rounded-[6px] bg-[#341a1d] px-1.5 py-0.5 text-[10px] font-bold text-bad">{overdue} {overdue === 1 ? "dzień" : "dni"} po terminie</span>}
+                  </div>
                   <div className="mt-0.5 text-[12px] text-ink-2">{t.description || "—"}{due ? ` · termin ${due}` : ""}</div>
                 </div>
                 <Pill label={m.label} fg={m.fg} bg={m.bg} />

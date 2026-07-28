@@ -392,6 +392,7 @@ export interface ServiceTaskRecord {
   description: string | null;
   status: ServiceStatus;
   due_date: string | null;
+  recurrence: string | null; // 'WEEKLY' = cotygodniowe (po „Zrobione" tworzy kolejne za 7 dni)
   created_at: string;
 }
 

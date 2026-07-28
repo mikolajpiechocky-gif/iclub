@@ -10,6 +10,7 @@ export interface ServiceFormValues {
   equipment: string;
   description: string;
   due_date: string;
+  weekly?: boolean;
 }
 
 export interface ActionResult {
@@ -29,6 +30,7 @@ export async function createServiceTaskAction(v: ServiceFormValues): Promise<Act
       equipment: v.equipment.trim() || null,
       description: v.description.trim() || null,
       due_date: v.due_date || null,
+      recurrence: v.weekly ? "WEEKLY" : null,
     });
     revalidatePath("/service");
     return { ok: true };
