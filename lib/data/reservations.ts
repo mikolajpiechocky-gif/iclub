@@ -404,6 +404,16 @@ export async function setDepositDeduction(id: string, amount: number): Promise<v
   if (error && !/deposit_deduction/i.test(error.message)) throw new Error(error.message);
 }
 
+// §wypożyczalnia Telefon do klienta przy wynajmie: potwierdzenie godziny dostawy + przejęcie
+// kontaktu przez pracownika. Zapisuje godzinę dostawy i oznacza telefon jako wykonany.
+export async function setRentalDeliveryConfirmed(id: string, deliveryTime: string | null): Promise<void> {
+  const supabase = await createClient();
+  const patch: Record<string, unknown> = { phone_call_done: true };
+  if (deliveryTime !== null) patch.delivery_time = deliveryTime;
+  const { error } = await supabase.from("reservations").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // Potwierdzenie szczegółów przez klienta (§42) — osobno od edycji rezerwacji.
 export async function setReservationConfirmed(id: string, confirmed: boolean): Promise<void> {
   const supabase = await createClient();

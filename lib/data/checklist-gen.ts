@@ -3,7 +3,7 @@
 import { getJob } from "./jobs";
 import { listAddons } from "./resources";
 import { generateChecklist, listChecklistItems } from "./checklist";
-import { buildChecklistTemplate } from "@/lib/domain/checklist";
+import { buildChecklistTemplate, type ChecklistTemplateItem } from "@/lib/domain/checklist";
 import { getEventWeather } from "@/lib/integrations/weather";
 
 export async function generateChecklistForJob(jobId: string, opts: { onlyIfEmpty?: boolean } = {}): Promise<void> {
@@ -13,6 +13,22 @@ export async function generateChecklistForJob(jobId: string, opts: { onlyIfEmpty
   }
   const [job, addons] = await Promise.all([getJob(jobId), listAddons()]);
   const r = job?.reservation;
+
+  // §wypożyczalnia Checklista = konkretne itemy z magazynu (dodatki z ilościami). Bez namiotu,
+  // pakietów i katalogu iClub — wprowadzamy dokładnie to, co klient wypożyczył.
+  if (job?.business_line === "EQUIPMENT_RENTAL") {
+    const items: ChecklistTemplateItem[] = (r?.addon_ids ?? [])
+      .map((id) => {
+        const a = addons.find((x) => x.id === id);
+        if (!a) return null;
+        const q = r?.addon_qty?.[id] ?? 1;
+        return { category: "Do wydania", label: a.name, qty: `${q} szt.`, required: true };
+      })
+      .filter((x): x is ChecklistTemplateItem => x !== null);
+    await generateChecklist(jobId, items);
+    return;
+  }
+
   const addonNames = (r?.addon_ids ?? [])
     .map((id) => addons.find((a) => a.id === id)?.name)
     .filter((n): n is string => Boolean(n));

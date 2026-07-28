@@ -309,6 +309,10 @@ export async function createReservationAction(values: ReservationFormValues): Pr
   try {
     const resolved = await resolveNewCustomer(values);
     const { id } = await createReservation(toInput(resolved));
+    // §wypożyczalnia Checklista pakowania tworzy się od razu — wprowadzamy konkretne itemy z magazynu.
+    if (values.business_line === "EQUIPMENT_RENTAL") {
+      try { const job = await getJobByReservation(id); if (job) await generateChecklistForJob(job.id, { onlyIfEmpty: true }); } catch { /* nie blokuje zapisu */ }
+    }
     // Nowa rezerwacja z apki → wolno utworzyć wydarzenie w kalendarzu.
     try { await syncReservationToCalendar(id, { allowCreate: true }); } catch (e) { console.error("Kalendarz: sync rezerwacji nie powiódł się", e); }
     // Nowe zlecenie iClub „do zgarnięcia" → push do pracowników.
@@ -431,6 +435,8 @@ export async function updateReservationAction(id: string, values: ReservationFor
     try {
       const job = await getJobByReservation(id);
       if (job) {
+        // §wypożyczalnia Odśwież checklistę pakowania z aktualnych itemów (jeśli jeszcze pusta — nie kasuje odhaczonej).
+        if (values.business_line === "EQUIPMENT_RENTAL") await generateChecklistForJob(job.id, { onlyIfEmpty: true }).catch(() => {});
         const assigned = (await listJobAssignments(job.id)).filter((a) => a.status === "APPROVED").map((a) => a.profile_id);
         if (assigned.length) await sendPushToUsers(assigned, { title: "Zmiana szczegółów realizacji", body: [values.event_type, values.event_date, values.location].filter(Boolean).join(" · "), url: `/field/${job.id}`, tag: `job-${job.id}` });
       }

@@ -9,7 +9,7 @@ import { createCost, listCosts } from "@/lib/data/costs";
 import { writeRealizationCosts } from "@/lib/data/realization-close";
 import { rentalWorkMs, rentalLabor } from "@/lib/domain/rental";
 import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
-import { saveCallDetails, setDepositDeduction } from "@/lib/data/reservations";
+import { saveCallDetails, setDepositDeduction, setRentalDeliveryConfirmed } from "@/lib/data/reservations";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
 import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
@@ -32,6 +32,20 @@ export interface ClientCallInput {
 export interface ActionResult {
   ok: boolean;
   error?: string;
+}
+
+// §wypożyczalnia Telefon do klienta: pracownik potwierdza godzinę dostawy i przejmuje kontakt.
+// Zapisuje godzinę dostawy na rezerwacji i oznacza telefon jako wykonany. (Odbiór własny nie wymaga.)
+export async function confirmRentalDeliveryAction(reservationId: string, jobId: string, deliveryTime: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo: skonfiguruj Supabase, aby zapisać." };
+  try {
+    await setRentalDeliveryConfirmed(reservationId, deliveryTime.trim() || null);
+    revalidatePath(`/field/${jobId}`);
+    revalidatePath(`/reservations/${reservationId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
+  }
 }
 
 // Wypożyczalnia: gdy wszystkie kroki zrobione — policz wynagrodzenie (ryczałt albo czas × stawka),

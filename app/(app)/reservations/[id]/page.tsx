@@ -68,10 +68,12 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
   const r = job?.reservation ?? reservation;
   const rm = RESERVATION_STATUS_META[reservation.status];
   const isOwner = profile?.role === "OWNER";
-  // §9.3 Autor ręcznego ustalenia godziny montażu (jeśli był).
-  const assemblyBy = reservation.assembly_time && reservation.assembly_time_by ? await getProfileName(reservation.assembly_time_by) : null;
+  const isRental = reservation.business_line === "EQUIPMENT_RENTAL";
+  // §9.3 Autor ręcznego ustalenia godziny montażu (iClub).
+  const assemblyBy = !isRental && reservation.assembly_time && reservation.assembly_time_by ? await getProfileName(reservation.assembly_time_by) : null;
 
-  const weather = reservation.event_date && reservation.location
+  // Pogoda dotyczy imprez plenerowych iClub — dla wypożyczalni pomijamy.
+  const weather = !isRental && reservation.event_date && reservation.location
     ? await getEventWeather(reservation.location, reservation.event_date)
     : null;
 
@@ -80,15 +82,26 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
     ? await Promise.all([reservation.customer_id ? getCustomer(reservation.customer_id) : Promise.resolve(null), getSettings()])
     : [null, null];
 
-  const cards: { h: string; rows: [string, string][] }[] = [
-    { h: "Klient", rows: [["Klient", (r as { customer?: { name?: string } }).customer?.name ?? "—"], ["Źródło", reservation.source ?? "—"]] },
-    { h: "Wydarzenie", rows: [["Typ", reservation.event_type ?? "—"], ["Goście", reservation.guests != null ? `${reservation.guests} osób` : "—"], ["Data", fmtDate(reservation.event_date)]] },
-    { h: "Terminy", rows: [["Montaż", fmtDate(reservation.setup_date)], ["Demontaż", fmtDate(reservation.teardown_date)], ["Start imprezy", reservation.event_start_time ?? "—"], ["Godz. montażu", reservation.assembly_time ?? "—"], ["Lokalizacja", reservation.location ?? "—"]] },
-    { h: "Namiot i pakiet", rows: [["Namiot", (r as { tent?: { name?: string } }).tent?.name ?? "—"], ["Pakiet", (r as { package?: { name?: string } }).package?.name ?? "—"], ...(reservation.heating ? ([["Ogrzewanie", "Nagrzewnica HT-01"]] as [string, string][]) : [])] },
-  ];
-  // Rozliczenie (Wartość/Rabat/Zadatek) — tylko szef; pracownika to nie dotyczy.
+  const clientName = (r as { customer?: { name?: string } }).customer?.name ?? "—";
+  // §wypożyczalnia Karty dopasowane do linii: wynajem nie ma namiotu/pakietu/gości ani montażu —
+  // pokazujemy wypożyczony sprzęt, odbiór/zwrot i godzinę dostawy.
+  const cards: { h: string; rows: [string, string][] }[] = isRental
+    ? [
+        { h: "Klient", rows: [["Klient", clientName], ["Źródło", reservation.source ?? "—"]] },
+        { h: "Wypożyczenie", rows: [["Sprzęt", reservation.rental_items || "—"], ["Pozycji", String((reservation.addon_ids ?? []).length)], ["Odbiór", reservation.self_pickup ? "Własny (klient)" : "Transport (my)"]] },
+        { h: "Terminy", rows: [["Odbiór / dostawa", fmtDate(reservation.event_date)], ["Zwrot", fmtDate(reservation.teardown_date)], ["Godzina dostawy", reservation.delivery_time ?? "—"], ["Lokalizacja", reservation.location ?? "—"]] },
+      ]
+    : [
+        { h: "Klient", rows: [["Klient", clientName], ["Źródło", reservation.source ?? "—"]] },
+        { h: "Wydarzenie", rows: [["Typ", reservation.event_type ?? "—"], ["Goście", reservation.guests != null ? `${reservation.guests} osób` : "—"], ["Data", fmtDate(reservation.event_date)]] },
+        { h: "Terminy", rows: [["Montaż", fmtDate(reservation.setup_date)], ["Demontaż", fmtDate(reservation.teardown_date)], ["Start imprezy", reservation.event_start_time ?? "—"], ["Godz. montażu", reservation.assembly_time ?? "—"], ["Lokalizacja", reservation.location ?? "—"]] },
+        { h: "Namiot i pakiet", rows: [["Namiot", (r as { tent?: { name?: string } }).tent?.name ?? "—"], ["Pakiet", (r as { package?: { name?: string } }).package?.name ?? "—"], ...(reservation.heating ? ([["Ogrzewanie", "Nagrzewnica HT-01"]] as [string, string][]) : [])] },
+      ];
+  // Rozliczenie — tylko szef. Wynajem: zamiast zadatku „Opłacone z góry".
   if (isOwner) {
-    cards.push({ h: "Rozliczenie", rows: [["Wartość", fmtPLN(reservation.price)], ["Rabat", fmtPLN(reservation.discount ?? 0)], ["Zadatek", fmtPLN(reservation.deposit ?? 0)]] });
+    cards.push(isRental
+      ? { h: "Rozliczenie", rows: [["Wartość", fmtPLN(reservation.price)], ["Rabat", fmtPLN(reservation.discount ?? 0)], ["Opłacone z góry", reservation.payment_upfront ? "Tak" : "Nie"]] }
+      : { h: "Rozliczenie", rows: [["Wartość", fmtPLN(reservation.price)], ["Rabat", fmtPLN(reservation.discount ?? 0)], ["Zadatek", fmtPLN(reservation.deposit ?? 0)]] });
   }
 
   return (
@@ -112,7 +125,7 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
         {job && isOwner && <span className="ml-auto"><RealizationDoneButton reservationId={reservation.id} done={job.status === "DONE"} /></span>}
       </div>
 
-      {isOwner && (
+      {isOwner && !isRental && (
         <ClientConfirmToggle
           id={reservation.id}
           confirmed={reservation.client_confirmed}

@@ -27,6 +27,7 @@ import { JOB_STATUS_META } from "@/lib/data/types";
 import { PackingBlock, RealizationFlow, type RealizationContext } from "../realization-flow";
 import { ProtocolBlock } from "../protocol-block";
 import { TelefonBlock } from "../telefon-block";
+import { RentalPhoneBlock } from "../rental-phone-block";
 import { AddonWarning } from "./addon-warning";
 import { settlementBreakdown, type AddonPriceMap } from "@/lib/domain/billing";
 
@@ -161,22 +162,29 @@ export default async function FieldRealizationPage({ params }: { params: Promise
       </div>
 
       <div className="px-4 pt-4">
-        {/* Skrót danych */}
+        {/* Skrót danych — wypożyczalnia: dostawa/odbiór własny/zwrot; iClub: montaż/start/goście */}
         <div className="mb-3.5 flex flex-wrap gap-2">
-          {[
-            r?.assembly_time ? `Montaż ${r.assembly_time}` : null,
-            r?.event_start_time ? `Start ${r.event_start_time}` : null,
-            r?.guests != null ? `${r.guests} os.` : null,
-          ].filter(Boolean).map((c) => (
+          {(job.business_line === "EQUIPMENT_RENTAL"
+            ? [
+                r?.self_pickup ? "Odbiór własny" : "Transport",
+                r?.delivery_time ? `Dostawa ${r.delivery_time}` : null,
+                r?.teardown_date ? `Zwrot ${fmtDate(r.teardown_date)}` : null,
+              ]
+            : [
+                r?.assembly_time ? `Montaż ${r.assembly_time}` : null,
+                r?.event_start_time ? `Start ${r.event_start_time}` : null,
+                r?.guests != null ? `${r.guests} os.` : null,
+              ]
+          ).filter(Boolean).map((c) => (
             <span key={c as string} className="rounded-[10px] border border-border bg-surface px-2.5 py-2 text-[12px] font-semibold text-ink">{c}</span>
           ))}
         </div>
 
-        {/* §9.4 Ostrzeżenie o dodatkach — możliwe do zamknięcia (znika po odhaczeniu). */}
-        <AddonWarning jobId={job.id} addonNames={addonNames} />
+        {/* §9.4 Ostrzeżenie o dodatkach (iClub) — dla wynajmu bez sensu (całość to sprzęt). */}
+        {job.business_line === "ICLUB" && <AddonWarning jobId={job.id} addonNames={addonNames} />}
 
-        {/* §11.1 Zawartość pakietu — do spakowania. */}
-        {packageItems.length > 0 && (
+        {/* §11.1 Zawartość pakietu (iClub) — do spakowania. */}
+        {job.business_line === "ICLUB" && packageItems.length > 0 && (
           <div className="mb-3.5 rounded-[13px] border border-border bg-surface px-3.5 py-3">
             <div className="mb-1.5 text-[12.5px] font-bold text-ink">Zawartość pakietu{r?.package?.name ? ` · ${r.package.name}` : ""}</div>
             <div className="flex flex-wrap gap-1.5">
@@ -187,7 +195,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
           </div>
         )}
 
-        {/* §II.12 Blok: Telefon do klienta (przed pakowaniem) */}
+        {/* §II.12 Blok: Telefon do klienta (iClub — ustalenia + dosprzedaż) */}
         {job.business_line === "ICLUB" && (
           <TelefonBlock
             reservationId={r?.id ?? ""}
@@ -203,15 +211,25 @@ export default async function FieldRealizationPage({ params }: { params: Promise
           />
         )}
 
-        {/* Blok: Pakowanie (iClub — osobny etap, dzień przed) */}
-        {job.business_line === "ICLUB" && (
-          <PackingBlock
+        {/* §wypożyczalnia Telefon do klienta — tylko potwierdzenie godziny dostawy + przejęcie
+            kontaktu. Odbiór własny nie wymaga telefonu. */}
+        {job.business_line === "EQUIPMENT_RENTAL" && !r?.self_pickup && (
+          <RentalPhoneBlock
+            reservationId={r?.id ?? ""}
             jobId={job.id}
-            stage={packing}
-            checklistHref={`/field/${job.id}/checklist`}
-            progress={{ done: checklist.filter((i) => i.done).length, total: checklist.length }}
+            phone={phone}
+            deliveryTime={r?.delivery_time ?? null}
+            done={r?.phone_call_done ?? false}
           />
         )}
+
+        {/* Blok: Pakowanie / przygotowanie sprzętu — checklista z konkretnych itemów (obie linie) */}
+        <PackingBlock
+          jobId={job.id}
+          stage={packing}
+          checklistHref={`/field/${job.id}/checklist`}
+          progress={{ done: checklist.filter((i) => i.done).length, total: checklist.length }}
+        />
 
         {/* Pojazd realizacji — iClub oraz wypożyczalnia z transportem (nie przy odbiorze własnym) */}
         {!(job.business_line === "EQUIPMENT_RENTAL" && r?.self_pickup) && (
