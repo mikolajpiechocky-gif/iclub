@@ -102,14 +102,20 @@ export async function setAssignmentEarningsSnapshot(id: string, snapshot: Earnin
 }
 
 // §24 Rozliczenia pracownika: zakończone realizacje z zamrożonym wynagrodzeniem + status wypłaty.
+export interface SettlementBonus { label: string; amount: number }
 export interface EmployeeSettlementRow {
   assignmentId: string;
   jobId: string;
   reservationId: string | null;
   title: string;
   eventDate: string | null;
-  amount: number; // baza (zamrożone wynagrodzenie) — premie opinia/rolka i paliwo doliczane osobno
   settledAt: string | null;
+  // §rozliczenie Rozbicie propozycji: baza (za realizację) + czy jest DO WYPŁATY (ryczałt),
+  // czy tylko KOSZT „w ramach umowy" (czas wolny, rozliczany poza apką). Plus premie należne.
+  basePaidOut: boolean;
+  baseValue: number;
+  baseLabel: string;
+  guaranteed: SettlementBonus[]; // daleki, gastro, bonus szefa — do wypłaty
   reviewGiven: boolean; // opinia
   reelGiven: boolean;   // rolka
   reelLink: string | null;
@@ -149,24 +155,40 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
 
   // §rozliczenie Gdy brak zamrożonego wynagrodzenia (realizacja domknięta źle/starym trybem albo
   // bez snapshotu) — liczymy na żywo, żeby dało się rozliczyć. Indeks miesiąca z kolejności realizacji.
+  // §rozliczenie „Daleki wyjazd" zależy od trasy — pobierz farTrip (>100 km) dla realizacji iClub.
+  const jobIds = done.map((r) => r.job!.id);
+  const farByJob = new Map<string, boolean>();
+  if (jobIds.length) {
+    const { data: tc } = await supabase.from("transport_calculations").select("job_id, one_way_km").in("job_id", jobIds);
+    for (const t of (tc ?? []) as { job_id: string; one_way_km: number | string | null }[]) {
+      if (Number(t.one_way_km ?? 0) > 100) farByJob.set(t.job_id, true);
+    }
+  }
+
   const monthIdx = new Map<string, number>();
   const out = done.map((r) => {
     const month = (r.job!.event_date ?? "").slice(0, 7);
     const priorCount = monthIdx.get(month) ?? 0;
     monthIdx.set(month, priorCount + 1);
+    const ownerBonus = Number(r.job!.owner_bonus ?? 0) || 0;
 
-    const snapTotal = Number(r.earnings_snapshot?.total ?? 0);
-    let amount = snapTotal;
-    if (!(snapTotal > 0)) {
-      const ownerBonus = Number(r.job!.owner_bonus ?? 0) || 0;
-      if (r.job!.business_line === "EQUIPMENT_RENTAL") {
-        const flat = r.job!.reservation?.rental_settlement_flat != null ? Number(r.job!.reservation.rental_settlement_flat) : null;
-        amount = flat != null ? Math.round((flat + ownerBonus) * 100) / 100 : ownerBonus; // godzinowa = bez dodatkowej wypłaty
-      } else if (rate) {
-        const s = settlementForRealization(rules, priorCount, { hasGastro: r.job!.reservation?.tent_extra === "GASTRO", rate });
-        amount = Math.round((s.total + ownerBonus) * 100) / 100;
-      }
+    let basePaidOut = false;
+    let baseValue = 0;
+    let baseLabel = "Brak stawki";
+    const guaranteed: SettlementBonus[] = [];
+
+    if (r.job!.business_line === "EQUIPMENT_RENTAL") {
+      const flat = r.job!.reservation?.rental_settlement_flat != null ? Number(r.job!.reservation.rental_settlement_flat) : null;
+      if (flat != null) { basePaidOut = true; baseValue = flat; baseLabel = "Ryczałt za zlecenie"; }
+      else { basePaidOut = false; baseValue = 0; baseLabel = "Stawka godzinowa (koszt osobno)"; }
+    } else if (rate) {
+      const s = settlementForRealization(rules, priorCount, { farTrip: farByJob.get(r.job!.id) ?? false, hasGastro: r.job!.reservation?.tent_extra === "GASTRO", rate });
+      basePaidOut = s.form === "flat"; // ryczałt = do wypłaty; czas wolny = koszt w ramach umowy
+      baseValue = s.baseValue;
+      baseLabel = s.baseLabel;
+      for (const g of s.guaranteed) guaranteed.push(g);
     }
+    if (ownerBonus > 0) guaranteed.push({ label: "Bonus szefa", amount: ownerBonus });
 
     return {
       assignmentId: r.id,
@@ -174,8 +196,11 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
       reservationId: r.job!.reservation?.id ?? null,
       title: r.job!.reservation?.customer?.name ?? r.job!.reservation?.event_type ?? r.job!.title ?? "Realizacja",
       eventDate: r.job!.event_date ?? null,
-      amount,
       settledAt: r.settled_at ?? null,
+      basePaidOut,
+      baseValue,
+      baseLabel,
+      guaranteed,
       reviewGiven: Boolean(r.review_given),
       reelGiven: Boolean(r.reel_given),
       reelLink: r.reel_link ?? null,
@@ -183,6 +208,14 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
     };
   });
   return out.sort((a, b) => ((a.eventDate ?? "") < (b.eventDate ?? "") ? 1 : -1)); // wyświetlanie malejąco
+}
+
+// §rozliczenie Zapis narastająco wypłaconej kwoty (saldo „pozostało" = do wypłaty − wypłacono).
+export async function setEmployeePaidOut(profileId: string, amount: number): Promise<void> {
+  const supabase = await createClient();
+  const val = Math.max(0, Math.round((amount || 0) * 100) / 100);
+  const { error } = await supabase.from("employee_rates").update({ paid_out: val }).eq("profile_id", profileId);
+  if (error) throw new Error(error.message);
 }
 
 // §rozliczenie Zaznaczenie premii/zwrotów rozliczanych per realizacja (opinia/rolka/paliwo).

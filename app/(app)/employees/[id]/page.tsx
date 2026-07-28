@@ -30,7 +30,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
     <>
       <RateForm employee={employee} />
       <div className="mx-auto max-w-[820px] px-5 pb-10 md:px-8">
-        <EmployeeSettlements profileId={id} rows={settlements} reviewBonus={Number(employee.rate?.review_bonus ?? 20) || 0} reelBonus={Number(employee.rate?.reel_bonus ?? 50) || 0} />
+        <EmployeeSettlements profileId={id} rows={settlements} reviewBonus={Number(employee.rate?.review_bonus ?? 20) || 0} reelBonus={Number(employee.rate?.reel_bonus ?? 50) || 0} paidOut={Number(employee.rate?.paid_out ?? 0) || 0} />
       </div>
     </>
   );

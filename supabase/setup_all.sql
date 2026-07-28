@@ -1533,3 +1533,8 @@ alter table public.job_assignments add column if not exists reel_given boolean n
 alter table public.job_assignments add column if not exists reel_link text;                              -- link do rolki
 alter table public.job_assignments add column if not exists fuel_amount numeric(10,2) not null default 0; -- zwrot za paliwo (własne auto)
 
+-- ================= 0066: kwota już wypłacona pracownikowi (saldo „pozostało do wypłaty") =================
+-- Wypłaty bywają przesuwane na kolejne realizacje — trzymamy narastająco wypłaconą kwotę,
+-- a pozostało = suma „do wypłaty" − wypłacono.
+alter table public.employee_rates add column if not exists paid_out numeric(12,2) not null default 0;
+

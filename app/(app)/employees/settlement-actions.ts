@@ -3,14 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { setAssignmentSettled, listEmployeeSettlements, setAssignmentExtras } from "@/lib/data/assignments";
+import { setAssignmentExtras, setEmployeePaidOut } from "@/lib/data/assignments";
 
-export async function settleAssignmentAction(assignmentId: string, settled: boolean, profileId: string) {
+// §rozliczenie Zapis narastająco wypłaconej kwoty (pozostało = do wypłaty − wypłacono). Tylko szef.
+export async function setEmployeePaidOutAction(profileId: string, amount: number) {
   if (!isSupabaseConfigured()) return { ok: false as const, error: "Tryb demo." };
   const me = await getCurrentProfile();
-  if (me?.role !== "OWNER") return { ok: false as const, error: "Tylko szef rozlicza wypłaty." };
+  if (me?.role !== "OWNER") return { ok: false as const, error: "Tylko szef." };
   try {
-    await setAssignmentSettled(assignmentId, settled);
+    await setEmployeePaidOut(profileId, amount);
+    revalidatePath(`/employees`);
     revalidatePath(`/employees/${profileId}`);
     return { ok: true as const };
   } catch (e) {
@@ -34,19 +36,5 @@ export async function setAssignmentExtrasAction(
     return { ok: true as const };
   } catch (e) {
     return { ok: false as const, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
-  }
-}
-
-export async function settleAllForEmployeeAction(profileId: string) {
-  if (!isSupabaseConfigured()) return { ok: false as const, error: "Tryb demo." };
-  const me = await getCurrentProfile();
-  if (me?.role !== "OWNER") return { ok: false as const, error: "Tylko szef." };
-  try {
-    const rows = await listEmployeeSettlements(profileId);
-    for (const r of rows) if (!r.settledAt && r.amount > 0) await setAssignmentSettled(r.assignmentId, true);
-    revalidatePath(`/employees/${profileId}`);
-    return { ok: true as const };
-  } catch (e) {
-    return { ok: false as const, error: e instanceof Error ? e.message : "Nie udało się rozliczyć." };
   }
 }
