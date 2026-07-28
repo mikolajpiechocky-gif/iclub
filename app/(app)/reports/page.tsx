@@ -10,6 +10,7 @@ import { listCosts } from "@/lib/data/costs";
 import { listInvestments } from "@/lib/data/investments";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { JOB_STATUS_META, type JobWithReservation } from "@/lib/data/types";
+import { BackfillCostsButton } from "./backfill-button";
 
 export const dynamic = "force-dynamic";
 
@@ -220,6 +221,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       {/* Per zlecenie — każda realizacja z sumą kosztów; po rozwinięciu rozbicie na pozycje */}
       <h2 className="mb-1 mt-8 font-display text-[15px] font-bold text-white">Rentowność zleceń</h2>
       <p className="mb-3 text-[12px] text-ink-2">Kliknij realizację, aby zobaczyć rozbicie kosztów (wynagrodzenia, paliwo, pozostałe).</p>
+      <BackfillCostsButton />
       <div className="flex flex-col gap-2">
         {rows.length === 0 && (
           <div className="rounded-card border border-border bg-surface px-4 py-6 text-center text-[13px] text-ink-2">Brak zleceń w wybranym okresie.</div>
