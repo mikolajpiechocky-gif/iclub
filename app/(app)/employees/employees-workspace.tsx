@@ -64,7 +64,7 @@ export function EmployeesWorkspace({ employees, settlements }: { employees: Empl
               </div>
             </div>
             <RateForm key={selected.id} employee={selected} embedded />
-            <EmployeeSettlements key={`s-${selected.id}`} profileId={selected.id} rows={settlements[selected.id] ?? []} />
+            <EmployeeSettlements key={`s-${selected.id}`} profileId={selected.id} rows={settlements[selected.id] ?? []} reviewBonus={Number(selected.rate?.review_bonus ?? 20) || 0} reelBonus={Number(selected.rate?.reel_bonus ?? 50) || 0} />
           </div>
         ) : (
           <div className="flex h-full min-h-[300px] flex-col items-center justify-center rounded-card-lg border border-border bg-surface text-center">

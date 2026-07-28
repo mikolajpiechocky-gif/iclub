@@ -1526,3 +1526,10 @@ alter table public.packages add column if not exists price_small numeric(10,2);
 alter table public.packages add column if not exists price_big numeric(10,2);
 update public.packages set price_small = coalesce(price_small, base_price), price_big = coalesce(price_big, base_price);
 
+-- ================= 0065: premie i zwroty rozliczane per realizacja (opinia/rolka/paliwo) =================
+-- Zaznaczane przy zamykaniu realizacji i/lub przy rozliczaniu pracownika; kwoty doliczają się do wypłaty.
+alter table public.job_assignments add column if not exists review_given boolean not null default false; -- opinia
+alter table public.job_assignments add column if not exists reel_given boolean not null default false;   -- rolka
+alter table public.job_assignments add column if not exists reel_link text;                              -- link do rolki
+alter table public.job_assignments add column if not exists fuel_amount numeric(10,2) not null default 0; -- zwrot za paliwo (własne auto)
+

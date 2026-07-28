@@ -106,14 +106,22 @@ export interface EmployeeSettlementRow {
   reservationId: string | null;
   title: string;
   eventDate: string | null;
-  amount: number;
+  amount: number; // baza (zamrożone wynagrodzenie) — premie opinia/rolka i paliwo doliczane osobno
   settledAt: string | null;
+  reviewGiven: boolean; // opinia
+  reelGiven: boolean;   // rolka
+  reelLink: string | null;
+  fuelAmount: number;   // zwrot za paliwo (własne auto)
 }
 
 interface RawSettlementRow {
   id: string;
   earnings_snapshot: EarningsBreakdown | null;
   settled_at: string | null;
+  review_given: boolean | null;
+  reel_given: boolean | null;
+  reel_link: string | null;
+  fuel_amount: number | string | null;
   job: { id: string; title: string | null; status: string; event_date: string | null; reservation: { id: string; event_type: string | null; customer: { name: string | null } | null } | null } | null;
 }
 
@@ -122,7 +130,7 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
   const supabase = await createClient();
   const { data } = await supabase
     .from("job_assignments")
-    .select("id, earnings_snapshot, settled_at, status, job:jobs(id, title, status, event_date, reservation:reservations(id, event_type, customer:customers(name)))")
+    .select("id, earnings_snapshot, settled_at, status, review_given, reel_given, reel_link, fuel_amount, job:jobs(id, title, status, event_date, reservation:reservations(id, event_type, customer:customers(name)))")
     .eq("profile_id", profileId)
     .eq("status", "APPROVED");
   const rows = (data ?? []) as unknown as RawSettlementRow[];
@@ -136,8 +144,25 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
       eventDate: r.job!.event_date ?? null,
       amount: Number(r.earnings_snapshot?.total ?? 0),
       settledAt: r.settled_at ?? null,
+      reviewGiven: Boolean(r.review_given),
+      reelGiven: Boolean(r.reel_given),
+      reelLink: r.reel_link ?? null,
+      fuelAmount: Number(r.fuel_amount ?? 0) || 0,
     }))
     .sort((a, b) => ((a.eventDate ?? "") < (b.eventDate ?? "") ? 1 : -1));
+}
+
+// §rozliczenie Zaznaczenie premii/zwrotów rozliczanych per realizacja (opinia/rolka/paliwo).
+export async function setAssignmentExtras(id: string, extras: { reviewGiven?: boolean; reelGiven?: boolean; reelLink?: string | null; fuelAmount?: number }): Promise<void> {
+  const supabase = await createClient();
+  const patch: Record<string, unknown> = {};
+  if (extras.reviewGiven !== undefined) patch.review_given = extras.reviewGiven;
+  if (extras.reelGiven !== undefined) patch.reel_given = extras.reelGiven;
+  if (extras.reelLink !== undefined) patch.reel_link = extras.reelLink?.trim() || null;
+  if (extras.fuelAmount !== undefined) patch.fuel_amount = Math.max(0, Math.round((extras.fuelAmount || 0) * 100) / 100);
+  if (Object.keys(patch).length === 0) return;
+  const { error } = await supabase.from("job_assignments").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 // §pulpit Prośby pracowników o przypisanie (REQUESTED) — do sekcji „Wymaga uwagi" u szefa.

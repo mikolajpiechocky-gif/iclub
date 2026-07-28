@@ -1,20 +1,47 @@
 "use client";
-// §24 Rozliczenia pracownika: historia zakończonych realizacji z wynagrodzeniem, saldo
-// „do wypłaty" i oznaczanie „rozliczone" (tylko szef).
-import { useTransition } from "react";
+// §24 Rozliczenia pracownika: zakończone realizacje z wynagrodzeniem, premie rozliczane per
+// realizacja (opinia, rolka + link, zwrot paliwa), saldo „do wypłaty" i oznaczanie „rozliczone".
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { settleAssignmentAction, settleAllForEmployeeAction } from "./settlement-actions";
+import { settleAssignmentAction, settleAllForEmployeeAction, setAssignmentExtrasAction } from "./settlement-actions";
 import type { EmployeeSettlementRow } from "@/lib/data/assignments";
 
 const zl = (n: number) => new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n);
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short", year: "numeric" }) : "—");
 
-export function EmployeeSettlements({ profileId, rows }: { profileId: string; rows: EmployeeSettlementRow[] }) {
+export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus }: { profileId: string; rows: EmployeeSettlementRow[]; reviewBonus: number; reelBonus: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  // Lokalny stan edycji dodatków per realizacja (optymistycznie, potem zapis + refresh).
+  const [extras, setExtras] = useState<Record<string, { reviewGiven: boolean; reelGiven: boolean; reelLink: string; fuelAmount: string }>>(
+    Object.fromEntries(rows.map((r) => [r.assignmentId, { reviewGiven: r.reviewGiven, reelGiven: r.reelGiven, reelLink: r.reelLink ?? "", fuelAmount: r.fuelAmount ? String(r.fuelAmount) : "" }])),
+  );
+
+  const rowTotal = (r: EmployeeSettlementRow) => {
+    const e = extras[r.assignmentId];
+    const review = e?.reviewGiven ? reviewBonus : 0;
+    const reel = e?.reelGiven ? reelBonus : 0;
+    const fuel = Number((e?.fuelAmount ?? "").replace(",", ".")) || 0;
+    return Math.round((r.amount + review + reel + fuel) * 100) / 100;
+  };
+
   const unpaid = rows.filter((r) => !r.settledAt);
-  const saldo = unpaid.reduce((s, r) => s + r.amount, 0);
-  const paid = rows.filter((r) => r.settledAt).reduce((s, r) => s + r.amount, 0);
+  const saldo = unpaid.reduce((s, r) => s + rowTotal(r), 0);
+  const paid = rows.filter((r) => r.settledAt).reduce((s, r) => s + rowTotal(r), 0);
+
+  const saveExtras = (id: string, patch: Partial<{ reviewGiven: boolean; reelGiven: boolean; reelLink: string; fuelAmount: string }>) => {
+    setExtras((x) => ({ ...x, [id]: { ...x[id], ...patch } }));
+    const next = { ...extras[id], ...patch };
+    start(async () => {
+      await setAssignmentExtrasAction(id, profileId, {
+        reviewGiven: next.reviewGiven,
+        reelGiven: next.reelGiven,
+        reelLink: next.reelLink,
+        fuelAmount: Number((next.fuelAmount || "").replace(",", ".")) || 0,
+      });
+      router.refresh();
+    });
+  };
 
   const settle = (id: string, settled: boolean) => start(async () => { await settleAssignmentAction(id, settled, profileId); router.refresh(); });
   const settleAll = () => start(async () => { await settleAllForEmployeeAction(profileId); router.refresh(); });
@@ -46,21 +73,45 @@ export function EmployeeSettlements({ profileId, rows }: { profileId: string; ro
       {rows.length === 0 ? (
         <p className="text-[12.5px] text-ink-2">Brak zakończonych realizacji do rozliczenia.</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
-          {rows.map((r) => (
-            <li key={r.assignmentId} className={`flex items-center gap-2 rounded-card border px-3 py-2.5 ${r.settledAt ? "border-[#1d3a28] bg-[#12271b]" : "border-border bg-surface-2"}`}>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-semibold text-ink">{r.title}</div>
-                <div className="text-[11.5px] text-ink-2">{fmtDate(r.eventDate)}{r.settledAt ? ` · rozliczono ${fmtDate(r.settledAt)}` : ""}</div>
-              </div>
-              <div className="text-right">
-                <div className="font-display text-[14px] font-bold text-ink">{zl(r.amount)}</div>
-                <button onClick={() => settle(r.assignmentId, !r.settledAt)} disabled={pending} className={`text-[11.5px] font-bold ${r.settledAt ? "text-ink-2" : "text-ok"}`}>
-                  {r.settledAt ? "Cofnij" : "Rozlicz ✓"}
-                </button>
-              </div>
-            </li>
-          ))}
+        <ul className="flex flex-col gap-2">
+          {rows.map((r) => {
+            const e = extras[r.assignmentId] ?? { reviewGiven: false, reelGiven: false, reelLink: "", fuelAmount: "" };
+            const settled = Boolean(r.settledAt);
+            return (
+              <li key={r.assignmentId} className={`rounded-card border px-3 py-3 ${settled ? "border-[#1d3a28] bg-[#12271b]" : "border-border bg-surface-2"}`}>
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-semibold text-ink">{r.title}</div>
+                    <div className="text-[11.5px] text-ink-2">{fmtDate(r.eventDate)} · baza {zl(r.amount)}{settled ? ` · rozliczono ${fmtDate(r.settledAt)}` : ""}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-display text-[14px] font-bold text-ink">{zl(rowTotal(r))}</div>
+                    <button onClick={() => settle(r.assignmentId, !settled)} disabled={pending} className={`text-[11.5px] font-bold ${settled ? "text-ink-2" : "text-ok"}`}>
+                      {settled ? "Cofnij" : "Rozlicz ✓"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Premie i zwroty rozliczane per realizacja */}
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <button onClick={() => saveExtras(r.assignmentId, { reviewGiven: !e.reviewGiven })} disabled={pending || settled} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold disabled:opacity-60 ${e.reviewGiven ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface text-ink-2"}`}>
+                    Opinia +{zl(reviewBonus)}
+                  </button>
+                  <button onClick={() => saveExtras(r.assignmentId, { reelGiven: !e.reelGiven })} disabled={pending || settled} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold disabled:opacity-60 ${e.reelGiven ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface text-ink-2"}`}>
+                    Rolka +{zl(reelBonus)}
+                  </button>
+                  <div className="flex items-center gap-1 text-[11px] text-ink-2">
+                    <span>Paliwo</span>
+                    <input inputMode="decimal" value={e.fuelAmount} onChange={(ev) => setExtras((x) => ({ ...x, [r.assignmentId]: { ...x[r.assignmentId], fuelAmount: ev.target.value } }))} onBlur={() => saveExtras(r.assignmentId, { fuelAmount: e.fuelAmount })} disabled={settled} placeholder="0" className="w-16 rounded-[8px] border border-border bg-surface px-2 py-1 text-right text-[12px] text-ink outline-none focus:border-accent disabled:opacity-60" />
+                    <span>zł</span>
+                  </div>
+                </div>
+                {e.reelGiven && (
+                  <input value={e.reelLink} onChange={(ev) => setExtras((x) => ({ ...x, [r.assignmentId]: { ...x[r.assignmentId], reelLink: ev.target.value } }))} onBlur={() => saveExtras(r.assignmentId, { reelLink: e.reelLink })} disabled={settled} placeholder="Link do rolki (opcjonalnie)" className="mt-1.5 w-full rounded-[8px] border border-border bg-surface px-2.5 py-1.5 text-[12px] text-ink outline-none focus:border-accent disabled:opacity-60" />
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
