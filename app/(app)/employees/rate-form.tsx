@@ -10,7 +10,7 @@ import { saveEmployeeRateAction, type RateFormValues } from "./actions";
 
 const str = (v: number | null | undefined) => (v == null ? "" : String(v));
 
-export function RateForm({ employee }: { employee: EmployeeWithRate }) {
+export function RateForm({ employee, embedded = false }: { employee: EmployeeWithRate; embedded?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const r = employee.rate;
@@ -50,14 +50,8 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
     });
   };
 
-  return (
-    <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
-      <PageHeader
-        title={employee.full_name || "Pracownik"}
-        subtitle="Model rozliczenia, stawki i premie"
-        back={{ href: "/employees", label: "Pracownicy" }}
-      />
-
+  const body = (
+    <>
       {formError && <div className="mb-4"><Alert tone="bad" title="Nie udało się zapisać">{formError}</Alert></div>}
       {saved && <div className="mb-4"><Alert tone="ok" title="Zapisano">Stawki zostały zapisane.</Alert></div>}
 
@@ -114,10 +108,22 @@ export function RateForm({ employee }: { employee: EmployeeWithRate }) {
         </SectionCard>
 
         <div className="mt-4 flex justify-end gap-2.5">
-          <SecondaryButton type="button" onClick={() => router.push("/employees")}>Wróć</SecondaryButton>
+          {!embedded && <SecondaryButton type="button" onClick={() => router.push("/employees")}>Wróć</SecondaryButton>}
           <PrimaryButton type="submit" icon="check" disabled={pending}>{pending ? "Zapisywanie…" : "Zapisz stawki"}</PrimaryButton>
         </div>
       </form>
+    </>
+  );
+
+  if (embedded) return body;
+  return (
+    <div className="mx-auto max-w-[820px] px-5 py-6 md:px-8">
+      <PageHeader
+        title={employee.full_name || "Pracownik"}
+        subtitle="Model rozliczenia, stawki i premie"
+        back={{ href: "/employees", label: "Pracownicy" }}
+      />
+      {body}
     </div>
   );
 }
