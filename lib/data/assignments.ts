@@ -120,6 +120,7 @@ export interface EmployeeSettlementRow {
   reelGiven: boolean;   // rolka
   reelLink: string | null;
   fuelAmount: number;   // zwrot za paliwo (własne auto)
+  transportCost: number; // paliwo + eksploatacja (5 gr/km) z trasy — podpowiedź do zwrotu za własne auto
 }
 
 interface RawSettlementRow {
@@ -148,6 +149,11 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
   ]);
   const rate = (rateData as EmployeeRate) ?? null;
   const rules = rulesFromSettings(settings);
+  // §rozliczenie Tryb pracownika decyduje, czy BAZA jest do wypłaty:
+  //  - FLAT (ryczałtowy): baza (ryczałt) = DO WYPŁATY (przez apkę).
+  //  - THRESHOLD (mieszany, Bartek): baza (czas wolny I ryczałt po progu) = KOSZT rozliczany POZA apką;
+  //    przez apkę wypłacamy TYLKO dodatki (daleki/gastro/opinia/rolka/paliwo).
+  const basePaysOut = (rate?.iclub_settlement_mode ?? "THRESHOLD") === "FLAT";
 
   const done = ((data ?? []) as unknown as RawSettlementRow[])
     .filter((r) => r.job?.status === "DONE")
@@ -158,10 +164,12 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
   // §rozliczenie „Daleki wyjazd" zależy od trasy — pobierz farTrip (>100 km) dla realizacji iClub.
   const jobIds = done.map((r) => r.job!.id);
   const farByJob = new Map<string, boolean>();
+  const transportCostByJob = new Map<string, number>(); // paliwo + eksploatacja (5 gr/km) z trasy
   if (jobIds.length) {
-    const { data: tc } = await supabase.from("transport_calculations").select("job_id, one_way_km").in("job_id", jobIds);
-    for (const t of (tc ?? []) as { job_id: string; one_way_km: number | string | null }[]) {
+    const { data: tc } = await supabase.from("transport_calculations").select("job_id, one_way_km, fuel_cost, amortization").in("job_id", jobIds);
+    for (const t of (tc ?? []) as { job_id: string; one_way_km: number | string | null; fuel_cost: number | string | null; amortization: number | string | null }[]) {
       if (Number(t.one_way_km ?? 0) > 100) farByJob.set(t.job_id, true);
+      transportCostByJob.set(t.job_id, (transportCostByJob.get(t.job_id) ?? 0) + (Number(t.fuel_cost ?? 0) || 0) + (Number(t.amortization ?? 0) || 0));
     }
   }
 
@@ -183,7 +191,7 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
       else { basePaidOut = false; baseValue = 0; baseLabel = "Stawka godzinowa (koszt osobno)"; }
     } else if (rate) {
       const s = settlementForRealization(rules, priorCount, { farTrip: farByJob.get(r.job!.id) ?? false, hasGastro: r.job!.reservation?.tent_extra === "GASTRO", rate });
-      basePaidOut = s.form === "flat"; // ryczałt = do wypłaty; czas wolny = koszt w ramach umowy
+      basePaidOut = basePaysOut; // o wypłacie bazy decyduje TRYB pracownika, nie forma pojedynczej realizacji
       baseValue = s.baseValue;
       baseLabel = s.baseLabel;
       for (const g of s.guaranteed) guaranteed.push(g);
@@ -205,6 +213,7 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
       reelGiven: Boolean(r.reel_given),
       reelLink: r.reel_link ?? null,
       fuelAmount: Number(r.fuel_amount ?? 0) || 0,
+      transportCost: Math.round((transportCostByJob.get(r.job!.id) ?? 0) * 100) / 100,
     };
   });
   return out.sort((a, b) => ((a.eventDate ?? "") < (b.eventDate ?? "") ? 1 : -1)); // wyświetlanie malejąco

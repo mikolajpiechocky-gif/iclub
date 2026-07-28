@@ -35,6 +35,27 @@ export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus, p
   const wyplacono = Number(paidInput.replace(",", ".")) || 0;
   const pozostalo = Math.round((doWyplaty - wyplacono) * 100) / 100;
 
+  // Rozbicie „Do wypłaty" na składowe (dla przejrzystości).
+  const breakdown = rows.reduce(
+    (acc, r) => {
+      const e = extras[r.assignmentId];
+      if (r.basePaidOut) acc.ryczalt += r.baseValue;
+      for (const g of r.guaranteed) acc.gwarant[g.label] = (acc.gwarant[g.label] ?? 0) + g.amount;
+      if (e?.reviewGiven) acc.opinie += reviewBonus;
+      if (e?.reelGiven) acc.rolki += reelBonus;
+      acc.paliwo += Number((e?.fuelAmount ?? "").replace(",", ".")) || 0;
+      return acc;
+    },
+    { ryczalt: 0, gwarant: {} as Record<string, number>, opinie: 0, rolki: 0, paliwo: 0 },
+  );
+  const skladowe: { label: string; amount: number }[] = [
+    { label: "Ryczałty", amount: breakdown.ryczalt },
+    ...Object.entries(breakdown.gwarant).map(([label, amount]) => ({ label, amount })),
+    { label: "Opinie", amount: breakdown.opinie },
+    { label: "Rolki", amount: breakdown.rolki },
+    { label: "Paliwo/eksploatacja", amount: breakdown.paliwo },
+  ].filter((s) => s.amount > 0);
+
   const saveExtras = (id: string, patch: Partial<{ reviewGiven: boolean; reelGiven: boolean; reelLink: string; fuelAmount: string }>) => {
     setExtras((x) => ({ ...x, [id]: { ...x[id], ...patch } }));
     const payload: { reviewGiven?: boolean; reelGiven?: boolean; reelLink?: string; fuelAmount?: number } = {};
@@ -67,6 +88,15 @@ export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus, p
           <div className="text-[10.5px] text-ok/60">dodatki + ryczałt (przez apkę)</div>
         </div>
       </div>
+
+      {/* Rozbicie „Do wypłaty" na składowe */}
+      {skladowe.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {skladowe.map((s) => (
+            <span key={s.label} className="rounded-[8px] border border-border bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-ink-2">{s.label}: <span className="font-bold text-ink">{zl(s.amount)}</span></span>
+          ))}
+        </div>
+      )}
 
       {/* Wypłacono + pozostało */}
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-card border border-border bg-surface-2 px-4 py-3">
@@ -122,6 +152,11 @@ export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus, p
                     <input inputMode="decimal" value={e.fuelAmount} onChange={(ev) => setExtras((x) => ({ ...x, [r.assignmentId]: { ...x[r.assignmentId], fuelAmount: ev.target.value } }))} onBlur={() => saveExtras(r.assignmentId, { fuelAmount: e.fuelAmount })} placeholder="0" className="w-16 rounded-[8px] border border-border bg-surface px-2 py-1 text-right text-[12px] text-ink outline-none focus:border-accent" />
                     <span>zł</span>
                   </div>
+                  {r.transportCost > 0 && (
+                    <button type="button" onClick={() => saveExtras(r.assignmentId, { fuelAmount: String(r.transportCost) })} title="Zwrot za własne auto: paliwo + eksploatacja (5 gr/km) z trasy" className="rounded-[8px] border border-border bg-surface px-2 py-1 text-[10.5px] font-bold text-ink-2 hover:text-ink">
+                      Własnym autem: {zl(r.transportCost)}
+                    </button>
+                  )}
                 </div>
                 {e.reelGiven && (
                   <input value={e.reelLink} onChange={(ev) => setExtras((x) => ({ ...x, [r.assignmentId]: { ...x[r.assignmentId], reelLink: ev.target.value } }))} onBlur={() => saveExtras(r.assignmentId, { reelLink: e.reelLink })} placeholder="Link do rolki (opcjonalnie)" className="mt-1.5 w-full rounded-[8px] border border-border bg-surface px-2.5 py-1.5 text-[12px] text-ink outline-none focus:border-accent" />
