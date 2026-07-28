@@ -413,7 +413,7 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobI
       return <RentalPanel jobId={jobId} pending={pending} onDone={onDone} />;
 
     case "TEARDOWN":
-      return <TeardownPanel jobId={jobId} reservationId={ctx.reservationId} items={ctx.teardownItems} pending={pending} onDone={onDone} onProgress={onProgress} />;
+      return <TeardownPanel jobId={jobId} reservationId={ctx.reservationId} items={ctx.teardownItems} canUpload={ctx.canUpload} pending={pending} onDone={onDone} onProgress={onProgress} />;
 
     default:
       return <DoneButton pending={pending} onClick={onDone} label="Gotowe" block />;
@@ -469,55 +469,141 @@ function RentalPanel({ jobId, pending, onDone }: { jobId: string; pending: boole
 
 // §II.8 Demontaż: kontrola sprzętu po tej samej checkliście. Dla każdej pozycji: OK
 // (nic nie klikasz) / Czyszczenie / Uszkodzony / Brak → zgłoszenie serwisowe.
-function TeardownPanel({ jobId, reservationId, items, pending, onDone, onProgress }: { jobId: string; reservationId: string; items: string[]; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
+// §B2 Szkoda (Uszkodzony / Brak) wymaga OPISU + ZDJĘCIA — bez tego nie zakończysz demontażu.
+const isDamage = (s: string | undefined): boolean => s === "Uszkodzony" || s === "Brak";
+
+function TeardownPanel({ jobId, reservationId, items, canUpload, pending, onDone, onProgress }: { jobId: string; reservationId: string; items: string[]; canUpload: boolean; pending: boolean; onDone: () => void; onProgress: (frac: number) => void }) {
+  const router = useRouter();
   const [busy, startBusy] = useTransition();
   const [error, setError] = useState<string | null>(null);
   // Klucz po INDEKSIE pozycji (etykiety mogą się powtarzać między kategoriami → inaczej
   // dwa wiersze o tej samej nazwie dzieliłyby status i dawały duplikat klucza React).
   const [reported, setReported] = useState<Record<number, string>>({});
-  const [sent, setSent] = useState<Set<number>>(new Set()); // indeksy, dla których już utworzono zgłoszenie
+  const [sent, setSent] = useState<Set<number>>(new Set());        // indeksy z utworzonym zgłoszeniem
+  const [desc, setDesc] = useState<Record<number, string>>({});     // opis szkody per pozycja
+  const [photoCount, setPhotoCount] = useState<Record<number, number>>({}); // liczba zdjęć szkody per pozycja
+  const [uploading, setUploading] = useState<number | null>(null);
   const [deduction, setDeduction] = useState(""); // §II.16 potrącenie z kaucji za uszkodzenia
   const deducted = Number(deduction.replace(",", ".")) || 0;
-  const reviewed = Object.keys(reported).length;
+
+  // Pozycja „domknięta": OK (bez zgłoszenia) albo status z zapisanym zgłoszeniem (Czyszczenie/szkoda).
+  const isComplete = (idx: number): boolean => {
+    const st = reported[idx];
+    if (!st) return false;
+    return st === "OK" || sent.has(idx);
+  };
+  const completed = items.filter((_, idx) => isComplete(idx)).length;
+  const allComplete = items.length === 0 || completed === items.length;
 
   const applyStatus = (idx: number, status: string) => {
-    const next = { ...reported, [idx]: status };
-    setReported(next);
-    onProgress(items.length ? Object.keys(next).length / items.length : 0);
+    setReported((r) => ({ ...r, [idx]: status }));
   };
-  // Problem trafia do zgłoszeń serwisowych; „OK" tylko potwierdza sprawdzenie pozycji.
-  // Zgłoszenie tworzymy najwyżej RAZ na pozycję — ponowne kliknięcia tylko zmieniają status lokalnie
-  // (koniec duplikatów zgłoszeń przy dwukrotnym tapnięciu).
-  const report = (idx: number, item: string, status: EqStatus) => {
+
+  // §pasek: postęp = domknięte pozycje (a nie tylko zaznaczone) — bo szkoda bez zdjęcia nie liczy się.
+  const bumpProgress = (idxOverrideComplete?: number) => {
+    const done = items.filter((_, idx) => (idx === idxOverrideComplete ? true : isComplete(idx))).length;
+    onProgress(items.length ? done / items.length : 0);
+  };
+
+  // „OK" — potwierdza sprawdzenie, bez zgłoszenia. Czyszczenie — od razu tworzy zgłoszenie serwisowe.
+  // Uszkodzony / Brak — otwiera formularz szkody (opis + zdjęcie), zgłoszenie dopiero po „Zapisz szkodę".
+  const pick = (idx: number, item: string, status: EqStatus | "OK") => {
     if (reported[idx] === status) return;
-    if (sent.has(idx)) { applyStatus(idx, status); return; }
+    // Zmiana statusu resetuje wcześniejsze zapisanie zgłoszenia dla tej pozycji.
+    setSent((s) => { const n = new Set(s); n.delete(idx); return n; });
+    applyStatus(idx, status);
+    if (status === "OK") { setTimeout(() => bumpProgress(idx), 0); return; }
+    if (status === "Czyszczenie") {
+      setError(null);
+      startBusy(async () => {
+        const res = await reportEquipmentStatusAction(jobId, item, "Czyszczenie", "");
+        if (res.ok) { setSent((s) => new Set(s).add(idx)); bumpProgress(idx); }
+        else setError(res.error ?? "Błąd");
+      });
+    }
+    // Uszkodzony/Brak: nic nie tworzymy — czekamy na opis + zdjęcie.
+  };
+
+  const pickPhoto = async (idx: number, item: string, status: string, file: File | null) => {
+    if (!file) return;
+    setError(null);
+    if (!canUpload) { setPhotoCount((p) => ({ ...p, [idx]: (p[idx] ?? 0) + 1 })); return; } // demo: bez zapisu
+    setUploading(idx);
+    const supabase = createClient();
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `${jobId}/szkoda-${idx}-${crypto.randomUUID()}.${ext}`;
+    let uploaded = false;
+    try {
+      const { error: upErr } = await supabase.storage.from(REALIZATIONS_BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
+      if (upErr) throw new Error(upErr.message);
+      uploaded = true;
+      const res = await createJobPhotoAction(jobId, path, `Szkoda: ${item} — ${status}`);
+      if (!res.ok) throw new Error(res.error ?? "Nie udało się zapisać.");
+      uploaded = false;
+      setPhotoCount((p) => ({ ...p, [idx]: (p[idx] ?? 0) + 1 }));
+    } catch (e) {
+      if (uploaded) await supabase.storage.from(REALIZATIONS_BUCKET).remove([path]).catch(() => {});
+      setError(e instanceof Error ? e.message : "Nie udało się wysłać zdjęcia.");
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const saveDamage = (idx: number, item: string, status: EqStatus) => {
+    const d = (desc[idx] ?? "").trim();
+    if (d.length < 3) { setError("Opisz szkodę (min. 3 znaki)."); return; }
+    if ((photoCount[idx] ?? 0) < 1) { setError("Dodaj przynajmniej jedno zdjęcie szkody."); return; }
+    if (sent.has(idx)) return;
     setError(null);
     startBusy(async () => {
-      const res = await reportEquipmentStatusAction(jobId, item, status, "");
-      if (res.ok) { setSent((s) => new Set(s).add(idx)); applyStatus(idx, status); }
+      const res = await reportEquipmentStatusAction(jobId, item, status, d);
+      if (res.ok) { setSent((s) => new Set(s).add(idx)); bumpProgress(idx); router.refresh(); }
       else setError(res.error ?? "Błąd");
     });
   };
 
   return (
     <div>
-      {items.length > 0 && <StepProgressHeader label="Sprawdzony sprzęt" done={reviewed} total={items.length} />}
-      <p className="mb-3 text-[12.5px] text-ink-2">Zdemontuj i sprawdź każdy element. Potwierdź „OK”, a problem zaznacz — trafi do zgłoszeń serwisowych.</p>
+      {items.length > 0 && <StepProgressHeader label="Sprawdzony sprzęt" done={completed} total={items.length} />}
+      <p className="mb-3 text-[12.5px] text-ink-2">Zdemontuj i sprawdź każdy element. Potwierdź „OK”, a problem zaznacz — przy uszkodzeniu dołącz opis i zdjęcie.</p>
       {error && <div className="mb-2"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
       {items.length > 0 ? (
         <div className="mb-3 flex flex-col gap-1.5">
           {items.map((it, idx) => {
             const st = reported[idx];
             const ok = st === "OK";
+            const damage = isDamage(st);
+            const saved = sent.has(idx);
+            const nPhotos = photoCount[idx] ?? 0;
             return (
               <div key={`${idx}-${it}`} className={`rounded-[10px] border px-2.5 py-2 ${ok ? "border-[#1d3a28] bg-[#12271b]" : st ? "border-[#3d3216] bg-[#241e10]" : "border-border bg-surface"}`}>
-                <div className="mb-1.5 text-[12.5px] font-semibold text-ink">{it}{st && <span className={`ml-1.5 text-[11px] font-bold ${ok ? "text-ok" : "text-warn"}`}>· {st}</span>}</div>
+                <div className="mb-1.5 text-[12.5px] font-semibold text-ink">{it}{st && <span className={`ml-1.5 text-[11px] font-bold ${ok ? "text-ok" : "text-warn"}`}>· {st}</span>}{damage && saved && <span className="ml-1.5 text-[11px] font-bold text-ok">✓ zapisano</span>}</div>
                 <div className="flex flex-wrap gap-1.5">
-                  <button onClick={() => applyStatus(idx, "OK")} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold ${ok ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface-2 text-ink-2"}`}>OK</button>
+                  <button onClick={() => pick(idx, it, "OK")} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold ${ok ? "border-ok bg-[#16301f] text-ok" : "border-border bg-surface-2 text-ink-2"}`}>OK</button>
                   {(["Czyszczenie", "Uszkodzony", "Brak"] as EqStatus[]).map((s) => (
-                    <button key={s} onClick={() => report(idx, it, s)} disabled={busy} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold ${st === s ? "border-warn bg-[#332814] text-warn" : "border-border bg-surface-2 text-ink-2"}`}>{s}</button>
+                    <button key={s} onClick={() => pick(idx, it, s)} disabled={busy} className={`rounded-[8px] border px-2.5 py-1 text-[11px] font-bold ${st === s ? "border-warn bg-[#332814] text-warn" : "border-border bg-surface-2 text-ink-2"}`}>{s}</button>
                   ))}
                 </div>
+
+                {/* §B2 Szkoda — wymagany opis + zdjęcie, inaczej nie domkniemy demontażu. */}
+                {damage && (
+                  <div className="mt-2 rounded-[9px] border border-[#3d3216] bg-[#1c1710] p-2.5">
+                    <textarea value={desc[idx] ?? ""} onChange={(e) => setDesc((d) => ({ ...d, [idx]: e.target.value }))} disabled={saved} rows={2} placeholder="Opis szkody (co, gdzie, zakres)…" className="w-full resize-none rounded-[8px] border border-border bg-surface-2 px-2.5 py-1.5 text-[12.5px] text-ink outline-none focus:border-accent disabled:opacity-70" />
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {!saved && (
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-[8px] border border-border bg-surface-2 px-2.5 py-1.5 text-[11px] font-bold text-ink-2">
+                          <Icon name={uploading === idx ? "refresh" : "camera"} className={`h-3.5 w-3.5 ${uploading === idx ? "animate-spin" : ""}`} />
+                          {uploading === idx ? "Wysyłanie…" : nPhotos > 0 ? "Dodaj kolejne" : "Dodaj zdjęcie"}
+                          <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading === idx} onChange={(e) => pickPhoto(idx, it, st ?? "", e.target.files?.[0] ?? null)} />
+                        </label>
+                      )}
+                      {nPhotos > 0 && <span className="text-[11px] font-bold text-ok">📷 {nPhotos} {nPhotos === 1 ? "zdjęcie" : "zdjęcia"}</span>}
+                      {!saved && <button onClick={() => saveDamage(idx, it, st as EqStatus)} disabled={busy} className="ml-auto rounded-[8px] bg-[#271b3f] px-3 py-1.5 text-[11px] font-bold text-[#e0c8ff]">Zapisz szkodę</button>}
+                    </div>
+                    {!saved && <div className="mt-1 text-[10.5px] text-warn">Wymagane: opis + min. 1 zdjęcie.</div>}
+                    {!canUpload && <div className="mt-0.5 text-[10px] text-ink-2/70">Tryb demo — zdjęcia liczone bez zapisu.</div>}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -536,11 +622,15 @@ function TeardownPanel({ jobId, reservationId, items, pending, onDone, onProgres
         <div className="mt-1.5 flex items-center justify-between text-[12px] font-bold"><span className="text-ink">Do zwrotu klientowi</span><span className="text-ok">{fmtPLN(Math.max(0, 1000 - deducted))}</span></div>
       </div>
 
-      <DoneButton pending={pending || busy} onClick={finish} label="Zakończone — sprzęt w bazie" block />
+      {!allComplete && items.length > 0 && (
+        <div className="mb-2 text-[11.5px] font-semibold text-warn">Domknij każdą pozycję — przy uszkodzeniu wymagany opis i zdjęcie ({completed}/{items.length}).</div>
+      )}
+      <DoneButton pending={pending || busy || !allComplete} onClick={finish} label="Zakończone — sprzęt w bazie" block />
     </div>
   );
 
   function finish() {
+    if (!allComplete) return;
     // §II.16 Zapisz potrącenie z kaucji (przychód realizacji) i zakończ demontaż.
     if (deducted > 0 && reservationId) startBusy(async () => { await saveDepositDeductionAction(reservationId, jobId, deducted); onDone(); });
     else onDone();

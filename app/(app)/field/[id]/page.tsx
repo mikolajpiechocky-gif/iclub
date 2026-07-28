@@ -27,6 +27,7 @@ import { JOB_STATUS_META } from "@/lib/data/types";
 import { PackingBlock, RealizationFlow, type RealizationContext } from "../realization-flow";
 import { ProtocolBlock } from "../protocol-block";
 import { TelefonBlock } from "../telefon-block";
+import { AddonWarning } from "./addon-warning";
 import { settlementBreakdown, type AddonPriceMap } from "@/lib/domain/billing";
 
 export const dynamic = "force-dynamic";
@@ -171,13 +172,8 @@ export default async function FieldRealizationPage({ params }: { params: Promise
           ))}
         </div>
 
-        {/* §9.4 Ostrzeżenie o dodatkach — większy czas pakowania i montażu. */}
-        {addonNames.length > 0 && (
-          <div className="mb-3.5 rounded-[13px] border border-[#3d3216] bg-[#241e10] px-3.5 py-3 text-[12.5px] text-warn">
-            <div className="font-bold">⚠ Realizacja zawiera dodatkowy sprzęt ({addonNames.length})</div>
-            <div className="mt-0.5 text-[12px] text-warn">Uwzględnij większy czas pakowania i montażu. Dodatki: {addonNames.join(", ")}.</div>
-          </div>
-        )}
+        {/* §9.4 Ostrzeżenie o dodatkach — możliwe do zamknięcia (znika po odhaczeniu). */}
+        <AddonWarning jobId={job.id} addonNames={addonNames} />
 
         {/* §11.1 Zawartość pakietu — do spakowania. */}
         {packageItems.length > 0 && (

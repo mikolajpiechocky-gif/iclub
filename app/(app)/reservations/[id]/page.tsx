@@ -15,6 +15,7 @@ import { getCurrentProfile, getProfileName } from "@/lib/data/profiles";
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
 import { listCosts } from "@/lib/data/costs";
+import { listPayments } from "@/lib/data/payments";
 import type { EmployeeRate } from "@/lib/data/types";
 import { getUnavailableProfileIds } from "@/lib/data/availability";
 import { listVehicles, listJobVehicles, findVehicleConflicts } from "@/lib/data/vehicles";
@@ -37,6 +38,23 @@ const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "long", year: "numeric" }) : "—";
 const fmtPLN = (v: number | null) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
+
+// §B2 Czas pracy z etapów (done_at): montaż + demontaż — spójnie z panelem terenowym.
+function workMsFromStages(stages: { stage_key: string; done_at: string | null }[]): number {
+  const at = (key: string): number | null => {
+    const s = stages.find((x) => x.stage_key === key)?.done_at;
+    return s ? new Date(s).getTime() : null;
+  };
+  const seg = (a: string, b: string): number => { const x = at(a), y = at(b); return x != null && y != null && y > x ? y - x : 0; };
+  if (stages.some((s) => s.stage_key.startsWith("R_"))) return seg("R_START", "R_READY") + seg("R_RETURN", "R_CHECK");
+  if (stages.some((s) => s.stage_key.startsWith("D_"))) return seg("D_START", "D_DONE") + seg("P_START", "P_CLEAN_PUT");
+  return seg("TRAVEL", "SETTLEMENT") + seg("RENTAL", "TEARDOWN");
+}
+function fmtDuration(ms: number): string {
+  if (ms <= 0) return "—";
+  const min = Math.round(ms / 60000); const h = Math.floor(min / 60); const m = min % 60;
+  return h > 0 ? `${h} h ${m} min` : `${m} min`;
+}
 
 export default async function ReservationHubPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -231,13 +249,14 @@ async function ReservationOps({
   isOwner,
   profile,
 }: OpsProps) {
-  const [stages, assignments, employees, settings, transportCalcs, allCosts] = await Promise.all([
+  const [stages, assignments, employees, settings, transportCalcs, allCosts, allPayments] = await Promise.all([
     getJobStages(job.id),
     listJobAssignments(job.id),
     listEmployees(),
     getSettings(),
     listTransportCalcs(job.id),
     listCosts(),
+    listPayments(),
   ]);
   const done = stages.filter((s) => s.status === "DONE").length;
   const ownerBonus = Number(job.owner_bonus ?? 0) || 0; // numeric z PG bywa stringiem
@@ -301,8 +320,42 @@ async function ReservationOps({
   const profit = Math.round((revenue - costsVerified - laborSum - transportSum) * 100) / 100;
   const margin = revenue > 0 ? profit / revenue : null;
 
+  // §B2 Podsumowanie realizacji dla szefa: koszty końcowe, czas pracy, rozliczenie z klientem, status.
+  const workMs = workMsFromStages(stages);
+  const paidByClient = allPayments.filter((p) => p.job_id === job.id && p.status === "PAID").reduce((s, p) => s + Number(p.amount || 0), 0);
+  const dueFromClient = Math.round((revenue - paidByClient) * 100) / 100;
+  const settledWithClient = dueFromClient <= 0.5;
+  const costsFinal = costsVerified; // zatwierdzone koszty = koszt końcowy realizacji
+
   return (
     <>
+      {isOwner && (
+        <SectionCard title="Podsumowanie realizacji" className="mt-4 p-5">
+          <div className="grid grid-cols-2 gap-2.5 px-5 pb-5 sm:grid-cols-4">
+            <div className="rounded-[12px] border border-border bg-surface-2 px-3 py-2.5">
+              <div className="text-[11px] font-semibold text-ink-2">Status</div>
+              <div className={`mt-0.5 font-display text-[14px] font-bold ${isDone ? "text-ok" : "text-warn"}`}>{isDone ? "Zrealizowana" : "W toku"}</div>
+              <div className="text-[10.5px] text-ink-2">{done}/{stages.length} etapów</div>
+            </div>
+            <div className="rounded-[12px] border border-border bg-surface-2 px-3 py-2.5">
+              <div className="text-[11px] font-semibold text-ink-2">Czas pracy</div>
+              <div className="mt-0.5 font-display text-[14px] font-bold text-ink">{fmtDuration(workMs)}</div>
+              <div className="text-[10.5px] text-ink-2">montaż + demontaż</div>
+            </div>
+            <div className="rounded-[12px] border border-border bg-surface-2 px-3 py-2.5">
+              <div className="text-[11px] font-semibold text-ink-2">Koszty końcowe</div>
+              <div className="mt-0.5 font-display text-[14px] font-bold text-ink">{fmtPLN(costsFinal)}</div>
+              <div className="text-[10.5px] text-ink-2">{costsPending > 0 ? `+ ${fmtPLN(costsPending)} do weryfikacji` : "zatwierdzone"}</div>
+            </div>
+            <div className="rounded-[12px] border border-border bg-surface-2 px-3 py-2.5">
+              <div className="text-[11px] font-semibold text-ink-2">Rozliczenie z klientem</div>
+              <div className={`mt-0.5 font-display text-[14px] font-bold ${settledWithClient ? "text-ok" : "text-warn"}`}>{settledWithClient ? "Rozliczone" : fmtPLN(dueFromClient)}</div>
+              <div className="text-[10.5px] text-ink-2">{settledWithClient ? `zapłacono ${fmtPLN(paidByClient)}` : `z ${fmtPLN(revenue)} do zapłaty`}</div>
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
       {isOwner && (
         <SectionCard title="Rentowność realizacji" className="mt-4 p-5">
           <div className="flex flex-col gap-1.5 px-5 pb-5 text-[13px]">
