@@ -66,3 +66,11 @@ export async function updateCustomer(id: string, input: CustomerInput): Promise<
   const { error } = await supabase.from("customers").update(input).eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+// Celowana aktualizacja samego telefonu (edycja telefonu klienta z formularza rezerwacji,
+// bez nadpisywania pozostałych pól). Null = wyczyszczenie.
+export async function setCustomerPhone(id: string, phone: string | null): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("customers").update({ phone }).eq("id", id);
+  if (error) throw new Error(error.message);
+}

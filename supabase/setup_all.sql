@@ -1516,3 +1516,7 @@ create policy olx_stats_owner on public.olx_advert_stats for all to authenticate
 -- recurrence = 'WEEKLY' → po oznaczeniu „Zrobione" tworzy kolejne wystąpienie za 7 dni.
 alter table public.service_tasks add column if not exists recurrence text;
 
+-- ================= 0063: liczba dób wynajmu (wypożyczalnia) =================
+-- Na ile dób (24h) klient wynajmuje sprzęt — do rozliczenia i podsumowania wynajmu.
+alter table public.reservations add column if not exists rental_days integer;
+

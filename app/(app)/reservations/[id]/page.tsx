@@ -88,7 +88,7 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
   const cards: { h: string; rows: [string, string][] }[] = isRental
     ? [
         { h: "Klient", rows: [["Klient", clientName], ["Źródło", reservation.source ?? "—"]] },
-        { h: "Wypożyczenie", rows: [["Sprzęt", reservation.rental_items || "—"], ["Pozycji", String((reservation.addon_ids ?? []).length)], ["Odbiór", reservation.self_pickup ? "Własny (klient)" : "Transport (my)"]] },
+        { h: "Wypożyczenie", rows: [["Sprzęt", reservation.rental_items || "—"], ["Pozycji", String((reservation.addon_ids ?? []).length)], ["Liczba dób", reservation.rental_days != null ? String(reservation.rental_days) : "—"], ["Odbiór", reservation.self_pickup ? "Własny (klient)" : "Transport (my)"]] },
         { h: "Terminy", rows: [["Odbiór / dostawa", fmtDate(reservation.event_date)], ["Zwrot", fmtDate(reservation.teardown_date)], ["Godzina dostawy", reservation.delivery_time ?? "—"], ["Lokalizacja", reservation.location ?? "—"]] },
       ]
     : [

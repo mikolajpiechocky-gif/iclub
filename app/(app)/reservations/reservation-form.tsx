@@ -17,7 +17,7 @@ import { AddressAutocomplete } from "./address-autocomplete";
 
 const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = { bufferMinutes: 30, addonMinutes: 10, gastroMinutes: 60 };
 
-type CustomerOption = { id: string; name: string };
+type CustomerOption = { id: string; name: string; phone?: string | null };
 
 const fmtPLN = (v: number) =>
   new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
@@ -47,10 +47,11 @@ function CustomerPicker({ customers, customerId, newName, newPhone, set }: {
   const onType = (val: string) => {
     setQuery(val); setOpen(true);
     const ex = customers.find((c) => c.name.trim().toLowerCase() === val.trim().toLowerCase());
-    if (ex) { set("customer_id", ex.id); set("new_customer_name", ""); }
+    if (ex) { set("customer_id", ex.id); set("new_customer_name", ""); set("new_customer_phone", ex.phone ?? ""); }
     else { set("customer_id", val.trim() ? "__new__" : ""); set("new_customer_name", val); }
   };
-  const pick = (c: CustomerOption) => { setQuery(c.name); set("customer_id", c.id); set("new_customer_name", ""); setOpen(false); };
+  const pick = (c: CustomerOption) => { setQuery(c.name); set("customer_id", c.id); set("new_customer_name", ""); set("new_customer_phone", c.phone ?? ""); setOpen(false); };
+  const existingSelected = Boolean(customerId) && customerId !== "__new__";
 
   return (
     <div className="relative">
@@ -67,6 +68,12 @@ function CustomerPicker({ customers, customerId, newName, newPhone, set }: {
         <div className="mt-2">
           <div className="mb-1 text-[11.5px] text-ok">✚ Nowy klient „{query.trim()}” — dodamy przy zapisie.</div>
           <input value={newPhone} onChange={(e) => set("new_customer_phone", e.target.value)} placeholder="Telefon (opcjonalnie)" inputMode="tel" className="w-full rounded-field border border-border bg-surface-2 px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-accent" />
+        </div>
+      )}
+      {existingSelected && (
+        <div className="mt-2">
+          <label className="mb-1 block text-[11.5px] font-semibold text-ink-2">Telefon do klienta</label>
+          <input value={newPhone} onChange={(e) => set("new_customer_phone", e.target.value)} placeholder="Telefon" inputMode="tel" className="w-full rounded-field border border-border bg-surface-2 px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-accent" />
         </div>
       )}
     </div>
@@ -167,11 +174,14 @@ export function ReservationForm({
   const initialMain = initial?.tent_main ?? (initial?.tent_id ? choiceFromTent(byId(initial.tent_id)?.size ?? null, byId(initial.tent_id)?.has_back_door) : "");
   const initialExtra = initial?.tent_extra ?? (initial?.tent_id_2 ? choiceFromTent(byId(initial.tent_id_2)?.size ?? null, byId(initial.tent_id_2)?.has_back_door) : "");
 
+  // Telefon do klienta w edycji: pre-fill z wybranego istniejącego klienta (regresja — dawniej znikał).
+  const initialPhone = initial?.customer_id ? (customers.find((c) => c.id === initial.customer_id)?.phone ?? "") : "";
+
   const [v, setV] = useState<ReservationFormValues>({
     business_line: initial?.business_line ?? "ICLUB",
     customer_id: initial?.customer_id ?? "",
     new_customer_name: "",
-    new_customer_phone: "",
+    new_customer_phone: initialPhone,
     self_pickup: initial?.self_pickup ?? false,
     event_type: initial?.event_type ?? "",
     event_date: initial?.event_date ?? "",
@@ -187,6 +197,7 @@ export function ReservationForm({
     addon_ids: initial?.addon_ids ?? [],
     addon_qty: initial?.addon_qty ?? {},
     rental_items: initial?.rental_items ?? "",
+    rental_days: initial?.rental_days != null ? String(initial.rental_days) : "",
     delivery_time: initial?.delivery_time ?? "",
     payment_upfront: initial?.payment_upfront ?? false,
     rental_hourly: initial?.rental_settlement_flat == null, // domyślnie godzinowo
@@ -407,6 +418,7 @@ export function ReservationForm({
               <>
                 <TextField label="Data odbioru" type="date" value={v.event_date} onChange={(e) => set("event_date", e.target.value)} />
                 <TextField label="Data zwrotu" type="date" value={v.teardown_date} onChange={(e) => set("teardown_date", e.target.value)} hint={v.event_date ? `puste = ${v.event_date} (ten sam dzień)` : undefined} />
+                <TextField label="Liczba dób" type="number" inputMode="numeric" value={v.rental_days} onChange={(e) => set("rental_days", e.target.value)} placeholder="np. 2" hint="Na ile dób (24h) wynajem" />
               </>
             ) : (
               <TextField label="Data imprezy" type="date" value={v.event_date} onChange={(e) => set("event_date", e.target.value)} />

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, checkHeatingAvailability, type ReservationInput, type AddonShortage, type HeatingAvailability } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
-import { createCustomer } from "@/lib/data/customers";
+import { createCustomer, setCustomerPhone } from "@/lib/data/customers";
 import { markJobPlannedPaid } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { syncReservationToCalendar, removeReservationFromCalendar } from "@/lib/data/calendar-sync";
@@ -43,6 +43,7 @@ export interface ReservationFormValues {
   addon_ids: string[];
   addon_qty: Record<string, number>; // §12.2 ilość per dodatek
   rental_items: string;
+  rental_days: string; // §wypożyczalnia liczba dób wynajmu
   delivery_time: string;
   payment_upfront: boolean;
   // §18 Rozliczenie pracownika (wypożyczalnia): godzinowe domyślnie; ryczałt per zlecenie nadpisuje.
@@ -154,6 +155,7 @@ function toInput(v: ReservationFormValues): ReservationInput {
     // §12.2 zapisz ilości tylko dla wybranych pozycji (≥ 1).
     addon_qty: Object.fromEntries(v.addon_ids.map((id) => [id, Math.max(1, Math.round(v.addon_qty?.[id] ?? 1))])),
     rental_items: clean(v.rental_items),
+    rental_days: v.business_line === "EQUIPMENT_RENTAL" ? (toNumber(v.rental_days) ?? null) : null,
     delivery_time: clean(v.delivery_time),
     payment_upfront: v.payment_upfront,
     price: toNumber(v.price),
@@ -292,12 +294,19 @@ export async function computeReservationTransportAction(location: string): Promi
 }
 
 // §klient Nowy klient wpisany z ręki (customer_id="__new__") → utwórz go i podmień id.
+// Istniejący klient z podanym telefonem → zaktualizuj jego numer (edycja telefonu z rezerwacji).
 async function resolveNewCustomer(values: ReservationFormValues): Promise<ReservationFormValues> {
-  if (values.customer_id !== "__new__") return values;
-  const name = values.new_customer_name.trim();
-  if (!name) return { ...values, customer_id: "" }; // brak nazwy → traktuj jak „bez klienta"
-  const { id } = await createCustomer({ type: "PRIVATE", name, phone: values.new_customer_phone.trim() || null });
-  return { ...values, customer_id: id };
+  if (values.customer_id === "__new__") {
+    const name = values.new_customer_name.trim();
+    if (!name) return { ...values, customer_id: "" }; // brak nazwy → traktuj jak „bez klienta"
+    const { id } = await createCustomer({ type: "PRIVATE", name, phone: values.new_customer_phone.trim() || null });
+    return { ...values, customer_id: id };
+  }
+  const existingId = values.customer_id.trim();
+  if (existingId && values.new_customer_phone.trim()) {
+    try { await setCustomerPhone(existingId, values.new_customer_phone.trim()); } catch { /* nie blokuje zapisu rezerwacji */ }
+  }
+  return values;
 }
 
 export async function createReservationAction(values: ReservationFormValues): Promise<ActionResult> {

@@ -212,6 +212,7 @@ export interface ReservationRecord {
   addon_ids: string[];
   addon_qty: Record<string, number> | null; // §12.2 ilość per dodatek (domyślnie 1)
   rental_items: string | null;
+  rental_days: number | null; // §wypożyczalnia liczba dób wynajmu
   delivery_time: string | null;
   payment_upfront: boolean;
   price: number | null;

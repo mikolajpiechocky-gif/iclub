@@ -211,6 +211,7 @@ export interface ReservationInput {
   addon_ids: string[];
   addon_qty?: Record<string, number>; // §12.2 ilość per dodatek
   rental_items?: string | null;
+  rental_days?: number | null; // §wypożyczalnia liczba dób wynajmu
   delivery_time?: string | null;
   payment_upfront?: boolean;
   price?: number | null;
