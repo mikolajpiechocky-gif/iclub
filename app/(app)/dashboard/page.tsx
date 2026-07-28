@@ -8,6 +8,8 @@ import { listReservationAddons } from "@/lib/data/resources";
 import { listInquiries } from "@/lib/data/inquiries";
 import { listCustomers } from "@/lib/data/customers";
 import { listJobs } from "@/lib/data/jobs";
+import { listCosts } from "@/lib/data/costs";
+import { listPendingAssignmentRequests, countUnsettledDoneAssignments } from "@/lib/data/assignments";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { fuelReminderDue } from "@/lib/data/settings";
 import { listOlxAdverts } from "@/lib/data/olx-adverts";
@@ -21,7 +23,7 @@ const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : "—";
 
 export default async function DashboardPage() {
-  const [reservations, addonList, inquiries, customers, jobs, profile, fuelDue, adverts] = await Promise.all([
+  const [reservations, addonList, inquiries, customers, jobs, profile, fuelDue, adverts, costs, assignmentRequests, unsettledCount] = await Promise.all([
     listReservations(),
     listReservationAddons(),
     listInquiries(),
@@ -30,6 +32,9 @@ export default async function DashboardPage() {
     getCurrentProfile(),
     fuelReminderDue(),
     listOlxAdverts(),
+    listCosts(),
+    listPendingAssignmentRequests(),
+    countUnsettledDoneAssignments(),
   ]);
   // §4.5 Skrót dodatków realizacji (liczba + najważniejsze nazwy).
   const addonName = new Map(addonList.map((a) => [a.id, a.name]));
@@ -57,40 +62,47 @@ export default async function DashboardPage() {
     .sort((a, b) => (a.event_date! < b.event_date! ? -1 : 1));
 
   const near7 = upcoming.filter((r) => r.event_date! <= plus7Str).length;
-  const toConfirm = upcoming.filter((r) => r.event_date! <= plus7Str && !r.client_confirmed);
-  const newInquiries = inquiries.filter((q) => q.status === "NEW").length;
-  // „Niepotwierdzone": aktywna rezerwacja czekająca na podpis umowy LUB wpłatę zadatku.
-  // (numeric z Postgresa bywa stringiem "0.00" — koercja przed porównaniem.)
-  const unconfirmed = reservations.filter(
-    (r) => (r.status === "TEMPORARY" || r.status === "CONFIRMED") && (!r.client_confirmed || !Number(r.deposit))
-  );
+  // §pulpit „Nowe zapytania" liczymy z ostatnich 14 dni (nie od początku).
+  const days14 = new Date(todayStr + "T00:00:00Z");
+  days14.setUTCDate(days14.getUTCDate() - 14);
+  const days14Str = days14.toISOString().slice(0, 10);
+  const newInquiries = inquiries.filter((q) => q.status === "NEW" && (q.created_at ?? "").slice(0, 10) >= days14Str).length;
   const plannedJobs = jobs.filter((j) => j.status === "PLANNED").length;
 
   // §4.2 Każdy kafelek prowadzi do przefiltrowanej listy rekordów, których dotyczy liczba.
   const kpis = [
-    { label: "Najbliższe (7 dni)", value: String(near7), sub: toConfirm.length ? `${toConfirm.length} do potwierdzenia` : `${upcoming.length} nadchodzących`, tone: (toConfirm.length ? "warn" : "neutral") as "warn" | "neutral", href: toConfirm.length ? "/reservations?filter=to-confirm" : "/reservations?filter=upcoming7" },
-    { label: "Nowe zapytania", value: String(newInquiries), sub: `${inquiries.length} łącznie`, tone: "neutral" as const, href: "/inquiries?status=NEW" },
-    { label: "Niepotwierdzone", value: String(unconfirmed.length), sub: unconfirmed.length ? "wymaga uwagi" : "brak", tone: (unconfirmed.length ? "warn" : "neutral") as "warn" | "neutral", href: "/reservations?filter=unconfirmed" },
+    { label: "Najbliższe (7 dni)", value: String(near7), sub: `${upcoming.length} nadchodzących`, tone: "neutral" as const, href: "/reservations?filter=upcoming7" },
+    { label: "Nowe zapytania", value: String(newInquiries), sub: "z ostatnich 14 dni", tone: "neutral" as const, href: "/inquiries?status=NEW" },
     { label: "Zlecenia zaplanowane", value: String(plannedJobs), sub: `${jobs.length} zleceń`, tone: "neutral" as const, href: "/reservations?filter=upcoming" },
     { label: "Klienci", value: String(customers.length), sub: "w bazie", tone: "neutral" as const, href: "/customers" },
   ];
 
+  // §pulpit „Wymaga uwagi" — wszystko wymagające decyzji szefa: prośby o przypisanie, koszty do
+  // akceptacji, rozliczenia pracowników, faktury, paliwo, ogłoszenia OLX.
   const attention: { tone: "bad" | "warn"; title: string; desc: string; href: string }[] = [];
-  if (isOwner && fuelDue) attention.push({ tone: "warn", title: "Zaktualizuj ceny paliwa", desc: "Minęły 2 tygodnie od ostatniej aktualizacji cen paliwa.", href: "/settings" });
-  const advToReact = analyzeFleet(adverts).summary.toReact;
-  if (advToReact > 0) attention.push({ tone: "warn", title: `Ogłoszenia do reakcji (${advToReact})`, desc: "Wygasają wkrótce lub już wygasły — sprawdź moduł Ogłoszenia OLX.", href: "/adverts" });
-  for (const r of toConfirm.slice(0, 4)) {
-    attention.push({ tone: "warn", title: "Potwierdź z klientem (≤7 dni)", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}` });
-  }
-  const invoicesToDo = reservations.filter(
-    (r) => r.is_invoice && !r.invoice_issued && r.status !== "CANCELLED" && r.event_date && r.event_date <= todayStr,
-  );
-  for (const r of invoicesToDo.slice(0, 4)) {
-    attention.push({ tone: "warn", title: "Wystaw fakturę VAT", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}` });
-  }
-  for (const r of unconfirmed.slice(0, 4)) {
-    const reason = !r.client_confirmed && !Number(r.deposit) ? "brak umowy i zadatku" : !r.client_confirmed ? "oczekuje na umowę" : "oczekuje na zadatek";
-    attention.push({ tone: "warn", title: "Niepotwierdzona rezerwacja", desc: `${r.customer?.name ?? "—"} · ${reason} · ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}/edit` });
+  if (isOwner) {
+    // Prośby pracowników o przypisanie — priorytet (blokują realizację).
+    for (const req of assignmentRequests.slice(0, 5)) {
+      attention.push({ tone: "bad", title: "Prośba o przypisanie", desc: `${req.employeeName} → ${req.title}${req.eventDate ? " · " + fmtDate(req.eventDate) : ""}`, href: req.reservationId ? `/reservations/${req.reservationId}` : `/jobs/${req.jobId}` });
+    }
+    // Koszty do akceptacji (PENDING).
+    const pendingCosts = costs.filter((c) => c.status === "PENDING");
+    if (pendingCosts.length > 0) {
+      attention.push({ tone: "warn", title: `Koszty do akceptacji (${pendingCosts.length})`, desc: "Zweryfikuj i zatwierdź zgłoszone koszty realizacji.", href: "/costs" });
+    }
+    // Pracownicy z saldem do wypłaty (zakończone realizacje, nierozliczone).
+    if (unsettledCount > 0) {
+      attention.push({ tone: "warn", title: `Rozliczenia pracowników (${unsettledCount})`, desc: "Zakończone realizacje z wynagrodzeniem do wypłaty.", href: "/employees" });
+    }
+    if (fuelDue) attention.push({ tone: "warn", title: "Zaktualizuj ceny paliwa", desc: "Minęły 2 tygodnie od ostatniej aktualizacji cen paliwa.", href: "/settings" });
+    const advToReact = analyzeFleet(adverts).summary.toReact;
+    if (advToReact > 0) attention.push({ tone: "warn", title: `Ogłoszenia do reakcji (${advToReact})`, desc: "Wygasają wkrótce lub już wygasły — sprawdź moduł Ogłoszenia OLX.", href: "/adverts" });
+    const invoicesToDo = reservations.filter(
+      (r) => r.is_invoice && !r.invoice_issued && r.status !== "CANCELLED" && r.event_date && r.event_date <= todayStr,
+    );
+    for (const r of invoicesToDo.slice(0, 4)) {
+      attention.push({ tone: "warn", title: "Wystaw fakturę VAT", desc: `${r.customer?.name ?? "—"} · ${r.event_type ?? ""} ${fmtDate(r.event_date)}`, href: `/reservations/${r.id}` });
+    }
   }
 
   const recentInquiries = inquiries.slice(0, 5);

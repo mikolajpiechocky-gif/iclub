@@ -281,9 +281,12 @@ export async function createReservation(input: ReservationInput): Promise<{ id: 
 
   const resolved = input.tent_main !== undefined ? await resolveFromChoices(input) : {};
   const stamp = await assemblyStampFor(supabase, null, input);
+  // §rezerwacja Nową rezerwację zakładamy jako POTWIERDZONĄ z klientem (nie ma stanu „niepotwierdzona"
+  // — to może być co najwyżej zapytanie). Odwołać może tylko klient (osobna akcja).
+  const confirmedStamp = { client_confirmed: true, client_confirmed_at: new Date().toISOString() };
   const { data: reservation, error: rErr } = await supabase
     .from("reservations")
-    .insert({ ...input, ...resolved, ...(stamp ?? {}), created_by: user?.id ?? null })
+    .insert({ ...input, ...resolved, ...(stamp ?? {}), ...confirmedStamp, created_by: user?.id ?? null })
     .select("id, business_line, event_type, event_date")
     .single();
   if (rErr) throw new Error(rErr.message);
@@ -412,6 +415,13 @@ export async function setRentalDeliveryConfirmed(id: string, deliveryTime: strin
   const patch: Record<string, unknown> = { phone_call_done: true };
   if (deliveryTime !== null) patch.delivery_time = deliveryTime;
   const { error } = await supabase.from("reservations").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// §rezerwacja Zmiana statusu rezerwacji (np. odwołanie przez klienta → CANCELLED).
+export async function setReservationStatus(id: string, status: ReservationStatus): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("reservations").update({ status }).eq("id", id);
   if (error) throw new Error(error.message);
 }
 

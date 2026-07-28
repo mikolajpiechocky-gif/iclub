@@ -3,10 +3,10 @@
 // rezerwacji automatycznie generuje zlecenie i etapy (warstwa danych).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, checkHeatingAvailability, type ReservationInput, type AddonShortage, type HeatingAvailability } from "@/lib/data/reservations";
+import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setReservationStatus, getReservation, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, checkHeatingAvailability, type ReservationInput, type AddonShortage, type HeatingAvailability } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
 import { createCustomer, setCustomerPhone } from "@/lib/data/customers";
-import { markJobPlannedPaid } from "@/lib/data/payments";
+import { markJobPlannedPaid, createPayment } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { syncReservationToCalendar, removeReservationFromCalendar } from "@/lib/data/calendar-sync";
 import { sumSlots, type TentChoice } from "@/lib/domain/tents";
@@ -350,6 +350,33 @@ export async function deleteReservationAction(id: string): Promise<ActionResult>
     return { ok: true, id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się usunąć rezerwacji." };
+  }
+}
+
+// §rezerwacja Odwołanie rezerwacji przez klienta. Status → CANCELLED, zlecenie → CANCELLED.
+// iClub: zadatek przepada i liczy się do przychodu (zapis jako opłacona płatność). Tylko szef.
+export async function cancelReservationByClientAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko szef może odwołać rezerwację." };
+  try {
+    const reservation = await getReservation(id);
+    if (!reservation) return { ok: false, error: "Nie znaleziono rezerwacji." };
+    await setReservationStatus(id, "CANCELLED");
+    const job = await getJobByReservation(id);
+    if (job) await setJobStatus(job.id, "CANCELLED");
+    const deposit = Number(reservation.deposit ?? 0) || 0;
+    if (reservation.business_line === "ICLUB" && deposit > 0 && job) {
+      // Zadatek przepada → przychód realizacji (opłacona płatność).
+      await createPayment({ job_id: job.id, title: "Zadatek przepadł (odwołanie klienta)", method: "TRANSFER", amount: deposit, status: "PAID", note: null }).catch(() => {});
+    }
+    try { await removeReservationFromCalendar(id); } catch {}
+    revalidatePath(`/reservations/${id}`);
+    revalidatePath("/reservations");
+    revalidatePath("/dashboard");
+    return { ok: true, id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się odwołać rezerwacji." };
   }
 }
 

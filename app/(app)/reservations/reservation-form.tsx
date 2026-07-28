@@ -215,7 +215,7 @@ export function ReservationForm({
     is_invoice: initial?.is_invoice ?? false,
     heating: initial?.heating ?? false,
     source: initial?.source ?? "",
-    status: initial?.status ?? "TEMPORARY",
+    status: initial?.status ?? "CONFIRMED", // §rezerwacja zakładamy tylko potwierdzone (odwołać może tylko klient)
     notes: initial?.notes ?? "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});

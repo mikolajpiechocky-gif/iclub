@@ -28,6 +28,7 @@ import { ClientConfirmToggle } from "../confirm-toggle";
 import { InvoiceStatus } from "../invoice-status";
 import { RealizationDoneButton } from "../realization-done";
 import { DeleteReservationButton } from "../delete-reservation";
+import { CancelReservationButton } from "../cancel-reservation";
 import { JobTeam, type AssignmentView } from "../../jobs/job-team";
 import { JobVehicles, type JobVehicleView } from "../../jobs/job-vehicles";
 import { JobTransport } from "../../jobs/job-transport";
@@ -122,7 +123,12 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-card-lg border border-border bg-surface p-5">
         <Pill label={rm.label} fg={rm.fg} bg={rm.bg} />
         {reservation.location && <span className="text-[13px] font-semibold text-ink-2">📍 {reservation.location}</span>}
-        {job && isOwner && <span className="ml-auto"><RealizationDoneButton reservationId={reservation.id} done={job.status === "DONE"} /></span>}
+        {isOwner && (
+          <span className="ml-auto flex flex-wrap items-center gap-2">
+            <CancelReservationButton id={reservation.id} isIclub={reservation.business_line === "ICLUB"} deposit={Number(reservation.deposit ?? 0) || 0} cancelled={reservation.status === "CANCELLED"} />
+            {job && reservation.status !== "CANCELLED" && <RealizationDoneButton reservationId={reservation.id} done={job.status === "DONE"} />}
+          </span>
+        )}
       </div>
 
       {isOwner && !isRental && (

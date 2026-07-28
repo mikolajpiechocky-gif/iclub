@@ -140,6 +140,50 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
     .sort((a, b) => ((a.eventDate ?? "") < (b.eventDate ?? "") ? 1 : -1));
 }
 
+// §pulpit Prośby pracowników o przypisanie (REQUESTED) — do sekcji „Wymaga uwagi" u szefa.
+export interface PendingAssignmentRequest {
+  assignmentId: string;
+  jobId: string;
+  reservationId: string | null;
+  employeeName: string;
+  title: string;
+  eventDate: string | null;
+}
+
+export async function listPendingAssignmentRequests(): Promise<PendingAssignmentRequest[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("job_assignments")
+    .select("id, employee:profiles!profile_id(full_name), job:jobs(id, title, event_date, reservation_id, reservation:reservations(customer:customers(name)))")
+    .eq("status", "REQUESTED");
+  interface Raw { id: string; employee: { full_name: string | null } | null; job: { id: string; title: string | null; event_date: string | null; reservation_id: string | null; reservation: { customer: { name: string | null } | null } | null } | null }
+  const rows = (data ?? []) as unknown as Raw[];
+  return rows
+    .filter((r) => r.job)
+    .map((r) => ({
+      assignmentId: r.id,
+      jobId: r.job!.id,
+      reservationId: r.job!.reservation_id ?? null,
+      employeeName: r.employee?.full_name?.trim() || "Pracownik",
+      title: r.job!.reservation?.customer?.name ?? r.job!.title ?? "Realizacja",
+      eventDate: r.job!.event_date ?? null,
+    }));
+}
+
+// §pulpit Liczba zakończonych realizacji z nierozliczonym wynagrodzeniem (saldo „do wypłaty").
+export async function countUnsettledDoneAssignments(): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("job_assignments")
+    .select("id, settled_at, status, job:jobs(status)")
+    .eq("status", "APPROVED")
+    .is("settled_at", null);
+  const rows = (data ?? []) as unknown as { id: string; job: { status: string } | null }[];
+  return rows.filter((r) => r.job?.status === "DONE").length;
+}
+
 export async function setAssignmentSettled(id: string, settled: boolean): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
