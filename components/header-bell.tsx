@@ -43,8 +43,10 @@ export function HeaderBell({ unread = 0 }: { unread?: number }) {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const readOne = (id: string) => start(async () => { await markReadAction(id); setItems((xs) => xs.map((n) => (n.id === id ? { ...n, read: true } : n))); setCount((c) => Math.max(0, c - 1)); router.refresh(); });
   const readAll = () => start(async () => { await markAllReadAction(); setItems((xs) => xs.map((n) => ({ ...n, read: true }))); setCount(0); router.refresh(); });
+  // Kliknięcie powiadomienia: oznacz przeczytane LOKALNIE + w tle, BEZ router.refresh —
+  // refresh anulował nawigację <Link> i „nic się nie działo" (nie dało się przejść do akceptacji).
+  const readOneQuiet = (id: string) => { setItems((xs) => xs.map((n) => (n.id === id ? { ...n, read: true } : n))); setCount((c) => Math.max(0, c - 1)); void markReadAction(id); };
 
   const shown = items.slice(0, 8);
 
@@ -82,7 +84,7 @@ export function HeaderBell({ unread = 0 }: { unread?: number }) {
                 </div>
               );
               return n.job_id ? (
-                <Link key={n.id} href={`/jobs/${n.job_id}`} onMouseDown={() => { setOpen(false); readOne(n.id); }} className="block border-b border-border-soft last:border-0 hover:bg-surface-2">{inner}</Link>
+                <Link key={n.id} href={`/jobs/${n.job_id}`} onClick={() => { setOpen(false); readOneQuiet(n.id); }} className="block border-b border-border-soft last:border-0 hover:bg-surface-2">{inner}</Link>
               ) : (
                 <div key={n.id} className="border-b border-border-soft last:border-0">{inner}</div>
               );

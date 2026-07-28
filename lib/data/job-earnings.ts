@@ -2,8 +2,7 @@
 // oraz przy „zamrażaniu" rozliczenia w chwili zakończenia realizacji (snapshot), żeby
 // późniejsza zmiana stawek NIE zmieniała rozliczeń już zakończonych realizacji.
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
-import { predictedEarnings } from "@/lib/domain/earnings";
-import { settlementForRealization, rulesFromSettings, possibleAddonBonuses, type IclubSettlementRules } from "@/lib/domain/iclub-settlement";
+import { settlementForRealization, rulesFromSettings, type IclubSettlementRules } from "@/lib/domain/iclub-settlement";
 import { countDoneIclubRealizations } from "./jobs";
 import type { AppSettings } from "./settings";
 import type { BusinessLine, EmployeeRate, JobWithReservation } from "./types";
@@ -42,7 +41,9 @@ export async function buildAssignmentEarnings(
   profileId: string,
   isLead = false, // §II.12 premia od dosprzedaży należy się osobie prowadzącej realizację
 ): Promise<EarningsBreakdown | null> {
-  // Wypożyczalnia: ryczałt per zlecenie (nadrzędny) albo model stawki.
+  // Wypożyczalnia: wynagrodzenie pracownika to WYŁĄCZNIE ryczałt za zlecenie i/lub bonus szefa.
+  // Stawka godzinowa = czas obsługi liczony jako realny KOSZT zlecenia, ale pracownik NIE dostaje
+  // dodatkowego wynagrodzenia → nie pokazujemy żadnych zarobków (null). Bez bonusów iClub.
   if (!ctx.iclub) {
     if (ctx.rentalFlat != null) {
       return {
@@ -50,10 +51,13 @@ export async function buildAssignmentEarnings(
         baseLabel: "Ryczałt za zlecenie",
         ownerBonus: ctx.ownerBonus,
         total: Math.round((ctx.rentalFlat + ctx.ownerBonus) * 100) / 100,
-        possibleBonuses: possibleAddonBonuses(rate),
+        possibleBonuses: [],
       };
     }
-    return rate ? predictedEarnings(rate, ctx.businessLine, ctx.ownerBonus, ctx.hours) : null;
+    if (ctx.ownerBonus > 0) {
+      return { base: 0, baseLabel: "Bonus szefa", ownerBonus: ctx.ownerBonus, total: ctx.ownerBonus, possibleBonuses: [] };
+    }
+    return null; // godzinowa: bez dodatkowego wynagrodzenia dla pracownika
   }
   // iClub §19: czas wolny za pierwsze N / ryczałt, per pracownik.
   if (!rate) return null;

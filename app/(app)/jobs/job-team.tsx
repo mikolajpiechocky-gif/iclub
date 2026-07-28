@@ -25,10 +25,11 @@ export interface AssignmentView {
 }
 
 export function JobTeam({
-  jobId, isOwner, currentProfileId, ownerBonus, assignments, availableEmployees, unavailableIds, myEarnings, amIAssigned, amIRequested,
+  jobId, isOwner, isRental = false, currentProfileId, ownerBonus, assignments, availableEmployees, unavailableIds, myEarnings, amIAssigned, amIRequested,
 }: {
   jobId: string;
   isOwner: boolean;
+  isRental?: boolean; // wypożyczalnia: bez lidera (na razie niepotrzebny)
   currentProfileId: string | null;
   ownerBonus: number;
   assignments: AssignmentView[];
@@ -73,7 +74,7 @@ export function JobTeam({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[13.5px] font-bold text-ink">{a.full_name}</span>
-                    {a.is_lead && <Pill label="Lider" fg="#e0c8ff" bg="#271b3f" />}
+                    {!isRental && a.is_lead && <Pill label="Lider" fg="#e0c8ff" bg="#271b3f" />}
                   </div>
                   {a.earnings && (
                     <div className="mt-0.5 text-[12px] text-ink-2">
@@ -87,7 +88,7 @@ export function JobTeam({
                 </div>
                 {isOwner && (
                   <div className="flex gap-2">
-                    <button onClick={() => run(() => toggleLeadAction(a.id, jobId, !a.is_lead))} disabled={pending} className="rounded-[9px] border border-border bg-surface px-2.5 py-1.5 text-[11.5px] font-semibold text-ink-2">{a.is_lead ? "Zdejmij lidera" : "Ustaw lidera"}</button>
+                    {!isRental && <button onClick={() => run(() => toggleLeadAction(a.id, jobId, !a.is_lead))} disabled={pending} className="rounded-[9px] border border-border bg-surface px-2.5 py-1.5 text-[11.5px] font-semibold text-ink-2">{a.is_lead ? "Zdejmij lidera" : "Ustaw lidera"}</button>}
                     <button onClick={() => run(() => removeAssignmentAction(a.id, jobId))} disabled={pending} className="rounded-[9px] border border-[#3a1c1f] bg-[#251215] px-2.5 py-1.5 text-[11.5px] font-semibold text-bad">Usuń</button>
                   </div>
                 )}

@@ -17,8 +17,21 @@ export function tentsCode(sizes: (string | null)[]): string {
   return codes.join("");
 }
 
+// Miejscowość do tytułu kalendarza. Priorytet: miasto klienta (pole „city"). Gdy brak —
+// wyciągamy miasto z adresu: segment po kodzie pocztowym „NN-NNN Miasto", inaczej drugi
+// segment (zwykle miasto po ulicy), a w ostateczności pierwszy. NIE bierzemy już ulicy
+// (dawniej split(",")[0] dawał ulicę zamiast miejscowości).
 export function cityFrom(location: string | null, customerCity: string | null): string {
-  return (location?.split(",")[0]?.trim() || customerCity || location || "").trim();
+  const cc = customerCity?.trim();
+  if (cc) return cc;
+  const loc = location?.trim();
+  if (!loc) return "";
+  const parts = loc.split(",").map((s) => s.trim()).filter(Boolean);
+  for (const p of parts) {
+    const m = p.match(/\d{2}-\d{3}\s+(.+)/); // „05-500 Piaseczno" → „Piaseczno"
+    if (m) return m[1].trim();
+  }
+  return (parts[1] || parts[0] || loc).trim();
 }
 
 export interface CalendarTitleInput {

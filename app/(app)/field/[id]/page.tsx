@@ -10,7 +10,6 @@ import { getSettings } from "@/lib/data/settings";
 import { getEmployee } from "@/lib/data/employees";
 import { listJobAssignments } from "@/lib/data/assignments";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
-import { rentalWorkMs, rentalLabor } from "@/lib/domain/rental";
 import { getCustomer } from "@/lib/data/customers";
 import { listReservationAddons, listPackageItems } from "@/lib/data/resources";
 import { listChecklistItems } from "@/lib/data/checklist";
@@ -84,11 +83,12 @@ export default async function FieldRealizationPage({ params }: { params: Promise
       : await buildAssignmentEarnings(jobEarningsCtx(job, settings, (distanceKm ?? 0) > 100), employee?.rate ?? null, profile.id, mine?.is_lead ?? false);
     if (eb) earnings = { baseLabel: eb.baseLabel, total: eb.total };
   } else if (profile && job.business_line === "EQUIPMENT_RENTAL") {
-    // Wypożyczalnia: wynagrodzenie z czasu pracy × stawka albo ryczałt (podgląd; utrwalane przy domknięciu).
-    const settings = await getSettings();
+    // §wypożyczalnia Pracownik widzi wynagrodzenie TYLKO gdy jest ryczałt lub bonus szefa.
+    // Stawka godzinowa = czas obsługi liczony jako koszt zlecenia, ale bez dodatkowej wypłaty → nic nie pokazujemy.
     const flat = r?.rental_settlement_flat != null ? Number(r.rental_settlement_flat) : null;
-    const labor = rentalLabor(rentalWorkMs(stages), { flat, hourlyRate: Number(settings.iclub_hourly_rate ?? 0) });
-    if (labor.amount > 0) earnings = { baseLabel: labor.isFlat ? "Ryczałt za realizację" : `Czas pracy ${labor.hours} h × stawka`, total: labor.amount };
+    const ownerBonus = Number(job.owner_bonus ?? 0) || 0;
+    if (flat != null) earnings = { baseLabel: "Ryczałt za realizację", total: Math.round((flat + ownerBonus) * 100) / 100 };
+    else if (ownerBonus > 0) earnings = { baseLabel: "Bonus szefa", total: ownerBonus };
   }
 
   // §9.4 Dodatki realizacji → ostrzeżenie o większym czasie pakowania i montażu.

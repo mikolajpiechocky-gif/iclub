@@ -405,6 +405,7 @@ async function ReservationOps({
       <JobTeam
         jobId={job.id}
         isOwner={isOwner}
+        isRental={job.business_line === "EQUIPMENT_RENTAL"}
         currentProfileId={profile?.id ?? null}
         ownerBonus={ownerBonus}
         assignments={assignmentViews}
