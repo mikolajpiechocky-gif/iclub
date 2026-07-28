@@ -5,8 +5,26 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getValidAccessToken } from "./olx";
-import { getAdverts, getAdvertStatistics } from "@/lib/integrations/olx";
+import { getAdverts, getAdvert, getAdvertStatistics } from "@/lib/integrations/olx";
 import { extractLocation } from "@/lib/integrations/olx/extract";
+
+// §OLX Głębokie (BFS) wyszukanie pierwszej liczbowej wartości pod pasującym kluczem — statystyki
+// OLX bywają zagnieżdżone/inaczej nazwane (telefony działają, a „views" bywa np. impressions/page_views).
+function deepNum(root: unknown, keys: string[]): number {
+  const set = new Set(keys.map((k) => k.toLowerCase()));
+  const queue: unknown[] = [root];
+  while (queue.length) {
+    const node = queue.shift();
+    if (!node || typeof node !== "object") continue;
+    if (Array.isArray(node)) { for (const it of node) queue.push(it); continue; }
+    const rec = node as Record<string, unknown>;
+    for (const [k, v] of Object.entries(rec)) {
+      if (set.has(k.toLowerCase())) { const n = Number(v); if (Number.isFinite(n)) return n; }
+    }
+    for (const v of Object.values(rec)) queue.push(v);
+  }
+  return 0;
+}
 
 export interface OlxAdvert {
   olx_id: string;
@@ -37,10 +55,6 @@ const pick = (obj: unknown, ...keys: string[]): unknown => {
     else return undefined;
   }
   return cur;
-};
-const num = (v: unknown): number => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
 };
 
 export async function listOlxAdverts(): Promise<OlxAdvert[]> {
@@ -121,11 +135,21 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
         let statsOk = false;
         try {
           const st = (await getAdvertStatistics(token, olxId)) as Record<string, unknown>;
-          views = num(pick(st, "data", "views") ?? pick(st, "views") ?? pick(st, "data", "impressions"));
-          phones = num(pick(st, "data", "phones") ?? pick(st, "phones") ?? pick(st, "data", "phone_views") ?? pick(st, "phone_views"));
+          // BFS po wszystkich wariantach nazw — dawniej sztywne „views" dawało 0 mimo realnych odsłon.
+          views = deepNum(st, ["views", "impressions", "page_views", "pageviews", "detail_views", "detailviews", "visits", "views_count", "view_count", "displays"]);
+          phones = deepNum(st, ["phones", "phone_views", "phoneviews", "phone", "calls", "phone_clicks", "phone_reveals", "reveal_phone", "phone_count", "contacts"]);
           statsOk = true;
         } catch {
           /* chwilowy błąd statystyk — NIE nadpisujemy realnych wartości zerami */
+        }
+
+        // §OLX Miasto: najpierw z listy; gdy brak (lista bywa uboga) — z detalu ogłoszenia.
+        let city = extractLocation(a);
+        if (!city) {
+          try {
+            const detail = (await getAdvert(token, olxId)) as Record<string, unknown>;
+            city = extractLocation(pick(detail, "data") ?? detail);
+          } catch { /* brak detalu — zostaje puste */ }
         }
 
         const { data: prev } = await s.from("olx_adverts").select("views, phones, last_synced_at").eq("olx_id", olxId).maybeSingle();
@@ -134,7 +158,7 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
         const row: Record<string, unknown> = {
           olx_id: olxId,
           title: (pick(a, "title") as string) ?? null,
-          city: extractLocation(a), // §B3 miasto ogłoszenia — rozróżnianie ofert po lokalizacji
+          city, // §B3 miasto ogłoszenia (z listy lub detalu) — rozróżnianie ofert po lokalizacji
           status: (pick(a, "status") as string) ?? null,
           url: (pick(a, "url") as string) ?? null,
           valid_to: (pick(a, "valid_to") ?? pick(a, "expires_at") ?? pick(a, "date_end") ?? null) as string | null,

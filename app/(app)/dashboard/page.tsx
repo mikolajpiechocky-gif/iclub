@@ -6,9 +6,9 @@ import { MetricCard, SectionCard, PrimaryButton, SecondaryButton, Pill, EmptySta
 import { listReservations } from "@/lib/data/reservations";
 import { listReservationAddons } from "@/lib/data/resources";
 import { listInquiries } from "@/lib/data/inquiries";
-import { listCustomers } from "@/lib/data/customers";
 import { listJobs } from "@/lib/data/jobs";
 import { listCosts } from "@/lib/data/costs";
+import { listPayments } from "@/lib/data/payments";
 import { listPendingAssignmentRequests, countUnsettledDoneAssignments } from "@/lib/data/assignments";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { fuelReminderDue } from "@/lib/data/settings";
@@ -21,13 +21,13 @@ import { warsawTodayISO } from "@/lib/domain/dates";
 export const dynamic = "force-dynamic";
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short" }) : "—";
+const fmtPLN = (v: number) => new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
 
 export default async function DashboardPage() {
-  const [reservations, addonList, inquiries, customers, jobs, profile, fuelDue, adverts, costs, assignmentRequests, unsettledCount] = await Promise.all([
+  const [reservations, addonList, inquiries, jobs, profile, fuelDue, adverts, costs, assignmentRequests, unsettledCount, payments] = await Promise.all([
     listReservations(),
     listReservationAddons(),
     listInquiries(),
-    listCustomers(),
     listJobs(),
     getCurrentProfile(),
     fuelReminderDue(),
@@ -35,6 +35,7 @@ export default async function DashboardPage() {
     listCosts(),
     listPendingAssignmentRequests(),
     countUnsettledDoneAssignments(),
+    listPayments(),
   ]);
   // §4.5 Skrót dodatków realizacji (liczba + najważniejsze nazwy).
   const addonName = new Map(addonList.map((a) => [a.id, a.name]));
@@ -69,12 +70,19 @@ export default async function DashboardPage() {
   const newInquiries = inquiries.filter((q) => q.status === "NEW" && (q.created_at ?? "").slice(0, 10) >= days14Str).length;
   const plannedJobs = jobs.filter((j) => j.status === "PLANNED").length;
 
+  // §pulpit Zysk w tym miesiącu = przychód (zapłacone płatności) − koszty (bez odrzuconych), wg miesiąca.
+  const monthPrefix = todayStr.slice(0, 7);
+  const revenueMonth = payments.filter((p) => p.status === "PAID" && (p.created_at ?? "").slice(0, 7) === monthPrefix).reduce((s, p) => s + Number(p.amount || 0), 0);
+  const costsMonth = costs.filter((c) => c.status !== "REJECTED" && (c.spent_on ?? "").slice(0, 7) === monthPrefix).reduce((s, c) => s + Number(c.amount || 0), 0);
+  const profitMonth = Math.round((revenueMonth - costsMonth) * 100) / 100;
+  const monthName = new Date(todayStr + "T00:00:00Z").toLocaleDateString("pl-PL", { month: "long" });
+
   // §4.2 Każdy kafelek prowadzi do przefiltrowanej listy rekordów, których dotyczy liczba.
   const kpis = [
     { label: "Najbliższe (7 dni)", value: String(near7), sub: `${upcoming.length} nadchodzących`, tone: "neutral" as const, href: "/reservations?filter=upcoming7" },
     { label: "Nowe zapytania", value: String(newInquiries), sub: "z ostatnich 14 dni", tone: "neutral" as const, href: "/inquiries?status=NEW" },
     { label: "Zlecenia zaplanowane", value: String(plannedJobs), sub: `${jobs.length} zleceń`, tone: "neutral" as const, href: "/reservations?filter=upcoming" },
-    { label: "Klienci", value: String(customers.length), sub: "w bazie", tone: "neutral" as const, href: "/customers" },
+    { label: "Zysk w tym miesiącu", value: fmtPLN(profitMonth), sub: monthName, tone: (profitMonth >= 0 ? "neutral" : "warn") as "warn" | "neutral", href: "/reports" },
   ];
 
   // §pulpit „Wymaga uwagi" — wszystko wymagające decyzji szefa: prośby o przypisanie, koszty do

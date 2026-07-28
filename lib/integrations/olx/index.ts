@@ -74,5 +74,7 @@ export const getMessages = (token: string, threadId: string, offset = 0, limit =
 // Ogłoszenia szefa + statystyki (wyświetlenia, odsłony numeru).
 export const getAdverts = (token: string, offset = 0, limit = 100) =>
   olxGet<Record<string, unknown>>(`/adverts?offset=${offset}&limit=${limit}`, token);
+export const getAdvert = (token: string, advertId: string) =>
+  olxGet<Record<string, unknown>>(`/adverts/${advertId}`, token);
 export const getAdvertStatistics = (token: string, advertId: string) =>
   olxGet<Record<string, unknown>>(`/adverts/${advertId}/statistics`, token);
