@@ -8,6 +8,8 @@ import { listJobs } from "@/lib/data/jobs";
 import { listPayments } from "@/lib/data/payments";
 import { listCosts } from "@/lib/data/costs";
 import { listInvestments } from "@/lib/data/investments";
+import { listReservations } from "@/lib/data/reservations";
+import { listAddons } from "@/lib/data/resources";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { JOB_STATUS_META, type JobWithReservation } from "@/lib/data/types";
 import { BackfillCostsButton } from "./backfill-button";
@@ -35,7 +37,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     );
   }
 
-  const [jobs, payments, costs, investments] = await Promise.all([listJobs(), listPayments(), listCosts(), listInvestments()]);
+  const [jobs, payments, costs, investments, reservations, addons] = await Promise.all([listJobs(), listPayments(), listCosts(), listInvestments(), listReservations(), listAddons()]);
   const demo = !isSupabaseConfigured();
 
   // Dostępne lata (malejąco) + wybór z URL; domyślnie „Wszystko".
@@ -94,6 +96,27 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   const scopeLabel = selectedYear === "all" ? "od początku" : `rok ${selectedYear}`;
   const tabs = [{ k: "all", label: "Wszystko" }, ...years.map((y) => ({ k: y, label: y }))];
+
+  // §B4 Ranking „co najlepiej się wypożycza": przychód i liczba wypożyczeń per dodatek.
+  // Pomija rezerwacje tymczasowe (niepotwierdzone przytrzymania). Respektuje filtr roku.
+  const addonById = new Map(addons.map((a) => [a.id, a]));
+  const addonAgg = new Map<string, { name: string; rentals: number; qty: number; revenue: number }>();
+  for (const r of reservations) {
+    if (r.status === "TEMPORARY") continue;
+    if (selectedYear !== "all" && (r.event_date ?? "").slice(0, 4) !== selectedYear) continue;
+    for (const id of r.addon_ids ?? []) {
+      const a = addonById.get(id);
+      if (!a) continue;
+      const q = r.addon_qty?.[id] ?? 1;
+      const cur = addonAgg.get(id) ?? { name: a.name, rentals: 0, qty: 0, revenue: 0 };
+      cur.rentals += 1;
+      cur.qty += q;
+      cur.revenue += Number(a.price || 0) * q;
+      addonAgg.set(id, cur);
+    }
+  }
+  const addonRanking = [...addonAgg.values()].sort((a, b) => b.revenue - a.revenue);
+  const addonMaxRev = Math.max(1, ...addonRanking.map((r) => r.revenue));
 
   return (
     <div className="mx-auto max-w-[1200px] px-5 py-6 md:px-8">
@@ -216,6 +239,31 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </div>
           </details>
         </div>
+      )}
+
+      {/* §B4 Co najlepiej się wypożycza — ranking dodatków po przychodzie */}
+      {addonRanking.length > 0 && (
+        <>
+          <h2 className="mb-1 mt-8 font-display text-[15px] font-bold text-white">Co najlepiej się wypożycza</h2>
+          <p className="mb-3 text-[12px] text-ink-2">Ranking dodatków po przychodzie z wypożyczeń ({scopeLabel}). Przychód = cena × ilość × liczba rezerwacji.</p>
+          <div className="overflow-hidden rounded-card border border-border bg-surface">
+            {addonRanking.slice(0, 20).map((a, idx) => (
+              <div key={a.name} className="flex items-center gap-3 border-b border-border-soft px-4 py-3 last:border-0">
+                <span className="w-5 flex-none text-[13px] font-bold text-ink-2">{idx + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-baseline justify-between gap-2">
+                    <span className="truncate text-[13px] font-bold text-ink">{a.name}</span>
+                    <span className="flex-none font-display text-[13.5px] font-bold text-ok">{fmtPLN(a.revenue)}</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+                    <div className="h-full rounded-full" style={{ width: `${Math.round((a.revenue / addonMaxRev) * 100)}%`, background: "linear-gradient(90deg,#5fd68b,#14b8c4)" }} />
+                  </div>
+                  <div className="mt-1 text-[11px] text-ink-2">{a.rentals} {a.rentals === 1 ? "wypożyczenie" : "wypożyczeń"} · {a.qty} szt. łącznie</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Per zlecenie — każda realizacja z sumą kosztów; po rozwinięciu rozbicie na pozycje */}
