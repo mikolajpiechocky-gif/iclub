@@ -15,6 +15,7 @@ import { clientTransportPrice, tripClass } from "@/lib/domain/transport";
 import { getSettings } from "@/lib/data/settings";
 import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
 import { listTransportCalcs } from "@/lib/data/transport";
+import { writeRealizationCosts } from "@/lib/data/realization-close";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
 import { sendPushToEmployees, sendPushToUsers } from "@/lib/integrations/push";
@@ -388,6 +389,8 @@ export async function markRealizationDoneAction(reservationId: string): Promise<
     }
     await setJobStatus(job.id, "DONE");
     await markJobPlannedPaid(job.id);
+    // §II.17 Zapisz wynagrodzenia + paliwo jako koszty realizacji (do Raportów/Finansów).
+    await writeRealizationCosts(job.id).catch(() => {});
     revalidatePath(`/reservations/${reservationId}`);
     revalidatePath("/reports");
     revalidatePath("/payments");

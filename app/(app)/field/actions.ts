@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { setStageStatus, recomputeJobStatus, getJob, getJobStages, setJobStatus } from "@/lib/data/jobs";
 import { createPayment, markJobPlannedPaid } from "@/lib/data/payments";
 import { createCost, listCosts } from "@/lib/data/costs";
+import { writeRealizationCosts } from "@/lib/data/realization-close";
 import { rentalWorkMs, rentalLabor } from "@/lib/domain/rental";
 import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
 import { saveCallDetails, setDepositDeduction } from "@/lib/data/reservations";
@@ -57,6 +58,7 @@ async function finalizeRentalIfDone(jobId: string): Promise<void> {
   } catch (e) { console.error("Wypożyczalnia: koszt robocizny nie powiódł się", e); }
   await setJobStatus(jobId, "DONE");
   await markJobPlannedPaid(jobId);
+  await writeRealizationCosts(jobId).catch(() => {}); // paliwo do kosztów realizacji
 }
 
 export async function advanceStageAction(stageId: string, jobId: string, status: StageStatus, reason?: string): Promise<ActionResult> {
@@ -126,6 +128,7 @@ export async function finishRealizationAction(jobId: string): Promise<ActionResu
     } catch (e) { console.error("snapshot", e); }
     await setJobStatus(jobId, "DONE");
     await markJobPlannedPaid(jobId);
+    await writeRealizationCosts(jobId).catch(() => {}); // wynagrodzenia + paliwo do kosztów
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/reservations/${job.reservation_id ?? ""}`);
     revalidatePath(`/field`);

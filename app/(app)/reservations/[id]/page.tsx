@@ -284,19 +284,20 @@ async function ReservationOps({
 
   const photos = await listJobPhotos(job.id);
 
-  // §II.7 Rentowność realizacji: przychód − koszty (zatwierdzone) − wynagrodzenia − transport.
-  // Wynagrodzenia liczymy z rozliczenia zespołu (laborSum); koszty kategorii „Wynagrodzenie"/„Premia"
-  // pomijamy, żeby nie odjąć tego samego dwa razy.
-  const jobCosts = allCosts.filter((c) => c.job_id === job.id && c.category !== "Wynagrodzenie" && c.category !== "Premia");
+  // §II.7 Rentowność realizacji: przychód − koszty − wynagrodzenia − transport.
+  // Po DOMKNIĘCIU realizacji wynagrodzenia (Wynagrodzenie/Robocizna) i paliwo (Paliwo) są już
+  // wierszami w `costs`. Przed domknięciem pokazujemy je jako SZACUNEK, żeby nie liczyć dwa razy.
+  const jobCosts = allCosts.filter((c) => c.job_id === job.id);
   // §II.16 Potrącenie z kaucji za uszkodzenia = dodatkowy przychód realizacji.
   const depositDeduction = Number(job.reservation?.deposit_deduction ?? 0) || 0;
   const revenue = (Number(job.reservation?.price ?? 0) || 0) + depositDeduction;
   const costsVerified = jobCosts.filter((c) => c.status === "VERIFIED").reduce((s, c) => s + Number(c.amount || 0), 0);
   const costsPending = jobCosts.filter((c) => c.status === "PENDING").reduce((s, c) => s + Number(c.amount || 0), 0);
-  // iClub: wynagrodzenia z rozliczenia zespołu. Wypożyczalnia: robocizna jest osobnym kosztem
-  // „Robocizna" (liczonym w costsVerified) — więc tu jej nie dubluje­my.
-  const laborSum = job.business_line === "ICLUB" ? assignmentViews.filter((a) => a.status === "APPROVED").reduce((s, a) => s + (a.earnings?.total ?? 0), 0) : 0;
-  const transportSum = transportCalcs.reduce((s, t) => s + Number(t.fuel_cost || 0) + Number(t.amortization || 0), 0);
+  const hasWageCost = jobCosts.some((c) => (c.category === "Wynagrodzenie" || c.category === "Robocizna") && c.status !== "REJECTED");
+  const hasFuelCost = jobCosts.some((c) => c.category === "Paliwo" && c.status !== "REJECTED");
+  // Szacunek wynagrodzeń (iClub) / transportu — tylko dopóki nie ma jeszcze wiersza kosztu.
+  const laborSum = hasWageCost ? 0 : (job.business_line === "ICLUB" ? assignmentViews.filter((a) => a.status === "APPROVED").reduce((s, a) => s + (a.earnings?.total ?? 0), 0) : 0);
+  const transportSum = hasFuelCost ? 0 : transportCalcs.reduce((s, t) => s + Number(t.fuel_cost || 0) + Number(t.amortization || 0), 0);
   const profit = Math.round((revenue - costsVerified - laborSum - transportSum) * 100) / 100;
   const margin = revenue > 0 ? profit / revenue : null;
 
