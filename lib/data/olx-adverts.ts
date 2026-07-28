@@ -88,6 +88,16 @@ export async function getOlxSeasonality(): Promise<{ series: OlxSeasonalityYear[
   return { series, hasData };
 }
 
+// §OLX Ręczne usunięcie WSZYSTKICH zaimportowanych ogłoszeń (bez rozłączania konta) —
+// naprawa po błędnym spięciu, gdy właściwe konto jest już podpięte. Kolejna synchronizacja
+// pobierze ogłoszenia z aktualnego konta na czysto.
+export async function clearAllOlxAdverts(): Promise<number> {
+  const s = createAdminClient();
+  const { data } = await s.from("olx_adverts").delete().not("olx_id", "is", null).select("olx_id");
+  await s.from("olx_advert_stats").delete().not("olx_id", "is", null).then(() => {}, () => {});
+  return data?.length ?? 0;
+}
+
 export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
   const token = await getValidAccessToken();
   if (!token) return { ok: false, synced: 0, error: "OLX niepołączone — najpierw „Połącz OLX” w Ustawieniach." };
@@ -95,6 +105,7 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
   const s = createAdminClient();
   let synced = 0;
   let offset = 0;
+  const seenIds: string[] = []; // §OLX id-ki ogłoszeń realnie obecnych na koncie (do sprzątania nieaktualnych)
   try {
     for (let page = 0; page < 50; page++) {
       const resp = (await getAdverts(token, offset, 100)) as Record<string, unknown>;
@@ -141,6 +152,7 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
           row.prev_synced_at = p?.last_synced_at ?? null;
         }
         await s.from("olx_adverts").upsert(row);
+        seenIds.push(olxId);
         // §B3 Dzienny snapshot statystyk (do wykresu sezonowości rok-do-roku). Jeden wpis na dzień
         // (upsert po olx_id+captured_on) — kilka synchronizacji dziennie nadpisuje najnowszą wartością.
         if (statsOk) {
@@ -152,6 +164,16 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
 
       if (adverts.length < 100) break;
       offset += adverts.length;
+    }
+    // §OLX Usuń ogłoszenia, których NIE ma już na koncie (np. z wcześniej błędnie podpiętego konta) —
+    // inaczej zostawałyby na zawsze. Tylko gdy sync coś pobrał (pusta odpowiedź nie kasuje wszystkiego).
+    if (seenIds.length > 0) {
+      const { data: existing } = await s.from("olx_adverts").select("olx_id");
+      const stale = ((existing ?? []) as { olx_id: string }[]).map((r) => r.olx_id).filter((id) => !seenIds.includes(id));
+      if (stale.length) {
+        await s.from("olx_adverts").delete().in("olx_id", stale);
+        await s.from("olx_advert_stats").delete().in("olx_id", stale).then(() => {}, () => {});
+      }
     }
     return { ok: true, synced };
   } catch (e) {
