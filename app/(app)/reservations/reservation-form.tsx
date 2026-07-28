@@ -73,38 +73,70 @@ function CustomerPicker({ customers, customerId, newName, newPhone, set }: {
   );
 }
 
-// Wyszukiwarka sprzętu z magazynu (wypożyczalnia). Wybrane pozycje jako „tagi" → rental_items.
-function WarehousePicker({ items, value, onChange }: { items: ReservationAddon[]; value: string; onChange: (v: string) => void }) {
+// Przełącznik w stylu iOS (zamiast checkboxów).
+function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
+  return (
+    <button type="button" onClick={() => onChange(!checked)} className="flex w-full items-center justify-between gap-3 text-left">
+      <span className="min-w-0">
+        <span className="text-[13px] font-semibold text-ink">{label}</span>
+        {hint && <span className="mt-0.5 block text-[11.5px] font-normal text-ink-2">{hint}</span>}
+      </span>
+      <span className="relative h-6 w-[42px] flex-none rounded-full transition-colors" style={{ background: checked ? "#22c55e" : "#3a3d4a" }}>
+        <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform" style={{ transform: checked ? "translateX(18px)" : "translateX(2px)" }} />
+      </span>
+    </button>
+  );
+}
+
+// Wyszukiwarka sprzętu z magazynu z ILOŚCIĄ (+/− i z ręki) — cena liczy się z pozycji × ilość.
+// Zapisujemy do addon_ids + addon_qty (jak dodatki), więc kwota liczy się automatycznie.
+function WarehousePicker({ items, addonIds, addonQty, toggleAddon, setAddonQty }: {
+  items: ReservationAddon[]; addonIds: string[]; addonQty: Record<string, number>;
+  toggleAddon: (id: string) => void; setAddonQty: (id: string, q: number) => void;
+}) {
   const [query, setQuery] = useState("");
-  const selected = value.split(",").map((s) => s.trim()).filter(Boolean);
+  const byId = new Map(items.map((a) => [a.id, a]));
+  const qtyOf = (id: string) => Math.max(1, Math.round(addonQty[id] ?? 1));
   const ql = query.trim().toLowerCase();
-  const results = ql ? items.filter((a) => a.name.toLowerCase().includes(ql) && !selected.includes(a.name)).slice(0, 8) : [];
-  const add = (name: string) => { if (!selected.includes(name)) onChange([...selected, name].join(", ")); setQuery(""); };
-  const remove = (name: string) => onChange(selected.filter((s) => s !== name).join(", "));
+  const results = ql ? items.filter((a) => a.name.toLowerCase().includes(ql) && !addonIds.includes(a.id)).slice(0, 8) : [];
+  const total = addonIds.reduce((s, id) => s + Number(byId.get(id)?.price ?? 0) * qtyOf(id), 0);
+
   return (
     <div>
-      <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Sprzęt z magazynu</label>
-      {selected.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {selected.map((n) => (
-            <span key={n} className="flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[12px] font-semibold text-ink">{n}<button type="button" onClick={() => remove(n)} className="text-[14px] leading-none text-bad">×</button></span>
-          ))}
+      <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Sprzęt z magazynu {total > 0 && <span className="text-ink">· {fmtPLN(total)}</span>}</label>
+      {addonIds.length > 0 && (
+        <div className="mb-2 flex flex-col gap-1.5">
+          {addonIds.map((id) => {
+            const a = byId.get(id); const q = qtyOf(id); const price = Number(a?.price ?? 0);
+            return (
+              <div key={id} className="flex items-center gap-2 rounded-[10px] border border-border bg-surface-2 px-2.5 py-1.5">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold text-ink">{a?.name ?? "Pozycja"}</div>
+                  <div className="text-[11px] text-ink-2">{fmtPLN(price)} / szt · razem {fmtPLN(price * q)}</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => setAddonQty(id, q - 1)} className="h-7 w-7 rounded-[7px] border border-border bg-surface text-[15px] font-bold text-ink-2">−</button>
+                  <input inputMode="numeric" value={String(q)} onChange={(e) => { const n = parseInt(e.target.value.replace(/\D/g, ""), 10); setAddonQty(id, Number.isNaN(n) ? 1 : n); }} className="w-11 rounded-[7px] border border-border bg-surface px-1 py-1.5 text-center text-[13px] font-bold text-ink outline-none focus:border-accent" />
+                  <button type="button" onClick={() => setAddonQty(id, q + 1)} className="h-7 w-7 rounded-[7px] border border-border bg-surface text-[15px] font-bold text-ink-2">+</button>
+                </div>
+                <button type="button" onClick={() => toggleAddon(id)} className="ml-1 text-[11px] font-semibold text-bad">Usuń</button>
+              </div>
+            );
+          })}
         </div>
       )}
-      <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (query.trim()) add(query.trim()); } }} placeholder="Szukaj w magazynie…" className="w-full rounded-field border border-border bg-surface-2 px-3.5 py-3 text-[14px] text-ink outline-none focus:border-accent" />
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Szukaj sprzętu w magazynie…" className="w-full rounded-field border border-border bg-surface-2 px-3.5 py-3 text-[14px] text-ink outline-none focus:border-accent" />
       {results.length > 0 && (
         <div className="mt-1 flex flex-col gap-0.5 rounded-field border border-border bg-surface p-1">
           {results.map((a) => (
-            <button key={a.id} type="button" onClick={() => add(a.name)} className="flex items-center justify-between rounded-[8px] px-2.5 py-1.5 text-left text-[13px] text-ink hover:bg-surface-2">
+            <button key={a.id} type="button" onClick={() => { toggleAddon(a.id); setQuery(""); }} className="flex items-center justify-between rounded-[8px] px-2.5 py-1.5 text-left text-[13px] text-ink hover:bg-surface-2">
               <span>{a.name}</span>
-              {a.available != null && <span className="text-[11px] text-ink-2">{a.available} szt.</span>}
+              <span className="text-[11px] text-ink-2">{fmtPLN(Number(a.price ?? 0))}{a.available != null ? ` · ${a.available} szt.` : ""}</span>
             </button>
           ))}
         </div>
       )}
-      {query.trim() && results.length === 0 && !selected.includes(query.trim()) && (
-        <button type="button" onClick={() => add(query.trim())} className="mt-1.5 text-[12px] font-semibold text-accent-soft">+ Dodaj „{query.trim()}” (spoza magazynu)</button>
-      )}
+      {ql && results.length === 0 && <p className="mt-1.5 text-[11px] text-ink-2">Brak pozycji „{query.trim()}” w magazynie.</p>}
     </div>
   );
 }
@@ -324,6 +356,10 @@ export function ReservationForm({
       price: v.price.trim() !== "" ? v.price : String(order.total),
       discount_amount: String(order.discountAmount),
       deposit: depositValue,
+      // Wypożyczalnia: rental_items = nazwy wybranego sprzętu (z ilością) — do tytułu w kalendarzu i opisu.
+      rental_items: v.business_line === "EQUIPMENT_RENTAL"
+        ? addons.filter((a) => v.addon_ids.includes(a.id)).map((a) => (v.addon_qty?.[a.id] ?? 1) > 1 ? `${a.name} ×${v.addon_qty[a.id]}` : a.name).join(", ")
+        : v.rental_items,
       pricing_snapshot: JSON.stringify(snapshot),
     };
     startTransition(async () => {
@@ -370,26 +406,18 @@ export function ReservationForm({
             <AddressAutocomplete label="Lokalizacja" placeholder="Tarnowo Podgórne, ul. …" value={v.location} onChange={(val) => set("location", val)} />
             <TextField label="Godzina dostawy (opcjonalnie)" type="time" value={v.delivery_time} onChange={(e) => set("delivery_time", e.target.value)} hint="Puste = wydarzenie całodniowe" />
           </div>
-          {/* §8 Daty montażu/demontażu domyślnie ukryte; rozwijane w razie nietypowego terminu. */}
-          <div className="px-5 pb-5">
-            <label className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-ink">
-              <input type="checkbox" checked={showCustomDates} onChange={(e) => setShowCustomDates(e.target.checked)} className="h-4 w-4 accent-accent" />
-              Montaż lub demontaż w innym terminie
-            </label>
-            {!showCustomDates && (
-              <p className="mt-1.5 text-[11.5px] text-ink-2">
-                {v.event_date
-                  ? `Domyślnie: montaż ${v.event_date}, demontaż ${nextDay(v.event_date)}.`
-                  : "Domyślnie montaż w dniu imprezy, demontaż następnego dnia."}
-              </p>
-            )}
-            {showCustomDates && (
-              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <TextField label="Data montażu" type="date" value={v.setup_date} onChange={(e) => set("setup_date", e.target.value)} hint={v.event_date ? `puste = ${v.event_date}` : "puste = dzień imprezy"} />
-                <TextField label="Data demontażu" type="date" value={v.teardown_date} onChange={(e) => set("teardown_date", e.target.value)} hint={v.event_date ? `puste = ${nextDay(v.event_date)}` : "puste = następny dzień"} />
-              </div>
-            )}
-          </div>
+          {/* §8 Daty montażu/demontażu (iClub) — domyślnie ukryte, rozwijane w razie nietypowego terminu. */}
+          {v.business_line === "ICLUB" && (
+            <div className="px-5 pb-5">
+              <Toggle checked={showCustomDates} onChange={setShowCustomDates} label="Montaż lub demontaż w innym terminie" hint={!showCustomDates ? (v.event_date ? `Domyślnie: montaż ${v.event_date}, demontaż ${nextDay(v.event_date)}.` : "Domyślnie montaż w dniu imprezy, demontaż następnego dnia.") : undefined} />
+              {showCustomDates && (
+                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <TextField label="Data montażu" type="date" value={v.setup_date} onChange={(e) => set("setup_date", e.target.value)} hint={v.event_date ? `puste = ${v.event_date}` : "puste = dzień imprezy"} />
+                  <TextField label="Data demontażu" type="date" value={v.teardown_date} onChange={(e) => set("teardown_date", e.target.value)} hint={v.event_date ? `puste = ${nextDay(v.event_date)}` : "puste = następny dzień"} />
+                </div>
+              )}
+            </div>
+          )}
         </SectionCard>
 
         {v.business_line === "ICLUB" ? (
@@ -492,21 +520,14 @@ export function ReservationForm({
         ) : (
           <SectionCard title="Sprzęt do wynajęcia" className="p-5">
             <div className="flex flex-col gap-4 px-5 pb-5">
-              <WarehousePicker items={addons} value={v.rental_items} onChange={(val) => set("rental_items", val)} />
-              <label className="flex cursor-pointer items-center gap-2.5 text-[13px] font-semibold text-ink">
-                <input type="checkbox" checked={v.payment_upfront} onChange={(e) => set("payment_upfront", e.target.checked)} className="h-4 w-4 accent-accent" />
-                Opłacone z góry
-                <span className="text-[11.5px] font-normal text-ink-2">(inaczej: płatność przy odbiorze)</span>
-              </label>
+              <WarehousePicker items={addons} addonIds={v.addon_ids} addonQty={v.addon_qty} toggleAddon={toggleAddon} setAddonQty={setAddonQty} />
+              <Toggle checked={v.payment_upfront} onChange={(val) => set("payment_upfront", val)} label="Opłacone z góry" hint="Inaczej: płatność przy odbiorze" />
               {/* §18 Forma rozliczenia pracownika: godzinowa domyślnie, ryczałt per zlecenie nadpisuje. */}
               <div>
-                <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-ink">
-                  <input type="checkbox" checked={v.rental_hourly} onChange={(e) => set("rental_hourly", e.target.checked)} className="h-4 w-4 accent-accent" />
-                  Rozliczenie pracownika godzinowe (domyślne)
-                </label>
+                <Toggle checked={v.rental_hourly} onChange={(val) => set("rental_hourly", val)} label="Rozliczenie pracownika godzinowe" hint="Domyślne — czas × stawka. Wyłącz, aby ustawić ryczałt." />
                 {!v.rental_hourly && (
                   <div className="mt-2">
-                    <TextField label="Ryczałt za to zlecenie (zł)" inputMode="numeric" placeholder="np. 400" value={v.rental_flat} onChange={(e) => set("rental_flat", e.target.value)} error={errors.rental_flat} hint="Nadpisuje stawkę godzinową — pracownik dostaje tę kwotę za to zlecenie." />
+                    <TextField label="Ryczałt za to zlecenie (zł)" inputMode="numeric" placeholder="0" value={v.rental_flat} onChange={(e) => set("rental_flat", e.target.value)} error={errors.rental_flat} hint="Nadpisuje stawkę godzinową — pracownik dostaje tę kwotę za to zlecenie." />
                   </div>
                 )}
               </div>
@@ -550,15 +571,12 @@ export function ReservationForm({
           {/* Wypożyczalnia: odbiór własny jako czytelny, pełnej szerokości wiersz. */}
           {v.business_line === "EQUIPMENT_RENTAL" && (
             <div className="px-5 pb-3">
-              <label className="flex cursor-pointer items-center gap-2.5 text-[13px] font-semibold text-ink">
-                <input type="checkbox" checked={v.self_pickup} onChange={(e) => set("self_pickup", e.target.checked)} className="h-4 w-4 accent-accent" />
-                Odbiór własny — klient odbiera i zwraca sam (bez transportu)
-              </label>
+              <Toggle checked={v.self_pickup} onChange={(val) => set("self_pickup", val)} label="Odbiór własny" hint="Klient odbiera i zwraca sam — bez transportu" />
             </div>
           )}
           <div className="grid grid-cols-1 gap-4 px-5 pb-2 sm:grid-cols-3">
             <div>
-              <TextField label="Wartość końcowa (zł)" inputMode="numeric" placeholder="6800" value={v.price} onChange={(e) => set("price", e.target.value)} error={errors.price} />
+              <TextField label="Wartość końcowa (zł)" inputMode="numeric" placeholder="0" value={v.price} onChange={(e) => set("price", e.target.value)} error={errors.price} />
               {order.total > 0 && (
                 <button type="button" onClick={() => set("price", String(order.total))} className="mt-1.5 text-[12px] font-semibold text-accent-soft">
                   Z kalkulatora: {fmtPLN(order.total)} →

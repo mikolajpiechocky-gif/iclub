@@ -147,10 +147,11 @@ function toInput(v: ReservationFormValues): ReservationInput {
     overbooking_override: v.overbooking_override,
     overbooking_reason: v.overbooking_override ? clean(v.overbooking_reason) : null,
     package_id: v.package_id.trim() ? v.package_id.trim() : null,
-    // Dodatki iClub tylko dla linii iClub — wypożyczalnia nie zajmuje stanu dodatków (§12.3).
-    addon_ids: isIclub ? v.addon_ids : [],
-    // §12.2 zapisz ilości tylko dla wybranych dodatków (≥ 1).
-    addon_qty: isIclub ? Object.fromEntries(v.addon_ids.map((id) => [id, Math.max(1, Math.round(v.addon_qty?.[id] ?? 1))])) : {},
+    // iClub: dodatki; wypożyczalnia: wybrany sprzęt z magazynu (id + ilość) — w obu wypadkach
+    // po to, by kwota liczyła się z pozycji × ilość.
+    addon_ids: v.addon_ids,
+    // §12.2 zapisz ilości tylko dla wybranych pozycji (≥ 1).
+    addon_qty: Object.fromEntries(v.addon_ids.map((id) => [id, Math.max(1, Math.round(v.addon_qty?.[id] ?? 1))])),
     rental_items: clean(v.rental_items),
     delivery_time: clean(v.delivery_time),
     payment_upfront: v.payment_upfront,
