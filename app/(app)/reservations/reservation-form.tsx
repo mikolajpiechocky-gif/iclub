@@ -237,6 +237,17 @@ export function ReservationForm({
         (initial?.teardown_date && initial.teardown_date !== nextDay(evD))),
   );
   const [showCustomDates, setShowCustomDates] = useState(hadCustomDates);
+  // §wypożyczalnia Liczba dób liczona automatycznie z dat (odbiór→zwrot), ale można nadpisać ręcznie
+  // (idziemy klientowi na rękę). „Touched" = użytkownik zmienił ręcznie → nie nadpisujemy z dat.
+  const [daysTouched, setDaysTouched] = useState(initial?.rental_days != null);
+  useEffect(() => {
+    if (v.business_line !== "EQUIPMENT_RENTAL" || daysTouched || !v.event_date) return;
+    const end = v.teardown_date || v.event_date;
+    const diff = Math.round((new Date(end + "T00:00:00Z").getTime() - new Date(v.event_date + "T00:00:00Z").getTime()) / 86_400_000);
+    const days = String(Math.max(1, diff || 1));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setV((s) => (s.rental_days === days ? s : { ...s, rental_days: days }));
+  }, [v.business_line, v.event_date, v.teardown_date, daysTouched]);
 
   // Okno zajętości DOKŁADNIE takie jak zapis/blok serwerowy (§8): przy zwiniętej sekcji
   // dat montaż/demontaż są zerowane, a domyślny demontaż to dzień po imprezie. Dzięki temu
@@ -305,9 +316,12 @@ export function ReservationForm({
   // §11.1 Ilość dodatku zawarta w wybranym pakiecie (płatna jest tylko nadwyżka).
   const includedOf = (id: string) => packageComposition[v.package_id]?.[id] ?? 0;
   const billableOf = (id: string) => Math.max(0, qtyOf(id) - includedOf(id));
-  const addonsTotal = addons
+  const addonsPerDay = addons
     .filter((a) => v.addon_ids.includes(a.id))
     .reduce((sum, a) => sum + Number(a.price || 0) * billableOf(a.id), 0);
+  // §wypożyczalnia Cena wynajmu = suma pozycji × liczba dób. Dla iClub liczba dób nie dotyczy.
+  const rentalDaysNum = Math.max(1, Math.floor(Number(v.rental_days) || 1));
+  const addonsTotal = v.business_line === "EQUIPMENT_RENTAL" ? addonsPerDay * rentalDaysNum : addonsPerDay;
 
   // §13 Kalkulacja na żywo: pakiet + dodatki + transport − rabat = razem; zadatek; pozostało.
   const selectedPackage = packages.find((p) => p.id === v.package_id);
@@ -422,7 +436,7 @@ export function ReservationForm({
               <>
                 <TextField label="Data odbioru" type="date" value={v.event_date} onChange={(e) => set("event_date", e.target.value)} />
                 <TextField label="Data zwrotu" type="date" value={v.teardown_date} onChange={(e) => set("teardown_date", e.target.value)} hint={v.event_date ? `puste = ${v.event_date} (ten sam dzień)` : undefined} />
-                <TextField label="Liczba dób" type="number" inputMode="numeric" value={v.rental_days} onChange={(e) => set("rental_days", e.target.value)} placeholder="np. 2" hint="Na ile dób (24h) wynajem" />
+                <TextField label="Liczba dób" type="number" inputMode="numeric" value={v.rental_days} onChange={(e) => { setDaysTouched(true); set("rental_days", e.target.value); }} placeholder="np. 2" hint="Liczy się z dat; można zmienić ręcznie" />
               </>
             ) : (
               <TextField label="Data imprezy" type="date" value={v.event_date} onChange={(e) => set("event_date", e.target.value)} />
