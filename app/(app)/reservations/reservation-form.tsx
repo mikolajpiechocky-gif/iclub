@@ -349,8 +349,9 @@ export function ReservationForm({
     // §13: dołącz wyliczoną kwotę rabatu i ustalony zadatek (sugestia, jeśli nietknięty).
     const payload: ReservationFormValues = {
       ...v,
-      setup_date: showCustomDates ? v.setup_date : "",
-      teardown_date: showCustomDates ? v.teardown_date : "",
+      // Wypożyczalnia: okno = data odbioru (event_date) → data zwrotu (teardown, puste = ten sam dzień).
+      setup_date: v.business_line === "EQUIPMENT_RENTAL" ? v.event_date : (showCustomDates ? v.setup_date : ""),
+      teardown_date: v.business_line === "EQUIPMENT_RENTAL" ? (v.teardown_date || v.event_date) : (showCustomDates ? v.teardown_date : ""),
       // §K2 Gdy „Wartość końcowa" nie jest wpisana ręcznie, zapisz WYLICZONĄ cenę (order.total),
       // a nie puste pole — inaczej przychód/rentowność rezerwacji pokazywały 0 zł.
       price: v.price.trim() !== "" ? v.price : String(order.total),
@@ -402,7 +403,14 @@ export function ReservationForm({
                 {RESERVATION_STATUS_ORDER.map((s) => <option key={s} value={s}>{RESERVATION_STATUS_LABELS[s]}</option>)}
               </SelectField>
             )}
-            <TextField label="Data imprezy" type="date" value={v.event_date} onChange={(e) => set("event_date", e.target.value)} />
+            {v.business_line === "EQUIPMENT_RENTAL" ? (
+              <>
+                <TextField label="Data odbioru" type="date" value={v.event_date} onChange={(e) => set("event_date", e.target.value)} />
+                <TextField label="Data zwrotu" type="date" value={v.teardown_date} onChange={(e) => set("teardown_date", e.target.value)} hint={v.event_date ? `puste = ${v.event_date} (ten sam dzień)` : undefined} />
+              </>
+            ) : (
+              <TextField label="Data imprezy" type="date" value={v.event_date} onChange={(e) => set("event_date", e.target.value)} />
+            )}
             <AddressAutocomplete label="Lokalizacja" placeholder="Tarnowo Podgórne, ul. …" value={v.location} onChange={(val) => set("location", val)} />
             <TextField label="Godzina dostawy (opcjonalnie)" type="time" value={v.delivery_time} onChange={(e) => set("delivery_time", e.target.value)} hint="Puste = wydarzenie całodniowe" />
           </div>

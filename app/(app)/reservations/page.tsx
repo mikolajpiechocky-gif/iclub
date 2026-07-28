@@ -127,7 +127,7 @@ export default async function ReservationsPage({ searchParams }: { searchParams:
             <table className="w-full text-left">
               <thead className="border-b border-border bg-[#12131a] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">
                 <tr>
-                  {["Klient", "Linia", "Termin", "Sprzęt / pakiet", "Wartość", "Status", ""].map((h, i) => (
+                  {["Klient", "Termin", "Czego dotyczy", "Wartość", "Status", ""].map((h, i) => (
                     <th key={i} className="px-4 py-3 font-bold">{h}</th>
                   ))}
                 </tr>
@@ -136,14 +136,22 @@ export default async function ReservationsPage({ searchParams }: { searchParams:
                 {list.map((r) => {
                   const line = LINE_META[r.business_line] ?? { label: r.business_line, fg: "#9aa0b2", bg: "#22242e" };
                   const st = realizedMeta(jobStatusByRes.get(r.id), r.status);
-                  const items = r.business_line === "EQUIPMENT_RENTAL" ? (r.rental_items || "—") : [r.tent?.name, r.package?.name].filter(Boolean).join(" · ") || "—";
+                  const covers = r.business_line === "EQUIPMENT_RENTAL"
+                    ? (r.rental_items || r.event_type || "Wynajem sprzętu")
+                    : ([r.tent?.name, r.package?.name].filter(Boolean).join(" · ") || r.event_type || "Realizacja iClub");
+                  const termin = r.business_line === "EQUIPMENT_RENTAL" && r.teardown_date && r.teardown_date !== r.event_date
+                    ? `${fmtDate(r.event_date)}–${fmtDate(r.teardown_date)}` : fmtDate(r.event_date);
                   return (
                     <tr key={r.id} className="border-b border-border-soft last:border-0 hover:bg-surface-2">
-                      <td className="px-4 py-3"><Link href={`/reservations/${r.id}`} className="text-[13.5px] font-bold text-ink">{r.customer?.name ?? "— bez klienta —"}</Link></td>
-                      <td className="px-4 py-3"><Pill label={line.label} fg={line.fg} bg={line.bg} /></td>
-                      <td className="px-4 py-3 text-[13px] text-ink">{fmtDate(r.event_date)}</td>
-                      <td className="px-4 py-3 text-[13px] text-ink-2">{items}</td>
-                      <td className="px-4 py-3 text-[13px] text-ink">{fmtPLN(r.price)}</td>
+                      <td className="px-4 py-3">
+                        <Link href={`/reservations/${r.id}`} className="flex items-center gap-2 text-[13.5px] font-bold text-ink">
+                          <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: line.fg }} title={line.label} />
+                          {r.customer?.name ?? "— bez klienta —"}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-[13px] text-ink">{termin}</td>
+                      <td className="px-4 py-3 text-[13px] text-ink-2"><span className="line-clamp-1 max-w-[280px]">{covers}</span></td>
+                      <td className="px-4 py-3 text-[13px] font-semibold text-ink">{fmtPLN(r.price)}</td>
                       <td className="px-4 py-3"><Pill label={st.label} fg={st.fg} bg={st.bg} /></td>
                       <td className="px-4 py-3 text-right"><Link href={`/reservations/${r.id}`} className="text-[12.5px] font-semibold">Otwórz →</Link></td>
                     </tr>
@@ -158,7 +166,9 @@ export default async function ReservationsPage({ searchParams }: { searchParams:
             {list.map((r) => {
               const line = LINE_META[r.business_line] ?? { label: r.business_line, fg: "#9aa0b2", bg: "#22242e" };
               const st = realizedMeta(jobStatusByRes.get(r.id), r.status);
-              const items = r.business_line === "EQUIPMENT_RENTAL" ? (r.rental_items || "—") : [r.tent?.name, r.package?.name].filter(Boolean).join(" · ") || "—";
+              const covers = r.business_line === "EQUIPMENT_RENTAL"
+                ? (r.rental_items || r.event_type || "Wynajem sprzętu")
+                : ([r.tent?.name, r.package?.name].filter(Boolean).join(" · ") || r.event_type || "Realizacja iClub");
               return (
                 <Link key={r.id} href={`/reservations/${r.id}`} className="block rounded-card border-l-4 border border-border bg-surface p-4" style={{ borderLeftColor: line.fg }}>
                   <div className="flex items-start justify-between gap-2">
@@ -167,10 +177,10 @@ export default async function ReservationsPage({ searchParams }: { searchParams:
                   </div>
                   <div className="mt-1 flex items-center gap-2">
                     <Pill label={line.label} fg={line.fg} bg={line.bg} />
-                    <span className="truncate text-[12.5px] font-medium text-ink-2">{items}</span>
+                    <span className="truncate text-[12.5px] font-medium text-ink-2">{covers}</span>
                   </div>
                   <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ink-2">
-                    <span>📅 {fmtDate(r.event_date)}</span>
+                    <span>📅 {r.business_line === "EQUIPMENT_RENTAL" && r.teardown_date && r.teardown_date !== r.event_date ? `${fmtDate(r.event_date)}–${fmtDate(r.teardown_date)}` : fmtDate(r.event_date)}</span>
                     {r.location && <span>📍 {r.location}</span>}
                     <span>💰 {fmtPLN(r.price)}</span>
                   </div>
