@@ -17,14 +17,13 @@ export async function generateChecklistForJob(jobId: string, opts: { onlyIfEmpty
   // §wypożyczalnia Checklista = konkretne itemy z magazynu (dodatki z ilościami). Bez namiotu,
   // pakietów i katalogu iClub — wprowadzamy dokładnie to, co klient wypożyczył.
   if (job?.business_line === "EQUIPMENT_RENTAL") {
-    const items: ChecklistTemplateItem[] = (r?.addon_ids ?? [])
-      .map((id) => {
-        const a = addons.find((x) => x.id === id);
-        if (!a) return null;
-        const q = r?.addon_qty?.[id] ?? 1;
-        return { category: "Do wydania", label: a.name, qty: `${q} szt.`, required: true };
-      })
-      .filter((x): x is ChecklistTemplateItem => x !== null);
+    const items: ChecklistTemplateItem[] = [];
+    for (const id of r?.addon_ids ?? []) {
+      const a = addons.find((x) => x.id === id);
+      if (!a) continue;
+      const q = r?.addon_qty?.[id] ?? 1;
+      items.push({ category: "Do wydania", label: a.name, qty: `${q} szt.`, required: true });
+    }
     await generateChecklist(jobId, items);
     return;
   }
