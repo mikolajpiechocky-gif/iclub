@@ -67,6 +67,20 @@ function eventBody(e: CalendarEvent): Record<string, unknown> {
   return body;
 }
 
+// §BEZPIECZEŃSTWO Ciało do AKTUALIZACJI (PATCH) — BEZ pola `description`. Dzięki temu apka nigdy
+// nie nadpisuje ręcznie dodanego opisu wydarzenia (PATCH pomija pominięte pola). Opis ustawiamy
+// TYLKO przy tworzeniu nowego wydarzenia. Chroni ustalenia dopisywane wprost w Google Calendar.
+function eventBodyForUpdate(e: CalendarEvent): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    summary: e.summary,
+    location: e.location ?? "",
+    start: e.start,
+    end: e.end,
+  };
+  if (e.colorId) body.colorId = e.colorId;
+  return body;
+}
+
 const eventsUrl = () => `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(GCAL_CALENDAR_ID!)}/events`;
 
 // Zwraca id utworzonego wydarzenia lub null.
@@ -100,7 +114,7 @@ export async function updateCalendarEvent(eventId: string, e: CalendarEvent): Pr
     const res = await fetch(`${eventsUrl()}/${encodeURIComponent(eventId)}`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(eventBody(e)),
+      body: JSON.stringify(eventBodyForUpdate(e)), // BEZ description — chroni ręczny opis
     });
     if (res.ok) return "ok";
     if (res.status === 404 || res.status === 410) return "gone";
