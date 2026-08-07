@@ -25,12 +25,10 @@ export async function runNotificationsSweep(): Promise<{ ok: boolean; sent: Reco
   const tomorrow = ymd(1);
   const in2 = ymd(2);
 
-  // 0. Wygaś przeterminowane blokady tymczasowe (TEMPORARY, expires_at < teraz) → EXPIRED.
-  // Zwalnia namiot/zasób w listach i overbookingu (martwy hold nie blokuje już rezerwacji).
-  try {
-    const { data } = await s.from("reservations").update({ status: "EXPIRED" }).eq("status", "TEMPORARY").lt("expires_at", new Date().toISOString()).select("id");
-    if (data?.length) sent.expired = data.length;
-  } catch { /* pomiń */ }
+  // 0. §BEZPIECZEŃSTWO Auto-wygaszanie rezerwacji WYŁĄCZONE. Rezerwacje zakładamy jako
+  // Potwierdzone (odwołać może tylko klient), więc automatyczna zmiana na EXPIRED kasowała
+  // realne wpisy + wydarzenia w kalendarzu. Blokady tymczasowe i tak są pomijane w overbookingu
+  // po expires_at (isStaleHold) — nie trzeba ich niszczyć.
 
   // 1. Przypomnienie o cenach paliwa (≥14 dni od aktualizacji).
   try {

@@ -455,17 +455,10 @@ function isStaleHold(r: { status?: string | null; expires_at?: string | null }, 
   return r.status === "TEMPORARY" && !!r.expires_at && r.expires_at < nowIso;
 }
 
-// Zmiana przeterminowanych blokad tymczasowych na EXPIRED (dla spójności list/dashboardu).
+// §BEZPIECZEŃSTWO Auto-wygaszanie WYŁĄCZONE — nie zmieniamy statusu rezerwacji na EXPIRED
+// (kasowało realne wpisy + wydarzenia w kalendarzu). Martwe blokady i tak pomija isStaleHold.
 export async function expireStaleHolds(): Promise<number> {
-  if (!isSupabaseConfigured()) return 0;
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("reservations")
-    .update({ status: "EXPIRED" })
-    .eq("status", "TEMPORARY")
-    .lt("expires_at", new Date().toISOString())
-    .select("id");
-  return data?.length ?? 0;
+  return 0;
 }
 
 // --- Dostępność / konflikty namiotu (§8, §15) ---

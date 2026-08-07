@@ -70,8 +70,9 @@ export async function syncReservationToCalendar(reservationId: string, opts: { a
   const r = data as ResRow | null;
   if (!r) return;
 
-  // Anulowana / wygasła → usuń wydarzenie (id zerujemy tylko po udanym usunięciu).
-  if (r.status === "CANCELLED" || r.status === "EXPIRED") {
+  // §BEZPIECZEŃSTWO Usuwamy wydarzenie TYLKO przy świadomym odwołaniu (CANCELLED). Statusu EXPIRED
+  // nie traktujemy jako sygnału do kasowania — realne rezerwacje nie mogą znikać z kalendarza.
+  if (r.status === "CANCELLED") {
     if (r.gcal_event_id) {
       const removed = await deleteCalendarEvent(r.gcal_event_id);
       if (removed) await supabase.from("reservations").update({ gcal_event_id: null }).eq("id", reservationId);
