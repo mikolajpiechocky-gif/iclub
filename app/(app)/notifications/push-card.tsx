@@ -82,8 +82,13 @@ export function PushCard() {
     startTransition(async () => {
       setErr(null); setMsg(null);
       const res = await sendTestPushAction();
-      if (res.ok) setMsg("Wysłano testowe powiadomienie — powinno pojawić się za chwilę.");
-      else setErr(res.error ?? "Błąd.");
+      if (!res.ok) { setErr(res.error ?? "Błąd."); return; }
+      const d = res.diag;
+      if (!d) { setMsg("Wysłano testowe powiadomienie."); return; }
+      if (!d.configured) { setErr("Serwer nie ma kluczy VAPID — push wyłączony po stronie produkcji (do naprawy w zmiennych środowiskowych)."); return; }
+      if (d.subs === 0) { setErr("Brak subskrypcji na TYM urządzeniu. Kliknij „Włącz powiadomienia” tutaj (iPhone: z apki dodanej do ekranu głównego)."); return; }
+      if (d.sent > 0 && d.failed.length === 0) { setMsg(`Wysłano do ${d.sent}/${d.subs} urządzeń ✅. Jeśli nie widać — sprawdź ustawienia powiadomień systemu/przeglądarki dla tej strony.`); return; }
+      setErr(`Subskrypcje: ${d.subs}, wysłano: ${d.sent}, błędy: [${d.failed.join(", ")}]. Kod 403/401 = niepasujące klucze VAPID (serwer≠klient); 404/410 = subskrypcja wygasła — wyłącz i włącz push ponownie.`);
     });
 
   return (

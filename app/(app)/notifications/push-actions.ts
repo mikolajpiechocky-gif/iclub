@@ -3,9 +3,9 @@
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { savePushSubscription, deletePushSubscription, type WebPushSubscription } from "@/lib/data/push";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { sendPushToUsers } from "@/lib/integrations/push";
+import { sendTestDiagnostic, type PushDiag } from "@/lib/integrations/push";
 
-export interface PushActionResult { ok: boolean; error?: string }
+export interface PushActionResult { ok: boolean; error?: string; diag?: PushDiag }
 
 export async function subscribePushAction(sub: WebPushSubscription, quietFrom: number | null, quietTo: number | null): Promise<PushActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo: skonfiguruj Supabase, aby włączyć powiadomienia." };
@@ -32,8 +32,8 @@ export async function sendTestPushAction(): Promise<PushActionResult> {
   const profile = await getCurrentProfile();
   if (!profile) return { ok: false, error: "Brak zalogowanego użytkownika." };
   try {
-    await sendPushToUsers([profile.id], { title: "iClub", body: "Powiadomienia działają ✅", url: "/notifications", tag: "test" });
-    return { ok: true };
+    const diag = await sendTestDiagnostic(profile.id);
+    return { ok: true, diag };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się wysłać testu." };
   }

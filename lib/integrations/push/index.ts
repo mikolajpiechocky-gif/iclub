@@ -58,6 +58,30 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
   if (dead.length) await pruneDeadSubscriptions(dead);
 }
 
+// §diagnostyka Test z pełnym wynikiem: czy VAPID skonfigurowane, ile subskrypcji, ile wysłano,
+// jakie błędy (kod HTTP). Omija ciszę nocną. Pozwala od ręki zobaczyć, DLACZEGO push nie dochodzi.
+export interface PushDiag { configured: boolean; subs: number; sent: number; failed: (number | string)[] }
+export async function sendTestDiagnostic(userId: string): Promise<PushDiag> {
+  if (!ensureConfigured()) return { configured: false, subs: 0, sent: 0, failed: [] };
+  const subs = await listSubscriptionsForUsers([userId]);
+  const body = JSON.stringify({ title: "iClub", body: "Powiadomienia działają ✅", url: "/notifications", tag: "test" });
+  let sent = 0;
+  const failed: (number | string)[] = [];
+  const dead: string[] = [];
+  for (const s of subs) {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body);
+      sent++;
+    } catch (e) {
+      const code = (e as { statusCode?: number }).statusCode ?? (e instanceof Error ? e.message.slice(0, 80) : "?");
+      failed.push(code);
+      if (code === 404 || code === 410) dead.push(s.endpoint);
+    }
+  }
+  if (dead.length) await pruneDeadSubscriptions(dead);
+  return { configured: true, subs: subs.length, sent, failed };
+}
+
 export async function sendPushToOwners(payload: PushPayload): Promise<void> {
   return sendPushToUsers(await listOwnerUserIds(), payload);
 }
