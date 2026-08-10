@@ -318,10 +318,9 @@ export async function createReservationAction(values: ReservationFormValues): Pr
   try {
     const resolved = await resolveNewCustomer(values);
     const { id } = await createReservation(toInput(resolved));
-    // §wypożyczalnia Checklista pakowania tworzy się od razu — wprowadzamy konkretne itemy z magazynu.
-    if (values.business_line === "EQUIPMENT_RENTAL") {
-      try { const job = await getJobByReservation(id); if (job) await generateChecklistForJob(job.id, { onlyIfEmpty: true }); } catch { /* nie blokuje zapisu */ }
-    }
+    // §checklista Checklista pakowania tworzy się OD RAZU dla OBU linii — rezerwacje są zakładane
+    // jako potwierdzone, więc nie ma już „potwierdzenia", pod które podpięte było generowanie iClub.
+    try { const job = await getJobByReservation(id); if (job) await generateChecklistForJob(job.id, { onlyIfEmpty: true }); } catch { /* nie blokuje zapisu */ }
     // Nowa rezerwacja z apki → wolno utworzyć wydarzenie w kalendarzu.
     try { await syncReservationToCalendar(id, { allowCreate: true }); } catch (e) { console.error("Kalendarz: sync rezerwacji nie powiódł się", e); }
     // Nowe zlecenie iClub „do zgarnięcia" → push do pracowników.
