@@ -639,7 +639,9 @@ function TeardownPanel({ jobId, reservationId, items, canUpload, pending, onDone
 
 function DoneButton({ pending, onClick, label, block }: { pending: boolean; onClick: () => void; label: string; block?: boolean }) {
   return (
-    <button onClick={onClick} disabled={pending} className={`rounded-[11px] bg-[#22c55e] py-2.5 text-[12.5px] font-bold text-[#08170d] ${block ? "w-full" : "flex-1 px-3.5"}`}>
+    // §fix onClick BEZ przekazywania eventu — inaczej SyntheticEvent leciał jako `reason` do server
+    // action (React 19 nie serializuje eventu) i przejście do kolejnego kroku po cichu się wywalało.
+    <button onClick={() => onClick()} disabled={pending} className={`rounded-[11px] bg-[#22c55e] py-2.5 text-[12.5px] font-bold text-[#08170d] ${block ? "w-full" : "flex-1 px-3.5"}`}>
       {label} ✓
     </button>
   );
