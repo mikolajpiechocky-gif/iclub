@@ -34,7 +34,13 @@ export default async function EmployeeDashboardPage() {
   const upcoming = jobs
     .filter((j) => j.event_date && j.event_date >= todayStr)
     .sort((a, b) => (a.event_date! < b.event_date! ? -1 : 1));
-  const next = upcoming[0] ?? jobs[0];
+  // §pracownik „Najbliższa" tylko z NADCHODZĄCYCH — bez cofania się do starych zleceń (było „nieaktualne").
+  const next = upcoming[0] ?? null;
+  // Wszystkie przypisane (obie linie), poza „najbliższą" — żeby nic nie zniknęło (w tym wynajem
+  // z inną/brakującą datą). Sort: najpierw z datą rosnąco, potem bez daty.
+  const otherJobs = jobs
+    .filter((j) => j.id !== next?.id)
+    .sort((a, b) => ((a.event_date ?? "9999") < (b.event_date ?? "9999") ? -1 : 1));
   const name = profile?.full_name?.trim() || "Pracowniku";
 
   // §II.20 „Ten weekend": sobota+niedziela bieżącego (poniedziałkowego) tygodnia.
@@ -105,7 +111,10 @@ export default async function EmployeeDashboardPage() {
           <div className="font-display text-[19px] font-bold">{next.reservation?.customer?.name ?? next.title ?? "Realizacja"}</div>
           <div className="mt-1 text-[13px] font-medium text-[#c9cddb]">{[fmtDate(next.event_date), next.reservation?.location].filter(Boolean).join(" · ")}</div>
           <div className="mt-3.5 flex gap-2.5">
-            {[["NAMIOT", next.reservation?.tent?.name ?? "—"], ["PAKIET", next.reservation?.package?.name ?? "—"], ["MONTAŻ", next.reservation?.assembly_time || "—"]].map(([k, v]) => (
+            {(next.business_line === "EQUIPMENT_RENTAL"
+              ? [["ODBIÓR", next.reservation?.self_pickup ? "własny" : "transport"], ["ZWROT", fmtDate(next.reservation?.teardown_date ?? null)], ["SPRZĘT", next.reservation?.rental_items || "—"]]
+              : [["NAMIOT", next.reservation?.tent?.name ?? "—"], ["PAKIET", next.reservation?.package?.name ?? "—"], ["MONTAŻ", next.reservation?.assembly_time || "—"]]
+            ).map(([k, v]) => (
               <div key={k} className="flex-1 rounded-xl bg-white/[0.07] px-3 py-2.5">
                 <div className="text-[10px] font-semibold text-[#9aa0b2]">{k}</div>
                 <div className="mt-0.5 truncate font-display text-[13px] font-bold">{v}</div>
@@ -184,18 +193,22 @@ export default async function EmployeeDashboardPage() {
         </div>
       )}
 
-      {upcoming.length > 1 && (
+      {otherJobs.length > 0 && (
         <div className="rounded-card border border-border bg-surface p-1.5">
-          <div className="px-3 pt-2 pb-1 text-[13px] font-bold text-white">Kolejne realizacje</div>
-          {upcoming.slice(1).map((j) => (
-            <Link key={j.id} href={`/field/${j.id}`} className="flex items-center gap-3 rounded-[12px] px-3 py-2.5 transition hover:bg-surface-2">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13.5px] font-bold text-ink">{j.reservation?.customer?.name ?? j.title ?? "Realizacja"}</div>
-                <div className="truncate text-[12px] text-ink-2">{j.reservation?.location ?? "—"}</div>
-              </div>
-              <div className="text-[12px] font-semibold text-ink-2">{fmtDate(j.event_date)}</div>
-            </Link>
-          ))}
+          <div className="px-3 pt-2 pb-1 text-[13px] font-bold text-white">Twoje realizacje</div>
+          {otherJobs.map((j) => {
+            const rental = j.business_line === "EQUIPMENT_RENTAL";
+            return (
+              <Link key={j.id} href={`/field/${j.id}`} className="flex items-center gap-3 rounded-[12px] px-3 py-2.5 transition hover:bg-surface-2">
+                <span className="h-2 w-2 flex-none rounded-full" style={{ background: rental ? "#5fd68b" : "#b98cf5" }} title={rental ? "Wypożyczalnia" : "iClub"} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13.5px] font-bold text-ink">{j.reservation?.customer?.name ?? j.title ?? "Realizacja"}</div>
+                  <div className="truncate text-[12px] text-ink-2">{[rental ? "Wypożyczalnia" : null, j.reservation?.location].filter(Boolean).join(" · ") || "—"}</div>
+                </div>
+                <div className="text-[12px] font-semibold text-ink-2">{fmtDate(j.event_date)}</div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
