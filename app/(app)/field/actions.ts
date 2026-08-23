@@ -41,7 +41,9 @@ export async function confirmRentalDeliveryAction(reservationId: string, jobId: 
   if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo: skonfiguruj Supabase, aby zapisać." };
   try {
     await setRentalDeliveryConfirmed(reservationId, deliveryTime.trim() || null);
-    try { await syncReservationToCalendar(reservationId, { allowCreate: true }); } catch {}
+    // §BEZPIECZEŃSTWO allowCreate:false — akcje z realizacji (pracownik) tylko AKTUALIZUJĄ istniejący
+    // wpis apki, NIGDY nie tworzą nowego. Wpis tworzy się wyłącznie przy zakładaniu rezerwacji.
+    try { await syncReservationToCalendar(reservationId, { allowCreate: false }); } catch {}
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/reservations/${reservationId}`);
     return { ok: true };
@@ -119,7 +121,9 @@ export async function saveClientCallAction(reservationId: string, jobId: string,
     // §S3 Po telefonie (ustalono zakres/dodatki) wygeneruj checklistę pakowania, jeśli jej nie ma.
     await generateChecklistForJob(jobId, { onlyIfEmpty: true }).catch(() => {});
     // §kalendarz Ustalenia telefonu zmieniają godzinę montażu/dodatki → odśwież wydarzenie w kalendarzu.
-    try { await syncReservationToCalendar(reservationId, { allowCreate: true }); } catch {}
+    // §BEZPIECZEŃSTWO allowCreate:false — akcje z realizacji (pracownik) tylko AKTUALIZUJĄ istniejący
+    // wpis apki, NIGDY nie tworzą nowego. Wpis tworzy się wyłącznie przy zakładaniu rezerwacji.
+    try { await syncReservationToCalendar(reservationId, { allowCreate: false }); } catch {}
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/reservations/${reservationId}`);
     return { ok: true };

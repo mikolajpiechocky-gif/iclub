@@ -465,7 +465,9 @@ export async function updateReservationAction(id: string, values: ReservationFor
     await updateReservation(id, toInput(resolved));
     // §kalendarz Zapis edycji aktualizuje istniejące wydarzenie, a gdy go brak — dotwarza je
     // (backfill aktywnych rezerwacji; przeszłych nie dotwarzamy).
-    try { await syncReservationToCalendar(id, { allowCreate: true }); } catch (e) { console.error("Kalendarz: sync przy edycji nie powiódł się", e); }
+    // §BEZPIECZEŃSTWO Edycja tylko AKTUALIZUJE istniejący wpis apki (allowCreate:false) — nie tworzy
+    // nowego, żeby nie dublować wydarzeń dodanych ręcznie w kalendarzu (bez powiązania z apką).
+    try { await syncReservationToCalendar(id, { allowCreate: false }); } catch (e) { console.error("Kalendarz: sync przy edycji nie powiódł się", e); }
     // Zmiana szczegółów → push do przypisanych (APPROVED) pracowników.
     try {
       const job = await getJobByReservation(id);
