@@ -337,6 +337,11 @@ export const ICLUB_SETTLEMENT_MODE_LABELS: Record<IclubSettlementMode, string> =
   THRESHOLD: "Czas wolny za pierwsze N, potem ryczałt (Bartek)",
   FLAT: "Ryczałt od pierwszej realizacji",
 };
+// Krótka etykieta trybu do listy pracowników (THRESHOLD=mieszany, FLAT=ryczałtowy).
+export const ICLUB_SETTLEMENT_MODE_SHORT: Record<IclubSettlementMode, string> = {
+  THRESHOLD: "Mieszany",
+  FLAT: "Ryczałt",
+};
 
 export interface EmployeeRate {
   profile_id: string;

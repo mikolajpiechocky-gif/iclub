@@ -6,7 +6,7 @@ import { Avatar } from "@/components/avatar";
 import { Pill } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import type { EmployeeWithRate } from "@/lib/data/types";
-import { RATE_MODEL_LABELS } from "@/lib/data/types";
+import { ICLUB_SETTLEMENT_MODE_SHORT } from "@/lib/data/types";
 import type { EmployeeSettlementRow } from "@/lib/data/assignments";
 import { RateForm } from "./rate-form";
 import { EmployeeSettlements } from "./employee-settlements";
@@ -16,7 +16,7 @@ const roleLabel = (r: string) => (r === "OWNER" ? "Szef" : "Pracownik");
 
 function rateSummary(e: EmployeeWithRate): string {
   if (!e.rate) return "Stawki nie ustawione";
-  return `${RATE_MODEL_LABELS[e.rate.rate_model]} · ${e.rate.hourly_rate != null ? fmtPLN(e.rate.hourly_rate) + "/h" : fmtPLN(e.rate.iclub_flat)}`;
+  return `${ICLUB_SETTLEMENT_MODE_SHORT[e.rate.iclub_settlement_mode]} · ${e.rate.hourly_rate != null ? fmtPLN(e.rate.hourly_rate) + "/h" : fmtPLN(e.rate.iclub_flat)}`;
 }
 
 export function EmployeesWorkspace({ employees, settlements }: { employees: EmployeeWithRate[]; settlements: Record<string, EmployeeSettlementRow[]> }) {

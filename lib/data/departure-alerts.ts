@@ -64,7 +64,7 @@ export async function runDepartureAlertSweep(): Promise<{ ok: boolean; alerted: 
   const withTeam = new Set(((asg ?? []) as { job_id: string }[]).map((a) => a.job_id));
 
   // Dystans jednokierunkowy per zlecenie (do estymaty dojazdu).
-  const { data: tc } = await s.from("transport_calcs").select("job_id, one_way_km, distance_km").in("job_id", ids);
+  const { data: tc } = await s.from("transport_calculations").select("job_id, one_way_km, distance_km").in("job_id", ids);
   const kmByJob = new Map<string, number>();
   for (const t of (tc ?? []) as { job_id: string; one_way_km: number | null; distance_km: number | null }[]) {
     const km = Number(t.one_way_km ?? t.distance_km ?? 0) || 0;

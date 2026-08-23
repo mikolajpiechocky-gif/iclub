@@ -73,8 +73,9 @@ export function settlementForRealization(
   const index = priorCompletedThisMonth + 1;
   const rate = opts.rate ?? null;
   // Tryb per pracownik: THRESHOLD = czas wolny za pierwsze N, potem ryczałt (Bartek);
-  // FLAT = ryczałt od PIERWSZEJ realizacji (drugi pracownik). Domyślnie THRESHOLD.
-  const mode: IclubSettlementMode = opts.mode ?? rate?.iclub_settlement_mode ?? "THRESHOLD";
+  // FLAT = ryczałt od PIERWSZEJ realizacji (drugi pracownik).
+  // Domyślnie FLAT — zgodnie z domyślną wartością kolumny employee_rates.iclub_settlement_mode w bazie.
+  const mode: IclubSettlementMode = opts.mode ?? rate?.iclub_settlement_mode ?? "FLAT";
   const flatRate = numOr(rate?.iclub_flat, rules.flatRate); // ryczałt pracownika albo globalny
   const threshold = numOr(rate?.iclub_threshold, rules.monthlyThreshold); // próg „w ramach umowy" per pracownik
   // Czas wolny: godziny i stawka zł/h per pracownik (null = wartości globalne z Ustawień).

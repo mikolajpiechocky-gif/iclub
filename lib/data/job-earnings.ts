@@ -2,7 +2,7 @@
 // oraz przy „zamrażaniu" rozliczenia w chwili zakończenia realizacji (snapshot), żeby
 // późniejsza zmiana stawek NIE zmieniała rozliczeń już zakończonych realizacji.
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
-import { settlementForRealization, rulesFromSettings, type IclubSettlementRules } from "@/lib/domain/iclub-settlement";
+import { settlementForRealization, rulesFromSettings, numOr, possibleAddonBonuses, type IclubSettlementRules } from "@/lib/domain/iclub-settlement";
 import { countDoneIclubRealizations } from "./jobs";
 import type { AppSettings } from "./settings";
 import type { BusinessLine, EmployeeRate, JobWithReservation } from "./types";
@@ -17,7 +17,7 @@ export interface JobEarningsCtx {
   rentalFlat: number | null;
   ownerBonus: number;
   hours: number;
-  upsellPremium: number; // §II.12 premia 15% od dosprzedaży (dla osoby prowadzącej realizację)
+  upsellValue: number; // §II.12 wartość dosprzedaży; premia = wartość × upsell_percent prowadzącego
 }
 
 export function jobEarningsCtx(job: JobWithReservation, settings: AppSettings, farTrip: boolean): JobEarningsCtx {
@@ -31,7 +31,7 @@ export function jobEarningsCtx(job: JobWithReservation, settings: AppSettings, f
     rentalFlat: job.reservation?.rental_settlement_flat != null ? Number(job.reservation.rental_settlement_flat) : null,
     ownerBonus: Number(job.owner_bonus ?? 0) || 0,
     hours: settings.iclub_hours,
-    upsellPremium: Math.round((Number(job.reservation?.upsell_value ?? 0) || 0) * 0.15 * 100) / 100,
+    upsellValue: Number(job.reservation?.upsell_value ?? 0) || 0,
   };
 }
 
@@ -45,25 +45,29 @@ export async function buildAssignmentEarnings(
   // Stawka godzinowa = czas obsługi liczony jako realny KOSZT zlecenia, ale pracownik NIE dostaje
   // dodatkowego wynagrodzenia → nie pokazujemy żadnych zarobków (null). Bez bonusów iClub.
   if (!ctx.iclub) {
+    // Opinia/rolka są zawsze możliwe do zgarnięcia — także na wynajmie (rate może być null → wartości domyślne).
+    const possible = possibleAddonBonuses(rate);
     if (ctx.rentalFlat != null) {
       return {
         base: ctx.rentalFlat,
         baseLabel: "Ryczałt za zlecenie",
         ownerBonus: ctx.ownerBonus,
         total: Math.round((ctx.rentalFlat + ctx.ownerBonus) * 100) / 100,
-        possibleBonuses: [],
+        possibleBonuses: possible,
       };
     }
     if (ctx.ownerBonus > 0) {
-      return { base: 0, baseLabel: "Bonus szefa", ownerBonus: ctx.ownerBonus, total: ctx.ownerBonus, possibleBonuses: [] };
+      return { base: 0, baseLabel: "Bonus szefa", ownerBonus: ctx.ownerBonus, total: ctx.ownerBonus, possibleBonuses: possible };
     }
-    return null; // godzinowa: bez dodatkowego wynagrodzenia dla pracownika
+    // Domyślny wynajem: brak bazy do wypłaty, ale opinia/rolka wciąż możliwe → pokazujemy zachętę.
+    return { base: 0, baseLabel: "Bez wypłaty (wynajem)", ownerBonus: 0, total: 0, possibleBonuses: possible };
   }
   // iClub §19: czas wolny za pierwsze N / ryczałt, per pracownik.
   if (!rate) return null;
   const priorCount = ctx.monthPrefix ? await countDoneIclubRealizations(profileId, ctx.monthPrefix) : 0;
   const s = settlementForRealization(ctx.rules, priorCount, { farTrip: ctx.farTrip, hasGastro: ctx.hasGastro, rate });
-  const upsell = isLead ? ctx.upsellPremium : 0; // premia od dosprzedaży tylko dla prowadzącego
+  // Premia od dosprzedaży tylko dla prowadzącego; procent per pracownik (domyślnie 15%).
+  const upsell = isLead ? Math.round(ctx.upsellValue * (numOr(rate.upsell_percent, 15) / 100) * 100) / 100 : 0;
   const labels = s.guaranteed.map((b) => b.label);
   if (upsell > 0) labels.push("Dosprzedaż");
   const guaranteed = labels.join(" + ");

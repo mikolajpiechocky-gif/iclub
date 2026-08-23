@@ -15,7 +15,7 @@ import { clientTransportPrice, tripClass } from "@/lib/domain/transport";
 import { getSettings } from "@/lib/data/settings";
 import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
 import { listTransportCalcs } from "@/lib/data/transport";
-import { writeRealizationCosts } from "@/lib/data/realization-close";
+import { writeRealizationCosts, syncRentalLaborCost } from "@/lib/data/realization-close";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
 import { sendPushToEmployees, sendPushToUsers } from "@/lib/integrations/push";
@@ -93,6 +93,12 @@ function validate(v: ReservationFormValues): Record<string, string> {
   const priceN = toNumber(v.price);
   const depositN = toNumber(v.deposit);
   if (priceN != null && depositN != null && depositN > priceN) e.deposit = "Zadatek nie może przekroczyć wartości rezerwacji.";
+  // §18 Wypożyczalnia: gdy wyłączono rozliczenie godzinowe, ryczałt musi być podany i > 0 — inaczej
+  // toNumber('') === null i zapis po cichu wraca do godzinowego (pracownik nic nie dostaje „do wypłaty").
+  // Guard na linię, bo rental_hourly nie jest resetowany przy zmianie linii (bez guardu iClub dostałby fałszywy błąd).
+  if (v.business_line === "EQUIPMENT_RENTAL" && !v.rental_hourly && !e.rental_flat && (toNumber(v.rental_flat) ?? 0) <= 0) {
+    e.rental_flat = "Podaj ryczałt (> 0) lub włącz rozliczenie godzinowe.";
+  }
   return e;
 }
 
@@ -468,6 +474,9 @@ export async function updateReservationAction(id: string, values: ReservationFor
     // §BEZPIECZEŃSTWO Edycja tylko AKTUALIZUJE istniejący wpis apki (allowCreate:false) — nie tworzy
     // nowego, żeby nie dublować wydarzeń dodanych ręcznie w kalendarzu (bez powiązania z apką).
     try { await syncReservationToCalendar(id, { allowCreate: false }); } catch (e) { console.error("Kalendarz: sync przy edycji nie powiódł się", e); }
+    // §18 Wypożyczalnia: ryczałt zmieniony po domknięciu → zsynchronizuj koszt „Robocizna" z wypłatą
+    // (saldo pracownika czyta ryczałt na żywo). Self-guarded: no-op poza EQUIPMENT_RENTAL + DONE.
+    try { const job = await getJobByReservation(id); if (job) await syncRentalLaborCost(job.id); } catch (e) { console.error("Sync kosztu robocizny wypożyczalni nie powiódł się", e); }
     // Zmiana szczegółów → push do przypisanych (APPROVED) pracowników.
     try {
       const job = await getJobByReservation(id);
@@ -479,6 +488,7 @@ export async function updateReservationAction(id: string, values: ReservationFor
       }
     } catch { /* push opcjonalny */ }
     revalidatePath("/reservations");
+    revalidatePath(`/reservations/${id}`);
     revalidatePath(`/reservations/${id}/edit`);
     return { ok: true, id };
   } catch (e) {

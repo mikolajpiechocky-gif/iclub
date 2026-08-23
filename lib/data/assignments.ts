@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { EmployeeRate } from "./types";
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
 import { getSettings } from "./settings";
-import { settlementForRealization, rulesFromSettings } from "@/lib/domain/iclub-settlement";
+import { settlementForRealization, rulesFromSettings, numOr } from "@/lib/domain/iclub-settlement";
 
 export type AssignmentStatus = "REQUESTED" | "APPROVED";
 
@@ -132,7 +132,7 @@ interface RawSettlementRow {
   reel_given: boolean | null;
   reel_link: string | null;
   fuel_amount: number | string | null;
-  job: { id: string; title: string | null; status: string; business_line: string; event_date: string | null; owner_bonus: number | string | null; reservation: { id: string; event_type: string | null; tent_extra: string | null; rental_settlement_flat: number | string | null; customer: { name: string | null } | null } | null } | null;
+  job: { id: string; title: string | null; status: string; business_line: string; event_date: string | null; owner_bonus: number | string | null; reservation: { id: string; event_type: string | null; tent_extra: string | null; rental_settlement_flat: number | string | null; upsell_value: number | string | null; customer: { name: string | null } | null } | null } | null;
 }
 
 export async function listEmployeeSettlements(profileId: string): Promise<EmployeeSettlementRow[]> {
@@ -141,7 +141,7 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
   const [{ data }, { data: rateData }, settings] = await Promise.all([
     supabase
       .from("job_assignments")
-      .select("id, is_lead, earnings_snapshot, settled_at, status, review_given, reel_given, reel_link, fuel_amount, job:jobs(id, title, status, business_line, event_date, owner_bonus, reservation:reservations(id, event_type, tent_extra, rental_settlement_flat, customer:customers(name)))")
+      .select("id, is_lead, earnings_snapshot, settled_at, status, review_given, reel_given, reel_link, fuel_amount, job:jobs(id, title, status, business_line, event_date, owner_bonus, reservation:reservations(id, event_type, tent_extra, rental_settlement_flat, upsell_value, customer:customers(name)))")
       .eq("profile_id", profileId)
       .eq("status", "APPROVED"),
     supabase.from("employee_rates").select("*").eq("profile_id", profileId).maybeSingle(),
@@ -149,11 +149,10 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
   ]);
   const rate = (rateData as EmployeeRate) ?? null;
   const rules = rulesFromSettings(settings);
-  // §rozliczenie Tryb pracownika decyduje, czy BAZA jest do wypłaty:
-  //  - FLAT (ryczałtowy): baza (ryczałt) = DO WYPŁATY (przez apkę).
-  //  - THRESHOLD (mieszany, Bartek): baza (czas wolny I ryczałt po progu) = KOSZT rozliczany POZA apką;
-  //    przez apkę wypłacamy TYLKO dodatki (daleki/gastro/opinia/rolka/paliwo).
-  const basePaysOut = (rate?.iclub_settlement_mode ?? "THRESHOLD") === "FLAT";
+  // §rozliczenie O wypłacalności BAZY decyduje FORMA pojedynczej realizacji (nie tryb pracownika):
+  //  - free_time (dniówka, pierwsze N w THRESHOLD) = KOSZT rozliczany POZA apką;
+  //  - flat (ryczałt: cały FLAT oraz realizacje PO progu N w THRESHOLD) = DO WYPŁATY przez apkę.
+  //  Dodatki (daleki/gastro) i premie (opinia/rolka/paliwo/dosprzedaż) zawsze liczone osobno.
 
   const done = ((data ?? []) as unknown as RawSettlementRow[])
     .filter((r) => r.job?.status === "DONE")
@@ -166,10 +165,13 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
   const farByJob = new Map<string, boolean>();
   const transportCostByJob = new Map<string, number>(); // paliwo + eksploatacja (5 gr/km) z trasy
   if (jobIds.length) {
-    const { data: tc } = await supabase.from("transport_calculations").select("job_id, one_way_km, fuel_cost, amortization").in("job_id", jobIds);
-    for (const t of (tc ?? []) as { job_id: string; one_way_km: number | string | null; fuel_cost: number | string | null; amortization: number | string | null }[]) {
+    const { data: tc, error: tcErr } = await supabase.from("transport_calculations").select("job_id, one_way_km, distance_km, fuel_cost, amortization").in("job_id", jobIds);
+    if (tcErr) console.error("listEmployeeSettlements: transport_calculations select failed", tcErr.message);
+    for (const t of (tc ?? []) as { job_id: string; one_way_km: number | string | null; distance_km: number | string | null; fuel_cost: number | string | null; amortization: number | string | null }[]) {
       if (Number(t.one_way_km ?? 0) > 100) farByJob.set(t.job_id, true);
-      transportCostByJob.set(t.job_id, (transportCostByJob.get(t.job_id) ?? 0) + (Number(t.fuel_cost ?? 0) || 0) + (Number(t.amortization ?? 0) || 0));
+      // Eksploatacja: zapisana wartość (planowane km × stawka); gdy jej brak — wylicz z distance_km (planowane km).
+      const amort = t.amortization != null ? (Number(t.amortization) || 0) : (Number(t.distance_km ?? 0) || 0) * settings.amortization_per_km;
+      transportCostByJob.set(t.job_id, (transportCostByJob.get(t.job_id) ?? 0) + (Number(t.fuel_cost ?? 0) || 0) + amort);
     }
   }
 
@@ -191,10 +193,17 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
       else { basePaidOut = false; baseValue = 0; baseLabel = "Stawka godzinowa (koszt osobno)"; }
     } else if (rate) {
       const s = settlementForRealization(rules, priorCount, { farTrip: farByJob.get(r.job!.id) ?? false, hasGastro: r.job!.reservation?.tent_extra === "GASTRO", rate });
-      basePaidOut = basePaysOut; // o wypłacie bazy decyduje TRYB pracownika, nie forma pojedynczej realizacji
+      basePaidOut = s.form === "flat"; // ryczałt (flat) = do wypłaty; czas wolny (free_time) = koszt „w ramach umowy"
       baseValue = s.baseValue;
       baseLabel = s.baseLabel;
       for (const g of s.guaranteed) guaranteed.push(g);
+      // §II.12 Premia za dosprzedaż (upsell) należy się WYŁĄCZNIE prowadzącemu (is_lead) — JEST do wypłaty,
+      // tak samo jak daleki/gastro. Dotyczy iClub, w obu formach (w ramach umowy i po progu).
+      const upsellValue = Number(r.job!.reservation?.upsell_value ?? 0) || 0;
+      if (r.is_lead && upsellValue > 0) {
+        const upsell = Math.round(upsellValue * (numOr(rate.upsell_percent, 15) / 100) * 100) / 100;
+        if (upsell > 0) guaranteed.push({ label: "Dosprzedaż", amount: upsell });
+      }
     }
     if (ownerBonus > 0) guaranteed.push({ label: "Bonus szefa", amount: ownerBonus });
 

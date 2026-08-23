@@ -128,6 +128,35 @@ export async function countDoneIclubRealizations(profileId: string, monthPrefix:
   return seen.size;
 }
 
+// §19.4 (prognoza /me) Ile „slotów w ramach umowy" pracownik już zajął w danym miesiącu — liczy
+// PRZYPISANE (APPROVED) realizacje iClub, także jeszcze niezakończone (nie tylko DONE), pomijając
+// odwołane/wygasłe rezerwacje. Zwraca mapę miesiąc(YYYY-MM) → liczba, żeby karty „do zgarnięcia"
+// pokazywały właściwą formę (dniówka vs ryczałt po progu) z resetem progu co miesiąc.
+export async function countOccupiedIclubByMonth(profileId: string): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!isSupabaseConfigured()) return out;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("job_assignments")
+    .select("job:jobs(id, business_line, event_date, reservation:reservations(status))")
+    .eq("profile_id", profileId)
+    .eq("status", "APPROVED");
+  if (error) return out;
+  const rows = (data ?? []) as unknown as { job: { id: string; business_line: string; event_date: string | null; reservation: { status: string | null } | null } | null }[];
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const j = r.job;
+    if (!j || j.business_line !== "ICLUB" || !j.event_date) continue;
+    const rs = j.reservation?.status;
+    if (rs === "CANCELLED" || rs === "EXPIRED") continue;
+    if (seen.has(j.id)) continue;
+    seen.add(j.id);
+    const m = j.event_date.slice(0, 7);
+    out.set(m, (out.get(m) ?? 0) + 1);
+  }
+  return out;
+}
+
 export async function getJob(id: string): Promise<JobWithReservation | null> {
   if (!isSupabaseConfigured()) return DEMO_JOBS.find((j) => j.id === id) ?? null;
   const supabase = await createClient();

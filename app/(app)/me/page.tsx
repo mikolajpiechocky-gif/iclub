@@ -6,7 +6,7 @@ import { getCurrentProfile } from "@/lib/data/profiles";
 import { listAssignedJobs, listClaimableJobs } from "@/lib/data/jobs";
 import { getSettings } from "@/lib/data/settings";
 import { getEmployee } from "@/lib/data/employees";
-import { countDoneIclubRealizations } from "@/lib/data/jobs";
+import { countOccupiedIclubByMonth } from "@/lib/data/jobs";
 import { rulesFromSettings, settlementForRealization, type RealizationSettlement } from "@/lib/domain/iclub-settlement";
 import { geocode, routeLeg } from "@/lib/integrations/google-maps";
 import { warsawTodayISO } from "@/lib/domain/dates";
@@ -62,9 +62,10 @@ export default async function EmployeeDashboardPage() {
   if (claimable.length && profile) {
     const settings = await getSettings();
     const myRate = (await getEmployee(profile.id))?.rate ?? null;
-    // §19: ile realizacji iClub pracownik zaliczył w tym miesiącu → kolejna określa formę.
-    const monthPrefix = todayStr.slice(0, 7);
-    const priorCount = await countDoneIclubRealizations(profile.id, monthPrefix);
+    // §19: ile realizacji iClub pracownik już zajął w danym miesiącu (przypisane, także niezakończone)
+    // → kolejna określa formę. Prognoza z resetem progu co miesiąc.
+    const priorByMonth = await countOccupiedIclubByMonth(profile.id);
+    const perMonthOffset = new Map<string, number>();
     const rules = rulesFromSettings(settings);
     const baseGeo = await geocode(settings.base_address);
     const uniqLocs = [...new Set(claimable.map((j) => j.reservation?.location).filter((l): l is string => Boolean(l)))];
@@ -77,7 +78,12 @@ export default async function EmployeeDashboardPage() {
     );
     claimableCards = claimable.map((j) => {
       const km = j.reservation?.location ? kmByLoc.get(j.reservation.location) ?? null : null;
-      const settlement = settlementForRealization(rules, priorCount, {
+      // Indeks realizacji w jej miesiącu = już zajęte sloty + kolejne karty tego miesiąca (rosnąco).
+      const month = (j.event_date ?? todayStr).slice(0, 7);
+      const offset = perMonthOffset.get(month) ?? 0;
+      perMonthOffset.set(month, offset + 1);
+      const prior = (priorByMonth.get(month) ?? 0) + offset;
+      const settlement = settlementForRealization(rules, prior, {
         farTrip: km != null && km > 100, // §16.3 daleki wyjazd = powyżej 100 km w jedną stronę
         hasGastro: j.reservation?.tent_extra === "GASTRO",
         rate: myRate,
@@ -179,11 +185,12 @@ export default async function EmployeeDashboardPage() {
                     ))}
                   </div>
                   {settlement.possible.length > 0 && (
-                    <div className="mt-0.5 text-[10.5px] text-muted">Możliwe: {settlement.possible.map((b) => `${b.label.toLowerCase()} +${fmtPLN(b.amount)}`).join(" · ")}</div>
+                    <div className="mt-0.5 text-[10.5px] text-muted">Możliwe premie: <span className="font-semibold text-ok">+{fmtPLN(settlement.possible.reduce((s, b) => s + b.amount, 0))}</span> ({settlement.possible.map((b) => `${b.label.toLowerCase()} +${fmtPLN(b.amount)}`).join(" · ")})</div>
                   )}
                 </div>
                 <div className="flex-none text-right">
-                  <div className="font-display text-[15px] font-bold text-ok">{fmtPLN2(settlement.total)}</div>
+                  {/* „do zgarnięcia" = tylko realnie płatne przez apkę: dla free_time dniówka to KOSZT poza apką → same premie gwarantowane; dla flat ryczałt JEST do wypłaty. */}
+                  <div className="font-display text-[15px] font-bold text-ok">{fmtPLN2(settlement.form === "free_time" ? settlement.guaranteedTotal : settlement.total)}</div>
                   <div className="text-[9px] font-semibold text-ink-2">do zgarnięcia</div>
                   <div className="mt-1 text-[11px] font-bold text-ok">Zgarnij →</div>
                 </div>

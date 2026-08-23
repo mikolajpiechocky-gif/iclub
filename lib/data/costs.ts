@@ -38,6 +38,12 @@ export async function createCost(input: CostInput): Promise<void> {
   await logActivity("cost", data.id as string, input.category, "Dodano koszt", `${input.amount} zł`);
 }
 
+export async function updateCost(id: string, patch: { amount?: number; note?: string | null; status?: CostStatus }): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("costs").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function setCostStatus(id: string, status: CostStatus): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("costs").update({ status }).eq("id", id);

@@ -79,7 +79,17 @@ export function SettingsForm({ initial, disabled }: { initial: AppSettings; disa
         <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
           <TextField label="Stawka VAT (%)" inputMode="decimal" value={v.vat_rate} onChange={(e) => set("vat_rate", e.target.value)} error={errors.vat_rate} />
         </div>
-        <p className="px-5 pb-5 text-[12px] text-ink-2">Stawka VAT wykorzystywana w module faktur. Rozliczenia iClub (czas wolny, próg, ryczałt, premie) ustawiasz teraz per pracownik w „Pracownicy”.</p>
+        <p className="px-5 pb-5 text-[12px] text-ink-2">Stawka VAT wykorzystywana w module faktur.</p>
+      </SectionCard>
+
+      <SectionCard title="Rozliczenia iClub (wartości domyślne)" className="mt-4 p-5">
+        <div className="grid grid-cols-1 gap-4 px-5 pb-2 sm:grid-cols-2">
+          <TextField label="Czas wolny — godziny za realizację" inputMode="numeric" value={v.iclub_hours} onChange={(e) => set("iclub_hours", e.target.value)} error={errors.iclub_hours} hint="8 h = 1 dzień wolny" />
+          <TextField label="Czas wolny — stawka (zł/h)" inputMode="decimal" value={v.iclub_hourly_rate} onChange={(e) => set("iclub_hourly_rate", e.target.value)} error={errors.iclub_hourly_rate} hint="np. 32,40" />
+          <TextField label="Próg realizacji w miesiącu (N)" inputMode="numeric" value={v.iclub_month_threshold} onChange={(e) => set("iclub_month_threshold", e.target.value)} error={errors.iclub_month_threshold} hint="pierwsze N = czas wolny, kolejne = ryczałt" />
+          <TextField label="Ryczałt za realizację (zł)" inputMode="decimal" value={v.iclub_flat_rate} onChange={(e) => set("iclub_flat_rate", e.target.value)} error={errors.iclub_flat_rate} hint="np. 500" />
+        </div>
+        <p className="px-5 pb-5 text-[12px] text-ink-2">Wartości domyślne stosowane, gdy pracownik nie ma własnych ustawień (pole puste w „Pracownicy”). Tryb (mieszany/ryczałtowy) i indywidualne stawki ustawiasz per pracownik.</p>
       </SectionCard>
 
       <SectionCard title="Czas montażu (sugerowana godzina)" className="mt-4 p-5">

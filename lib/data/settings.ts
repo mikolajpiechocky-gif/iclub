@@ -46,11 +46,11 @@ const num = (v: unknown, fallback: number) => {
 export async function getSettings(): Promise<AppSettings> {
   if (!isSupabaseConfigured()) return DEFAULT_SETTINGS;
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("app_settings")
-    .select("base_address, fuel_price_petrol, fuel_price_diesel, fuel_price_lpg, amortization_per_km, iclub_hours, vat_rate, iclub_hourly_rate, iclub_month_threshold, iclub_flat_rate, assembly_buffer_minutes, assembly_addon_minutes, assembly_gastro_minutes")
-    .eq("id", true)
-    .maybeSingle();
+  // select('*') zamiast listy kolumn: brak POJEDYNCZEJ kolumny (np. zaległa migracja) nie może
+  // wywalić całego odczytu i po cichu podmienić WSZYSTKICH reguł iClub na wartości domyślne —
+  // brakujące pole degraduje się per-pole niżej przez num(data.x, default). Błąd logujemy (koniec cichego fallbacku).
+  const { data, error } = await supabase.from("app_settings").select("*").eq("id", true).maybeSingle();
+  if (error) console.error("getSettings: app_settings select failed", error.message);
   if (error || !data) return DEFAULT_SETTINGS;
   return {
     base_address: data.base_address || DEFAULT_SETTINGS.base_address,

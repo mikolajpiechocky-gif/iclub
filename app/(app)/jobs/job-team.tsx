@@ -76,7 +76,7 @@ export function JobTeam({
                     <span className="text-[13.5px] font-bold text-ink">{a.full_name}</span>
                     {!isRental && a.is_lead && <Pill label="Lider" fg="#e0c8ff" bg="#271b3f" />}
                   </div>
-                  {a.earnings && (
+                  {a.earnings && a.earnings.total > 0 && (
                     <div className="mt-0.5 text-[12px] text-ink-2">
                       Zarobek: <span className="font-bold text-ok">{fmtPLN(a.earnings.total)}</span>
                       <span className="text-muted"> ({a.earnings.baseLabel}{a.earnings.ownerBonus ? ` + bonus ${fmtPLN(a.earnings.ownerBonus)}` : ""})</span>
@@ -107,7 +107,7 @@ export function JobTeam({
                   <Avatar name={a.full_name} url={a.avatar_url} size={40} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[13.5px] font-bold text-ink">{a.full_name}</div>
-                    {a.earnings && <div className="mt-0.5 text-[12px] text-ink-2">Zarobek: <span className="font-bold text-ok">{fmtPLN(a.earnings.total)}</span></div>}
+                    {a.earnings && a.earnings.total > 0 && <div className="mt-0.5 text-[12px] text-ink-2">Zarobek: <span className="font-bold text-ok">{fmtPLN(a.earnings.total)}</span></div>}
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => run(() => approveAssignmentAction(a.id, jobId, a.profile_id))} disabled={pending} className="rounded-[9px] bg-ok px-3 py-1.5 text-[11.5px] font-bold text-[#08170d]">Akceptuj</button>
@@ -167,7 +167,7 @@ export function JobTeam({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-[13px] font-bold text-ink">Wolne zlecenie</div>
-                  {myEarnings && <div className="mt-0.5 text-[12px] text-ink-2">Twój przewidywany zarobek: <span className="font-bold text-ok">{fmtPLN(myEarnings.total)}</span> <span className="text-muted">({myEarnings.baseLabel})</span></div>}
+                  {myEarnings && myEarnings.total > 0 && <div className="mt-0.5 text-[12px] text-ink-2">Twój przewidywany zarobek: <span className="font-bold text-ok">{fmtPLN(myEarnings.total)}</span> <span className="text-muted">({myEarnings.baseLabel})</span></div>}
                   {myEarnings && myEarnings.possibleBonuses.length > 0 && <div className="text-[11px] text-muted">Możliwe: {myEarnings.possibleBonuses.map((b) => `${b.label.toLowerCase()} +${fmtPLN(b.amount)}`).join(" · ")}</div>}
                 </div>
                 <PrimaryButton onClick={() => run(() => selfClaimAction(jobId))} disabled={pending}>Poproś o przypisanie</PrimaryButton>
