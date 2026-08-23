@@ -16,7 +16,7 @@ import type { JobStageRecord, PaymentMethod } from "@/lib/data/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/data/types";
 import type { SettlementBreakdown } from "@/lib/domain/billing";
 import { REALIZATIONS_BUCKET } from "@/lib/config/storage";
-import { advanceStageAction, reportFieldPaymentAction, saveDepositDeductionAction } from "./actions";
+import { advanceStageAction, reportFieldPaymentAction, saveDepositDeductionAction, markDepartedAction } from "./actions";
 import { createJobPhotoAction } from "./photo-actions";
 import { reportEquipmentStatusAction, addIssueAction, saveActualKmAction, type EqStatus, type IssueType } from "./protocol-actions";
 
@@ -131,6 +131,7 @@ export interface RealizationContext {
   hasVehicle: boolean;     // §II.14 pojazd przypisany (wymagany, by rozpocząć)
   roundTripKm: number | null; // §II.19 trasa tam i z powrotem (do podsumowania pracy)
   earnings: { baseLabel: string; total: number } | null; // §II.19 wynagrodzenie za realizację (forma + łącznie)
+  departedAt: string | null; // §postęp znacznik „ruszył w trasę"
 }
 
 // §II.19 Czas pracy = sekcja montażu (przyjazd → koniec rozliczenia) + demontaż
@@ -194,10 +195,19 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
 
   const stepFill = (i: number, isDone: boolean) => (isDone ? 1 : i === currentIndex ? curFrac : 0);
 
-  const setStatus = (stageId: string, status: "DONE" | "TODO", reason?: string) => {
+  const setStatus = (stageId: string, status: "DONE" | "TODO", reason?: string, stageKey?: string) => {
     setError(null);
     startTransition(async () => {
-      const res = await advanceStageAction(stageId, jobId, status, reason);
+      const res = await advanceStageAction(stageId, jobId, status, reason, stageKey);
+      if (res.ok) router.refresh();
+      else setError(res.error ?? "Błąd");
+    });
+  };
+  // §postęp „Ruszam w trasę" — znacznik wyjazdu + powiadomienie szefa.
+  const depart = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await markDepartedAction(jobId);
       if (res.ok) router.refresh();
       else setError(res.error ?? "Błąd");
     });
@@ -291,7 +301,7 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
 
                 {isCurrent && (
                   <div className="mt-2 rounded-[13px] border border-[#2a2340] bg-[#181423] p-3.5">
-                    <StepPanel jobId={jobId} stageKey={s.stage_key} ctx={ctx} pending={pending} onDone={(reason) => setStatus(s.id, "DONE", reason)} onProgress={(frac) => setCurProg({ step: i, frac })} />
+                    <StepPanel jobId={jobId} stageKey={s.stage_key} ctx={ctx} pending={pending} onDone={(reason) => setStatus(s.id, "DONE", reason, s.stage_key)} onDepart={depart} onProgress={(frac) => setCurProg({ step: i, frac })} />
                   </div>
                 )}
               </div>
@@ -378,14 +388,19 @@ function RentalStepPanel({ jobId, stageKey, ctx, pending, onDone }: { jobId: str
 }
 
 /* ------------------- Panel czynności dla danego kroku ---------------- */
-function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobId: string; stageKey: string; ctx: RealizationContext; pending: boolean; onDone: (reason?: string) => void; onProgress: (frac: number) => void }) {
+function StepPanel({ jobId, stageKey, ctx, pending, onDone, onDepart, onProgress }: { jobId: string; stageKey: string; ctx: RealizationContext; pending: boolean; onDone: (reason?: string) => void; onDepart: () => void; onProgress: (frac: number) => void }) {
   if (RENTAL_STEP_INFO[stageKey]) return <RentalStepPanel jobId={jobId} stageKey={stageKey} ctx={ctx} pending={pending} onDone={onDone} />;
   switch (stageKey) {
-    case "TRAVEL":
+    case "TRAVEL": {
+      const departed = Boolean(ctx.departedAt);
       return (
         <div>
-          <p className="mb-3 text-[12.5px] text-ink-2">Jedź na miejsce imprezy i potwierdź przyjazd.</p>
+          <p className="mb-3 text-[12.5px] text-ink-2">{departed ? "W trasie — potwierdź przyjazd na miejsce." : "Ruszaj w trasę, a gdy dojedziesz — potwierdź przyjazd."}</p>
           {!ctx.hasVehicle && <div className="mb-2.5"><Alert tone="warn" title="Przypisz pojazd">Bez przypisanego pojazdu nie można rozpocząć realizacji (paliwo liczone z faktycznych km).</Alert></div>}
+          {!departed && (
+            <button type="button" disabled={pending || !ctx.hasVehicle} onClick={() => onDepart()} className="mb-2.5 w-full rounded-[11px] bg-accent py-2.5 text-center text-[12.5px] font-bold text-white disabled:opacity-50">Ruszam w trasę 🚗</button>
+          )}
+          {departed && <p className="mb-2.5 text-[11.5px] text-ok">✓ Wyjazd zgłoszony — szef dostał powiadomienie.</p>}
           <div className="flex gap-2.5">
             {ctx.navUrl ? (
               <a href={ctx.navUrl} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-[11px] border border-border bg-surface-2 py-2.5 text-center text-[12.5px] font-bold text-ink">Nawiguj</a>
@@ -396,6 +411,7 @@ function StepPanel({ jobId, stageKey, ctx, pending, onDone, onProgress }: { jobI
           </div>
         </div>
       );
+    }
 
     case "SETUP":
       return <CheckPanel points={MONTAZ_POINTS} title="Montaż" doneLabel="Montaż gotowy" pending={pending} onDone={onDone} onProgress={onProgress} />;

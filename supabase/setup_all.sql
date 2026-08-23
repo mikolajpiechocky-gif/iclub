@@ -1538,3 +1538,7 @@ alter table public.job_assignments add column if not exists fuel_amount numeric(
 -- a pozostało = suma „do wypłaty" − wypłacono.
 alter table public.employee_rates add column if not exists paid_out numeric(12,2) not null default 0;
 
+-- ================= 0067: znacznik wyjazdu pracownika w trasę (powiadomienia postępu) =================
+-- Kiedy pracownik „ruszył" — do powiadomienia szefa oraz alertu „powinien już jechać".
+alter table public.jobs add column if not exists departed_at timestamptz;
+

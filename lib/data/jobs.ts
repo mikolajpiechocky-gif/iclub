@@ -20,6 +20,7 @@ const DEMO_JOBS: JobWithReservation[] = DEMO_RESERVATIONS.map((r, i) => ({
   event_date: r.event_date,
   status: (i === 0 ? "IN_PROGRESS" : "PLANNED") as JobStatus,
   owner_bonus: 0,
+  departed_at: null,
   created_at: now,
   updated_at: now,
   reservation: r,
@@ -221,6 +222,14 @@ export async function setJobStatus(jobId: string, status: JobStatus): Promise<vo
   const supabase = await createClient();
   const { error } = await supabase.from("jobs").update({ status }).eq("id", jobId);
   if (error) throw new Error(error.message);
+}
+
+// §postęp Znacznik wyjazdu pracownika w trasę (do powiadomień i alertu „powinien już jechać").
+// Zwraca true, gdy realnie ustawiono (wcześniej było puste) — żeby nie dublować powiadomień.
+export async function setJobDepartedAt(jobId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("jobs").update({ departed_at: new Date().toISOString() }).eq("id", jobId).is("departed_at", null).select("id");
+  return (data?.length ?? 0) > 0;
 }
 
 // §II.11/§K4/§W2 Status zlecenia wg postępu etapów: rozpoczęte → „W realizacji", nic → „Zaplanowane".

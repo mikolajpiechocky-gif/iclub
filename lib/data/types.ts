@@ -283,6 +283,7 @@ export interface JobRecord {
   event_date: string | null;
   status: JobStatus;
   owner_bonus: number;
+  departed_at: string | null; // §postęp znacznik wyjazdu pracownika w trasę (push „ruszył")
   created_at: string;
   updated_at: string;
 }

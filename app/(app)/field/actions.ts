@@ -17,7 +17,15 @@ import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings
 import { getSettings } from "@/lib/data/settings";
 import { listTransportCalcs } from "@/lib/data/transport";
 import { createIncident } from "@/lib/data/incidents";
+import { getCurrentProfile } from "@/lib/data/profiles";
+import { sendPushToOwners } from "@/lib/integrations/push";
+import { setJobDepartedAt } from "@/lib/data/jobs";
 import type { StageStatus, PaymentMethod } from "@/lib/data/types";
+
+// §postęp Skrót tytułu realizacji do powiadomień (klient albo tytuł zlecenia).
+function jobTitle(job: Awaited<ReturnType<typeof getJob>>): string {
+  return job?.reservation?.customer?.name ?? job?.reservation?.event_type ?? job?.title ?? "Realizacja";
+}
 
 // §II.12 Ustalenia z telefonu do klienta przekazywane z formularza.
 export interface ClientCallInput {
@@ -79,7 +87,7 @@ async function finalizeRentalIfDone(jobId: string): Promise<void> {
   await writeRealizationCosts(jobId).catch(() => {}); // paliwo do kosztów realizacji
 }
 
-export async function advanceStageAction(stageId: string, jobId: string, status: StageStatus, reason?: string): Promise<ActionResult> {
+export async function advanceStageAction(stageId: string, jobId: string, status: StageStatus, reason?: string, stageKey?: string): Promise<ActionResult> {
   if (!isSupabaseConfigured())
     return { ok: false, error: "Tryb demo: skonfiguruj Supabase, aby zapisywać postęp." };
   try {
@@ -88,6 +96,16 @@ export async function advanceStageAction(stageId: string, jobId: string, status:
     if (status === "DONE" && reason && reason.trim().length >= 3) {
       await createIncident({ job_id: jobId, category: "Uwaga", description: `Krok zakończony mimo braków: ${reason.trim()}`, equipment: null, priority: "LOW" }).catch(() => {});
     }
+    // §postęp Powiadom szefa o kamieniach milowych realizacji (dojechał / zakończył montaż).
+    if (status === "DONE" && (stageKey === "TRAVEL" || stageKey === "SETUP")) {
+      try {
+        const [me, job] = await Promise.all([getCurrentProfile(), getJob(jobId)]);
+        const who = me?.full_name?.trim() || "Pracownik";
+        const title = jobTitle(job);
+        if (stageKey === "TRAVEL") await sendPushToOwners({ title: "🚗 Pracownik dojechał na miejsce", body: `${who} — ${title}`, url: `/reservations/${job?.reservation_id ?? ""}`, tag: `arrive-${jobId}` });
+        else await sendPushToOwners({ title: "🔧 Montaż zakończony", body: `${who} — ${title}`, url: `/reservations/${job?.reservation_id ?? ""}`, tag: `setup-${jobId}` });
+      } catch { /* push nie może wywrócić postępu */ }
+    }
     // §II.11/§II.15 Zaktualizuj status zlecenia wg postępu etapów (Zaplanowane → W realizacji).
     await recomputeJobStatus(jobId);
     // Wypożyczalnia: po ostatnim kroku domknij realizację (koszt robocizny + status Zakończone).
@@ -95,6 +113,25 @@ export async function advanceStageAction(stageId: string, jobId: string, status:
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath(`/field`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
+  }
+}
+
+// §postęp Pracownik oznacza, że RUSZYŁ w trasę → znacznik departed_at + powiadomienie szefa.
+// (Wyłącza też alert „powinien już jechać".) Idempotentne — powiadamiamy tylko przy pierwszym.
+export async function markDepartedAction(jobId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
+  try {
+    const firstTime = await setJobDepartedAt(jobId);
+    if (firstTime) {
+      try {
+        const [me, job] = await Promise.all([getCurrentProfile(), getJob(jobId)]);
+        await sendPushToOwners({ title: "🚗 Pracownik ruszył w trasę", body: `${me?.full_name?.trim() || "Pracownik"} — ${jobTitle(job)}`, url: `/reservations/${job?.reservation_id ?? ""}`, tag: `depart-${jobId}` });
+      } catch { /* push opcjonalny */ }
+    }
+    revalidatePath(`/field/${jobId}`);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };

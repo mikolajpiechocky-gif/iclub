@@ -129,6 +129,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
     hasVehicle,
     roundTripKm: distanceKm != null ? distanceKm * 2 : null,
     earnings,
+    departedAt: job.departed_at ?? null,
   };
 
   return (
