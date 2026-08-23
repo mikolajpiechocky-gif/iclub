@@ -51,7 +51,10 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
         await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body);
       } catch (e) {
         const code = (e as { statusCode?: number }).statusCode;
-        if (code === 404 || code === 410) dead.push(s.endpoint);
+        // 404/410 = subskrypcja wygasła; 403 = niepasujący klucz VAPID (stara subskrypcja po rotacji).
+        // Wszystkie trzy sprzątamy, żeby martwe subskrypcje nie duszyły push w nieskończoność.
+        if (code === 404 || code === 410 || code === 403) dead.push(s.endpoint);
+        else console.error("push send failed", code ?? "?", e instanceof Error ? e.message : e);
       }
     }),
   );
