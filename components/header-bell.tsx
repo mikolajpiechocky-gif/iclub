@@ -91,7 +91,7 @@ export function HeaderBell({ unread = 0 }: { unread?: number }) {
             })}
           </div>
 
-          <Link href="/notifications" onMouseDown={() => setOpen(false)} className="block border-t border-border px-4 py-2.5 text-center text-[12.5px] font-bold text-white hover:bg-surface-2">Zobacz wszystkie →</Link>
+          <Link href="/notifications" onClick={() => setOpen(false)} className="block border-t border-border px-4 py-2.5 text-center text-[12.5px] font-bold text-white hover:bg-surface-2">Zobacz wszystkie →</Link>
         </div>
       )}
     </div>
