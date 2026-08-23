@@ -1,7 +1,9 @@
 // GET /api/notifications/sweep — cykliczne powiadomienia push (raz dziennie z crona).
+// ?mode=departure → tylko alert „pracownik powinien już jechać" (cron co ~30 min).
 // Autoryzacja sekretem (CRON_SECRET / OLX_CRON_SECRET). Proxy przepuszcza tę ścieżkę.
 import { NextRequest, NextResponse } from "next/server";
 import { runNotificationsSweep } from "@/lib/data/notifications-sweep";
+import { runDepartureAlertSweep } from "@/lib/data/departure-alerts";
 import { sendPushToOwners } from "@/lib/integrations/push";
 
 function isCronAuthorized(req: NextRequest): boolean {
@@ -12,10 +14,16 @@ function isCronAuthorized(req: NextRequest): boolean {
 
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const params = new URL(req.url).searchParams;
   // ?test=1 → wyślij testowe powiadomienie do wszystkich szefów (weryfikacja push).
-  if (new URL(req.url).searchParams.get("test") === "1") {
+  if (params.get("test") === "1") {
     await sendPushToOwners({ title: "iClub — test", body: "Powiadomienia push działają ✅", url: "/notifications", tag: "test" });
     return NextResponse.json({ ok: true, test: true });
+  }
+  // ?mode=departure → lekki, częsty sprawdzian wyjazdu (bez pełnego, dziennego sweepu).
+  if (params.get("mode") === "departure") {
+    const result = await runDepartureAlertSweep();
+    return NextResponse.json(result, { status: 200 });
   }
   const result = await runNotificationsSweep();
   return NextResponse.json(result, { status: 200 });

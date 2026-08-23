@@ -1,0 +1,31 @@
+name: Alert wyjazdu (co 30 min)
+
+# Co 30 minut w godzinach 5–20 UTC (7–22 PL) sprawdza, czy pracownik powinien już
+# wyjechać na dzisiejszą realizację iClub (montaż − dojazd), a jeszcze nie ruszył.
+# Alert wysyłany RAZ na zlecenie. Endpoint chroniony sekretem OLX_CRON_SECRET.
+on:
+  schedule:
+    - cron: "*/30 5-20 * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: departure-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping departure-check endpoint
+        env:
+          CRON_SECRET: ${{ secrets.OLX_CRON_SECRET }}
+        run: |
+          code=$(curl -sS -o response.json -w "%{http_code}" -X GET \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://app.iclubevents.pl/api/notifications/sweep?mode=departure")
+          echo "HTTP ${code}"
+          cat response.json || true
+          echo ""
+          test "${code}" = "200"

@@ -1542,3 +1542,7 @@ alter table public.employee_rates add column if not exists paid_out numeric(12,2
 -- Kiedy pracownik „ruszył" — do powiadomienia szefa oraz alertu „powinien już jechać".
 alter table public.jobs add column if not exists departed_at timestamptz;
 
+
+-- ================= 0068: znacznik wysłanego alertu „powinien już jechać" =================
+-- Alert wysyłamy RAZ na zlecenie (cron sprawdza co ~30 min), żeby nie zasypywać szefa.
+alter table public.jobs add column if not exists late_depart_alerted_at timestamptz;
