@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createCost } from "@/lib/data/costs";
 import { createIncident } from "@/lib/data/incidents";
 import { setActualKm } from "@/lib/data/transport";
+import { syncTransportFuelCost } from "@/lib/data/realization-close";
 import { sendPushToOwners } from "@/lib/integrations/push";
 import type { IncidentPriority } from "@/lib/data/types";
 
@@ -34,8 +35,10 @@ export async function saveActualKmAction(jobId: string, km: string): Promise<Pro
   if (!Number.isFinite(n) || n <= 0) return { ok: false, error: "Podaj liczbę km większą od zera." };
   const res = await setActualKm(jobId, Math.round(n));
   if (!res.ok) return { ok: false, error: res.reason ?? "Nie udało się zapisać." };
+  await syncTransportFuelCost(jobId).catch(() => {}); // faktyczne km → zaktualizuj koszt „Paliwo"
   revalidatePath(`/field/${jobId}`);
   revalidatePath(`/reservations`);
+  revalidatePath("/costs");
   return { ok: true };
 }
 

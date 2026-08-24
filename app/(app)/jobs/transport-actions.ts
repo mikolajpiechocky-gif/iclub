@@ -6,6 +6,7 @@ import { createTransportCalc, removeTransportCalc } from "@/lib/data/transport";
 import { fuelCost, amortizationCost, clientTransportPrice, plannedKm, tripClass } from "@/lib/domain/transport";
 import { getSettings } from "@/lib/data/settings";
 import { getJob } from "@/lib/data/jobs";
+import { syncTransportFuelCost } from "@/lib/data/realization-close";
 import { computeRoundTrip } from "@/lib/integrations/google-maps";
 import { isGoogleMapsConfigured } from "@/lib/integrations/google-maps/config";
 
@@ -63,7 +64,12 @@ export async function createTransportAction(jobId: string, v: TransportFormValue
       client_price: clientPrice,
       note: v.note.trim() || null,
     });
+    // §16 Paliwo od razu do kosztów (nie dopiero przy domknięciu realizacji).
+    await syncTransportFuelCost(jobId).catch(() => {});
     revalidatePath(`/jobs/${jobId}`);
+    const rid = (await getJob(jobId))?.reservation_id;
+    if (rid) revalidatePath(`/reservations/${rid}`);
+    revalidatePath("/costs");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
@@ -98,7 +104,9 @@ export async function removeTransportAction(id: string, jobId: string): Promise<
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   try {
     await removeTransportCalc(id);
+    await syncTransportFuelCost(jobId).catch(() => {}); // zaktualizuj koszt „Paliwo" po usunięciu kalkulacji
     revalidatePath(`/jobs/${jobId}`);
+    revalidatePath("/costs");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Błąd." };

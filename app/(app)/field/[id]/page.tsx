@@ -242,7 +242,7 @@ export default async function FieldRealizationPage({ params }: { params: Promise
         )}
 
         {/* Blok: Realizacja (kroki z własnymi czynnościami) */}
-        <RealizationFlow jobId={job.id} steps={flowSteps} ctx={ctx} />
+        <RealizationFlow jobId={job.id} steps={flowSteps} ctx={ctx} unloadHint={job.business_line === "ICLUB" && job.status !== "DONE"} />
 
         {/* Blok: Rozpakowanie i protokół (iClub — koszty + sprzęt do czyszczenia/naprawy) */}
         {job.business_line === "ICLUB" && (

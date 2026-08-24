@@ -176,7 +176,7 @@ const TRAINING_POINTS = [
   "Jeżeli namiot zacznie tracić ciśnienie — najpierw bezpiecznie wyprowadzamy wszystkich, a dopiero potem szukamy przyczyny",
 ];
 
-export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: JobStageRecord[]; ctx: RealizationContext }) {
+export function RealizationFlow({ jobId, steps, ctx, unloadHint = false }: { jobId: string; steps: JobStageRecord[]; ctx: RealizationContext; unloadHint?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -230,7 +230,9 @@ export function RealizationFlow({ jobId, steps, ctx }: { jobId: string; steps: J
       {error && <div className="mb-3"><Alert tone="bad" title="Błąd">{error}</Alert></div>}
       {allDone && (
         <div className="mb-1">
-          <Alert tone="ok" title="Realizacja zakończona">Wszystkie kroki odhaczone. Dziękujemy!</Alert>
+          {unloadHint
+            ? <Alert tone="warn" title="Kroki na miejscu gotowe">Zostało domknięcie: po powrocie do bazy przejdź do „Rozładunek” niżej i kliknij „Zakończ realizację” — dopiero wtedy realizacja jest Zrealizowana.</Alert>
+            : <Alert tone="ok" title="Realizacja zakończona">Wszystkie kroki odhaczone. Dziękujemy!</Alert>}
           {/* §II.19 Podsumowanie pracy po demontażu: czas na miejscu + przejechane km */}
           <div className="mt-2 grid grid-cols-2 gap-2">
             <div className="rounded-[11px] border border-border bg-surface px-3 py-2.5">

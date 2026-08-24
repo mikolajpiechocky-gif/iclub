@@ -37,6 +37,22 @@ export async function writeRealizationCosts(jobId: string): Promise<void> {
   }
 }
 
+// §16 Koszt „Paliwo" widoczny OD RAZU po zapisaniu kalkulacji transportu (nie dopiero przy domknięciu).
+// Jeden wiersz „Paliwo" na zlecenie = suma paliwo + eksploatacja ze wszystkich kalkulacji. Idempotentny:
+// aktualizuje istniejący wiersz (writeRealizationCosts przy domknięciu i tak go nie zdubluje).
+export async function syncTransportFuelCost(jobId: string): Promise<void> {
+  const [transport, costs] = await Promise.all([listTransportCalcs(jobId), listCosts()]);
+  const fuel = transport.reduce((s, t) => s + (Number(t.fuel_cost ?? 0) || 0) + (Number(t.amortization ?? 0) || 0), 0);
+  const amount = Math.round(fuel * 100) / 100;
+  const existing = costs.find((c) => c.job_id === jobId && c.category === "Paliwo" && c.status !== "REJECTED");
+  const note = "Transport (paliwo + eksploatacja)";
+  if (existing) {
+    if (Number(existing.amount || 0) !== amount) await updateCost(existing.id, { amount, note, status: "VERIFIED" });
+  } else if (amount > 0) {
+    await createCost({ job_id: jobId, category: "Paliwo", amount, spent_on: new Date().toISOString().slice(0, 10), note, status: "VERIFIED" });
+  }
+}
+
 // §18 Wypożyczalnia: ryczałt (rental_settlement_flat) można dodać/zmienić „w dowolnym momencie" — także
 // PO domknięciu realizacji. Saldo pracownika czyta ryczałt na żywo, więc zapisany koszt „Robocizna" musi
 // za nim nadążać (inaczej rozjazd koszt↔wypłata i zawyżona rentowność). Self-guarded: no-op poza
