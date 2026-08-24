@@ -32,8 +32,9 @@ const GOOD_CONVERSION = 0.05; // ≥ 5%
 const MIN_VIEWS_FOR_CONV = 30; // poniżej tylu wyświetleń nie oceniamy skuteczności
 
 export function summarize(adverts: OlxAdvert[]): FleetSummary {
-  const totalViews = adverts.reduce((s, a) => s + (a.views || 0), 0);
-  const totalPhones = adverts.reduce((s, a) => s + (a.phones || 0), 0);
+  // Suma ŻYCIOWA akumulowana przez apkę (odporna na resety/pamięć OLX), nie bieżący odczyt.
+  const totalViews = adverts.reduce((s, a) => s + (a.total_views || 0), 0);
+  const totalPhones = adverts.reduce((s, a) => s + (a.total_phones || 0), 0);
   return {
     count: adverts.length,
     totalViews,
@@ -49,7 +50,8 @@ export function analyzeAdvert(a: OlxAdvert, fleet: FleetSummary, now = Date.now(
   const daysToExpiry = Number.isNaN(validMs) ? null : Math.floor((validMs - now) / DAY);
   const expired = daysToExpiry != null && daysToExpiry < 0;
   const expiringSoon = daysToExpiry != null && daysToExpiry >= 0 && daysToExpiry <= EXPIRING_DAYS;
-  const conversion = a.views > 0 ? a.phones / a.views : null;
+  const conversion = a.total_views > 0 ? a.total_phones / a.total_views : null;
+  // Delta = zmiana od ostatniej synchronizacji (surowy odczyt OLX) — do wykrywania zastoju.
   const deltaViews = a.prev_views != null ? a.views - a.prev_views : null;
   const deltaPhones = a.prev_phones != null ? a.phones - a.prev_phones : null;
 
@@ -65,7 +67,7 @@ export function analyzeAdvert(a: OlxAdvert, fleet: FleetSummary, now = Date.now(
   }
 
   // Skuteczność (telefony) tylko przy sensownej liczbie wyświetleń.
-  if (a.views >= MIN_VIEWS_FOR_CONV && conversion != null) {
+  if (a.total_views >= MIN_VIEWS_FOR_CONV && conversion != null) {
     if (conversion < LOW_CONVERSION) {
       rec.push("Dużo wyświetleń, mało telefonów — popraw cenę, pierwsze zdjęcie i pierwsze zdanie opisu.");
       priority = Math.max(priority, 50);
@@ -75,7 +77,7 @@ export function analyzeAdvert(a: OlxAdvert, fleet: FleetSummary, now = Date.now(
   }
 
   // Wyświetlenia znacznie poniżej średniej floty → słaba widoczność.
-  if (fleet.avgViews > 0 && a.views < 0.5 * fleet.avgViews) {
+  if (fleet.avgViews > 0 && a.total_views < 0.5 * fleet.avgViews) {
     rec.push("Mało wyświetleń względem reszty ogłoszeń — odśwież, popraw tytuł i miniaturę, rozważ promowanie.");
     priority = Math.max(priority, 40);
   }
@@ -95,9 +97,9 @@ export function analyzeAdvert(a: OlxAdvert, fleet: FleetSummary, now = Date.now(
 // Ranking skuteczności: leady (odsłony numeru) ważą najwięcej, potem skuteczność, potem
 // zasięg (wyświetlenia). Normalizacja do najlepszego w danej flocie → 0–100.
 function scoreAdvert(i: AdvertInsight, max: { phones: number; views: number; conv: number }): number {
-  const phonesN = max.phones > 0 ? i.advert.phones / max.phones : 0;
-  const viewsN = max.views > 0 ? i.advert.views / max.views : 0;
-  const convN = max.conv > 0 && i.advert.views >= MIN_VIEWS_FOR_CONV && i.conversion != null ? i.conversion / max.conv : 0;
+  const phonesN = max.phones > 0 ? i.advert.total_phones / max.phones : 0;
+  const viewsN = max.views > 0 ? i.advert.total_views / max.views : 0;
+  const convN = max.conv > 0 && i.advert.total_views >= MIN_VIEWS_FOR_CONV && i.conversion != null ? i.conversion / max.conv : 0;
   const raw = 0.55 * phonesN + 0.3 * convN + 0.15 * viewsN;
   return Math.round(raw * 100);
 }
@@ -108,12 +110,12 @@ export function analyzeFleet(adverts: OlxAdvert[], now = Date.now()): { insights
 
   // Ranking: normalizacja do najlepszego w flocie, potem sort malejąco po score.
   const max = {
-    phones: Math.max(0, ...insights.map((i) => i.advert.phones)),
-    views: Math.max(0, ...insights.map((i) => i.advert.views)),
-    conv: Math.max(0, ...insights.filter((i) => i.advert.views >= MIN_VIEWS_FOR_CONV).map((i) => i.conversion ?? 0)),
+    phones: Math.max(0, ...insights.map((i) => i.advert.total_phones)),
+    views: Math.max(0, ...insights.map((i) => i.advert.total_views)),
+    conv: Math.max(0, ...insights.filter((i) => i.advert.total_views >= MIN_VIEWS_FOR_CONV).map((i) => i.conversion ?? 0)),
   };
   for (const i of insights) i.score = scoreAdvert(i, max);
-  insights.sort((x, y) => y.score - x.score || y.advert.phones - x.advert.phones || y.advert.views - x.advert.views);
+  insights.sort((x, y) => y.score - x.score || y.advert.total_phones - x.advert.total_phones || y.advert.total_views - x.advert.total_views);
   insights.forEach((i, idx) => (i.rank = idx + 1));
 
   summary.toReact = insights.filter((i) => i.expired || i.expiringSoon).length;

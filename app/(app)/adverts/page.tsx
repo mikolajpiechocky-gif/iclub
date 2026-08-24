@@ -40,7 +40,7 @@ export default async function AdvertsPage() {
   const connected = Boolean(integration?.refresh_token);
   const { insights, summary } = analyzeFleet(adverts);
   const toReact = insights.filter((i) => i.expired || i.expiringSoon).sort((a, b) => b.priority - a.priority);
-  const podium = insights.filter((i) => i.advert.views > 0 || i.advert.phones > 0).slice(0, 3);
+  const podium = insights.filter((i) => i.advert.total_views > 0 || i.advert.total_phones > 0).slice(0, 3);
 
   return (
     <div className="mx-auto max-w-[1200px] px-5 py-6 md:px-8">
@@ -97,7 +97,7 @@ export default async function AdvertsPage() {
                     </div>
                     {expiryPill(i.daysToExpiry, i.expired)}
                   </div>
-                  <div className="mb-2 text-[12px] text-ink-2">👁 {i.advert.views.toLocaleString("pl-PL")}{delta(i.deltaViews)} · 📞 {i.advert.phones.toLocaleString("pl-PL")}{delta(i.deltaPhones)} · skuteczność {pct(i.conversion)}</div>
+                  <div className="mb-2 text-[12px] text-ink-2">👁 {i.advert.total_views.toLocaleString("pl-PL")}{delta(i.deltaViews)} · 📞 {i.advert.total_phones.toLocaleString("pl-PL")}{delta(i.deltaPhones)} · skuteczność {pct(i.conversion)}</div>
                   <p className="text-[12.5px] font-semibold text-warn">{i.recommendations[0]}</p>
                   {i.advert.url && <a href={i.advert.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[12.5px] font-bold text-white underline">Otwórz w OLX →</a>}
                 </div>
@@ -123,7 +123,7 @@ export default async function AdvertsPage() {
                     <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
                       <div className="h-full rounded-full" style={{ width: `${i.score}%`, background: scoreColor(i.score) }} />
                     </div>
-                    <div className="mt-2 text-[12px] text-ink-2">👁 {i.advert.views.toLocaleString("pl-PL")} · 📞 {i.advert.phones.toLocaleString("pl-PL")} · {pct(i.conversion)}</div>
+                    <div className="mt-2 text-[12px] text-ink-2">👁 {i.advert.total_views.toLocaleString("pl-PL")} · 📞 {i.advert.total_phones.toLocaleString("pl-PL")} · {pct(i.conversion)}</div>
                   </div>
                 ))}
               </div>
@@ -152,8 +152,8 @@ export default async function AdvertsPage() {
                         <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${i.score}%`, background: scoreColor(i.score) }} /></div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[13px] text-ink">{i.advert.views.toLocaleString("pl-PL")}<span className="text-[11px] text-ink-2">{delta(i.deltaViews)}</span></td>
-                    <td className="px-4 py-3 text-[13px] text-ink">{i.advert.phones.toLocaleString("pl-PL")}<span className="text-[11px] text-ink-2">{delta(i.deltaPhones)}</span></td>
+                    <td className="px-4 py-3 text-[13px] text-ink">{i.advert.total_views.toLocaleString("pl-PL")}<span className="text-[11px] text-ink-2">{delta(i.deltaViews)}</span></td>
+                    <td className="px-4 py-3 text-[13px] text-ink">{i.advert.total_phones.toLocaleString("pl-PL")}<span className="text-[11px] text-ink-2">{delta(i.deltaPhones)}</span></td>
                     <td className="px-4 py-3 text-[13px] font-bold" style={{ color: i.conversion == null ? "#9aa0b2" : i.conversion >= 0.05 ? "#5fd68b" : i.conversion < 0.02 ? "#f58585" : "#e9edf5" }}>{pct(i.conversion)}</td>
                     <td className="px-4 py-3">{expiryPill(i.daysToExpiry, i.expired)}</td>
                     <td className="px-4 py-3">

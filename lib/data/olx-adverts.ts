@@ -54,8 +54,10 @@ export interface OlxAdvert {
   url: string | null;
   valid_to: string | null;
   olx_created_at: string | null;
-  views: number;
+  views: number;   // bieżący odczyt OLX (do delty i migawek)
   phones: number;
+  total_views: number;  // §OLX suma ŻYCIOWA akumulowana przez apkę (odporna na resety OLX)
+  total_phones: number;
   prev_views: number | null;
   prev_phones: number | null;
   prev_synced_at: string | null;
@@ -82,7 +84,18 @@ export async function listOlxAdverts(): Promise<OlxAdvert[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("olx_adverts").select("*").order("valid_to", { ascending: true, nullsFirst: false });
   if (error) return [];
-  return (data ?? []) as OlxAdvert[];
+  // Koercja liczb + fallback sumy życiowej do bieżącego odczytu (gdy kolumny total_* jeszcze puste/brak —
+  // np. przed migracją albo przed pierwszym syncem — nie wywali .toLocaleString i pokaże realne wartości).
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => {
+    const views = Number(r.views ?? 0) || 0;
+    const phones = Number(r.phones ?? 0) || 0;
+    return {
+      ...(r as unknown as OlxAdvert),
+      views, phones,
+      total_views: Math.max(Number(r.total_views ?? 0) || 0, views),
+      total_phones: Math.max(Number(r.total_phones ?? 0) || 0, phones),
+    };
+  });
 }
 
 // §B3 Sezonowość rok-do-roku: z dziennych snapshotów (kumulatywne wartości OLX) liczymy
@@ -112,8 +125,10 @@ export async function getOlxSeasonality(): Promise<{ series: OlxSeasonalityYear[
     if (prev && prev.olx_id === cur.olx_id) {
       const d = new Date(row.captured_on);
       const b = ensure(d.getUTCFullYear());
-      b.views[d.getUTCMonth()] += Math.max(0, cur.views - prev.views);
-      b.phones[d.getUTCMonth()] += Math.max(0, cur.phones - prev.phones);
+      // Przyrost dzienny odporny na reset OLX: gdy dziś < wczoraj (licznik zresetowany przy odświeżeniu),
+      // liczymy dzisiejszą wartość jako przyrost (nowe okno), a nie 0 — inaczej gubilibyśmy odsłony po resecie.
+      b.views[d.getUTCMonth()] += cur.views >= prev.views ? cur.views - prev.views : cur.views;
+      b.phones[d.getUTCMonth()] += cur.phones >= prev.phones ? cur.phones - prev.phones : cur.phones;
     }
     prev = cur;
   }
@@ -167,8 +182,8 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
           /* chwilowy błąd statystyk — NIE nadpisujemy realnych wartości zerami */
         }
 
-        const { data: prev } = await s.from("olx_adverts").select("views, phones, last_synced_at, city").eq("olx_id", olxId).maybeSingle();
-        const p = prev as { views: number; phones: number; last_synced_at: string; city: string | null } | null;
+        const { data: prev } = await s.from("olx_adverts").select("views, phones, total_views, total_phones, last_synced_at, city").eq("olx_id", olxId).maybeSingle();
+        const p = prev as { views: number; phones: number; total_views: number | null; total_phones: number | null; last_synced_at: string; city: string | null } | null;
 
         // §OLX Miasto: REUŻYJ zapisane (żeby detal/geokodowanie robić RAZ na ogłoszenie, nie co sync —
         // inaczej funkcja przekracza limit czasu). Dopiero gdy brak: z listy → (detal tylko gdy brak lat/lng)
@@ -215,6 +230,15 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
           row.prev_views = p?.views ?? null;
           row.prev_phones = p?.phones ?? null;
           row.prev_synced_at = p?.last_synced_at ?? null;
+          // §OLX RZETELNOŚĆ: apka AKUMULUJE własną sumę życiową, niezależną od tego, co OLX trzyma w pamięci.
+          // Przyrost odporny na reset (OLX zeruje licznik przy odświeżeniu): gdy bieżący < poprzedni,
+          // traktujemy bieżący jako przyrost (nowe okno), nie ujemną deltę. Suma nigdy nie spada:
+          // max(akumulowana + przyrost, bieżący OLX) — dopóki OLX rośnie, trzyma się jego wartości; po
+          // resecie zostaje suma sprzed resetu + nowe przyrosty. Dane historyczne = nasze, nie OLX-a.
+          const incViews = views >= (p?.views ?? 0) ? views - (p?.views ?? 0) : views;
+          const incPhones = phones >= (p?.phones ?? 0) ? phones - (p?.phones ?? 0) : phones;
+          row.total_views = Math.max((p?.total_views ?? 0) + incViews, views);
+          row.total_phones = Math.max((p?.total_phones ?? 0) + incPhones, phones);
         }
         await s.from("olx_adverts").upsert(row);
         seenIds.push(olxId);
