@@ -42,6 +42,14 @@ export async function listInquiries(): Promise<InquiryWithCustomer[]> {
   return (data ?? []) as InquiryWithCustomer[];
 }
 
+// §OLX Liczba rozmów (wiadomości) z OLX — do statystyk ogłoszeń. Jedna rozmowa = jedno zapytanie OLX.
+export async function countOlxLeads(): Promise<number> {
+  if (!isSupabaseConfigured()) return DEMO_INQUIRIES.filter((i) => i.source === "OLX").length;
+  const supabase = await createClient();
+  const { count } = await supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("source", "OLX");
+  return count ?? 0;
+}
+
 export async function getInquiry(id: string): Promise<InquiryRecord | null> {
   if (!isSupabaseConfigured()) {
     return DEMO_INQUIRIES.find((i) => i.id === id) ?? null;

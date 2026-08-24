@@ -6,6 +6,7 @@ import { MetricCard, Alert, Pill } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { listOlxAdverts, getOlxSeasonality } from "@/lib/data/olx-adverts";
 import { getOlxIntegration } from "@/lib/data/olx";
+import { countOlxLeads } from "@/lib/data/inquiries";
 import { analyzeFleet } from "@/lib/domain/olx-adverts";
 import { AdvertsSyncButton } from "./sync-button";
 import { SeasonalityChart } from "./seasonality-chart";
@@ -35,7 +36,7 @@ export default async function AdvertsPage() {
     );
   }
 
-  const [adverts, integration, seasonality] = await Promise.all([listOlxAdverts(), getOlxIntegration(), getOlxSeasonality()]);
+  const [adverts, integration, seasonality, olxLeads] = await Promise.all([listOlxAdverts(), getOlxIntegration(), getOlxSeasonality(), countOlxLeads()]);
   const connected = Boolean(integration?.refresh_token);
   const { insights, summary } = analyzeFleet(adverts);
   const toReact = insights.filter((i) => i.expired || i.expiringSoon).sort((a, b) => b.priority - a.priority);
@@ -62,10 +63,11 @@ export default async function AdvertsPage() {
       {adverts.length > 0 && (
         <>
           {/* Wnioski (podsumowanie floty) */}
-          <div className="mb-5 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+          <div className="mb-5 grid grid-cols-2 gap-3.5 sm:grid-cols-5">
             <MetricCard label="Ogłoszenia" value={String(summary.count)} />
             <MetricCard label="Wyświetlenia" value={summary.totalViews.toLocaleString("pl-PL")} tone="ok" />
             <MetricCard label="Telefony" value={summary.totalPhones.toLocaleString("pl-PL")} tone="ok" />
+            <MetricCard label="Wiadomości" value={olxLeads.toLocaleString("pl-PL")} sub="rozmowy z OLX" tone="ok" />
             <MetricCard label="Skuteczność" value={pct(summary.avgConversion)} sub="telefony / wyświetlenia" />
           </div>
 

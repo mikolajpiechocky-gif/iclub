@@ -37,22 +37,18 @@ export function SeasonalityChart({ series }: { series: SeasonYear[] }) {
         ))}
       </div>
 
-      {/* Wykres */}
+      {/* Wykres — liczba zawsze nad słupkiem (na mobilce nie ma najechania). */}
       <div className="flex items-end gap-1" style={{ height: 150 }}>
         {MONTHS.map((mon, mi) => (
           <div key={mon} className="flex flex-1 flex-col items-center gap-1">
-            <div className="flex w-full items-end justify-center gap-[2px]" style={{ height: 128 }}>
+            <div className="flex w-full items-end justify-center gap-[3px]" style={{ height: 128 }}>
               {series.map((s, yi) => {
                 const v = valuesOf(s)[mi];
-                const h = Math.round((v / max) * 128);
+                const h = Math.round((v / max) * 108); // zostaw miejsce na liczbę nad słupkiem
                 return (
-                  <div key={s.year} className="group relative flex-1" style={{ maxWidth: 14 }}>
+                  <div key={s.year} className="flex h-full flex-1 flex-col items-center justify-end" style={{ maxWidth: 20 }} title={`${s.year}: ${fmt(v)}`}>
+                    {v > 0 && <span className="mb-0.5 text-[8.5px] font-bold leading-none text-ink">{fmt(v)}</span>}
                     <div className="w-full rounded-t-[3px] transition-all" style={{ height: Math.max(v > 0 ? 3 : 0, h), background: colorOf(yi) }} />
-                    {v > 0 && (
-                      <span className="pointer-events-none absolute -top-5 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-[#12131a] px-1.5 py-0.5 text-[10px] font-bold text-ink group-hover:block">
-                        {s.year}: {fmt(v)}
-                      </span>
-                    )}
                   </div>
                 );
               })}
