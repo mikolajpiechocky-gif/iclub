@@ -1,0 +1,32 @@
+name: OLX auto-sync ogłoszeń
+
+# Ogłoszenia (statystyki, ranking, miasto, valid_to, wykrycie odświeżenia) — co 2 godziny
+# w godzinach 6–20 UTC (8–22 PL). Dotąd robił to tylko cron Vercel RAZ dziennie, przez co
+# odświeżenia/bumpy ogłoszeń były widoczne z dużym opóźnieniem i trzeba było synchronizować ręcznie.
+# Endpoint chroniony sekretem OLX_CRON_SECRET.
+on:
+  schedule:
+    - cron: "0 6-20/2 * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: olx-sync-adverts
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping OLX sync-adverts endpoint
+        env:
+          CRON_SECRET: ${{ secrets.OLX_CRON_SECRET }}
+        run: |
+          code=$(curl -sS -o response.json -w "%{http_code}" -X GET \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            https://app.iclubevents.pl/api/olx/sync-adverts)
+          echo "HTTP ${code}"
+          cat response.json || true
+          echo ""
+          test "${code}" = "200"
