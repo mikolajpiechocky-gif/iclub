@@ -158,8 +158,9 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
         try {
           const st = (await getAdvertStatistics(token, olxId)) as Record<string, unknown>;
           rawStats = st; // §diagnostyka surowa odpowiedź statystyk — do naprawy zliczania wyświetleń
-          // Wyświetlenia: MAKSIMUM z pól widokowych (OLX bywa {views:0, impressions:N} — max łapie realną liczbę).
-          views = deepNumMax(st, ["impressions", "views", "page_views", "pageviews", "detail_views", "detailviews", "visits", "views_count", "view_count", "displays", "impressions_count"]);
+          // Wyświetlenia: OLX zwraca je pod „advert_views" (potwierdzone na danych: {advert_views, phone_views}).
+          // Max z pól widokowych — na wypadek innych wariantów nazw.
+          views = deepNumMax(st, ["advert_views", "advert_view", "impressions", "views", "page_views", "pageviews", "detail_views", "detailviews", "visits", "views_count", "view_count", "displays", "impressions_count"]);
           phones = deepNum(st, ["phones", "phone_views", "phoneviews", "phone", "calls", "phone_clicks", "phone_reveals", "reveal_phone", "phone_count", "contacts"]);
           statsOk = true;
         } catch {
