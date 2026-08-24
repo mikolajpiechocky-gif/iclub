@@ -37,13 +37,13 @@ export async function geocode(address: string): Promise<GeoPoint | null> {
 export async function reverseGeocodeCity(lat: number, lng: number): Promise<string | null> {
   if (!isGoogleMapsConfigured() || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   try {
-    const url =
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}` +
-      `&language=pl&result_type=locality|administrative_area_level_3|postal_town&key=${GOOGLE_MAPS_API_KEY}`;
+    // Bez filtra result_type (bywa zbyt restrykcyjny dla wsi/małych miejscowości) — przeszukujemy
+    // składowe wszystkich wyników w kolejności od najdokładniejszej nazwy miejscowości.
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=pl&key=${GOOGLE_MAPS_API_KEY}`;
     const res = await fetch(url);
     const json = await res.json();
     const results = (json?.results ?? []) as { address_components?: { long_name: string; types: string[] }[] }[];
-    const wanted = ["locality", "administrative_area_level_3", "postal_town"];
+    const wanted = ["locality", "postal_town", "administrative_area_level_3", "sublocality", "administrative_area_level_2"];
     for (const type of wanted) {
       for (const r of results) {
         const comp = (r.address_components ?? []).find((c) => c.types.includes(type));

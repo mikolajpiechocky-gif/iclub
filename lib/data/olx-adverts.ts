@@ -135,8 +135,10 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
         let views = 0;
         let phones = 0;
         let statsOk = false;
+        let rawStats: unknown = null;
         try {
           const st = (await getAdvertStatistics(token, olxId)) as Record<string, unknown>;
+          rawStats = st; // §diagnostyka surowa odpowiedź statystyk — do naprawy zliczania wyświetleń
           // BFS po wszystkich wariantach nazw — dawniej sztywne „views" dawało 0 mimo realnych odsłon.
           views = deepNum(st, ["views", "impressions", "page_views", "pageviews", "detail_views", "detailviews", "visits", "views_count", "view_count", "displays"]);
           phones = deepNum(st, ["phones", "phone_views", "phoneviews", "phone", "calls", "phone_clicks", "phone_reveals", "reveal_phone", "phone_count", "contacts"]);
@@ -189,6 +191,7 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
         if (statsOk) {
           row.views = views;
           row.phones = phones;
+          row.raw_stats = rawStats; // §diagnostyka do naprawy zliczania wyświetleń (pełna odpowiedź OLX)
           row.prev_views = p?.views ?? null;
           row.prev_phones = p?.phones ?? null;
           row.prev_synced_at = p?.last_synced_at ?? null;
