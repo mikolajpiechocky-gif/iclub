@@ -14,6 +14,7 @@ import { StatusBadge } from "./ui";
 import { UserMenu } from "./auth/user-menu";
 import { PullToRefresh } from "./pull-to-refresh";
 import { HeaderBell } from "./header-bell";
+import { HeaderSearch } from "./header-search";
 import type { StatusKey } from "@/lib/types";
 import type { ProfileRecord } from "@/lib/data/types";
 
@@ -200,7 +201,8 @@ export function AppShell({ children, profile, unread = 0 }: { children: ReactNod
       <main className="min-w-0 flex-1 pb-6 md:pb-0">
         <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-[#1b1d27] bg-panel px-4 py-2.5 md:px-8">
           <MobileDrawer profile={profile} />
-          <div className="ml-auto"><HeaderBell unread={unread} /></div>
+          <div className="min-w-0 flex-1"><HeaderSearch /></div>
+          <HeaderBell unread={unread} />
         </div>
         {children}
       </main>
