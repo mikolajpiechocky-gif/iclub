@@ -117,6 +117,24 @@ export function extractLocation(advertOrThread: unknown): string | null {
   return readable(loc);
 }
 
+// Współrzędne ogłoszenia (OLX zwraca latitude/longitude w obiekcie location) — do reverse-geocodingu miasta.
+export function extractLatLng(advertOrThread: unknown): { lat: number; lng: number } | null {
+  const advert = pick(advertOrThread, "advert") ?? pick(advertOrThread, "ad") ?? advertOrThread;
+  const lat = bfsFind(advert, keyIn("latitude", "lat"), (v) => v != null, { maxDepth: 5 });
+  const lng = bfsFind(advert, keyIn("longitude", "lng", "lon"), (v) => v != null, { maxDepth: 5 });
+  const nlat = Number(lat), nlng = Number(lng);
+  if (Number.isFinite(nlat) && Number.isFinite(nlng) && (nlat !== 0 || nlng !== 0)) return { lat: nlat, lng: nlng };
+  return null;
+}
+
+// Identyfikator miasta OLX (city_id) — klucz cache, żeby nie geokodować tego samego miasta wielokrotnie.
+export function extractCityId(advertOrThread: unknown): number | null {
+  const advert = pick(advertOrThread, "advert") ?? pick(advertOrThread, "ad") ?? advertOrThread;
+  const id = bfsFind(advert, keyIn("city_id", "cityid"), (v) => v != null, { maxDepth: 5 });
+  const n = Number(id);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 // Pola wiadomości: treść, znacznik czasu, id autora (do kierunku).
 export function extractMessageText(m: unknown): string {
   const t = bfsFind(m, keyIn("text", "message", "body", "content"), isStr, { maxDepth: 3 });

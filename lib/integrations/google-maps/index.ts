@@ -32,6 +32,30 @@ export async function geocode(address: string): Promise<GeoPoint | null> {
   }
 }
 
+// Współrzędne → nazwa miasta (reverse geocoding). OLX podaje tylko city_id + lat/lng
+// (bez nazwy), więc nazwę miasta wyłuskujemy z Google. Bez klucza / przy błędzie → null.
+export async function reverseGeocodeCity(lat: number, lng: number): Promise<string | null> {
+  if (!isGoogleMapsConfigured() || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  try {
+    const url =
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}` +
+      `&language=pl&result_type=locality|administrative_area_level_3|postal_town&key=${GOOGLE_MAPS_API_KEY}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    const results = (json?.results ?? []) as { address_components?: { long_name: string; types: string[] }[] }[];
+    const wanted = ["locality", "administrative_area_level_3", "postal_town"];
+    for (const type of wanted) {
+      for (const r of results) {
+        const comp = (r.address_components ?? []).find((c) => c.types.includes(type));
+        if (comp?.long_name) return comp.long_name.trim();
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // Podpowiadanie adresów (§37) — Places API (New) Autocomplete. Bez klucza lub
 // przy błędzie zwraca pustą listę (formularz działa jak zwykłe pole tekstowe).
 export interface AddressSuggestion {

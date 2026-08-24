@@ -6,7 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getValidAccessToken } from "./olx";
 import { getAdverts, getAdvert, getAdvertStatistics } from "@/lib/integrations/olx";
-import { extractLocation } from "@/lib/integrations/olx/extract";
+import { extractLocation, extractLatLng, extractCityId } from "@/lib/integrations/olx/extract";
+import { reverseGeocodeCity } from "@/lib/integrations/google-maps";
 
 // §OLX Głębokie (BFS) wyszukanie pierwszej liczbowej wartości pod pasującym kluczem — statystyki
 // OLX bywają zagnieżdżone/inaczej nazwane (telefony działają, a „views" bywa np. impressions/page_views).
@@ -120,6 +121,7 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
   let synced = 0;
   let offset = 0;
   const seenIds: string[] = []; // §OLX id-ki ogłoszeń realnie obecnych na koncie (do sprzątania nieaktualnych)
+  const cityByCityId = new Map<number, string>(); // §OLX cache miast (city_id → nazwa) — jedno geokodowanie na miasto
   try {
     for (let page = 0; page < 50; page++) {
       const resp = (await getAdverts(token, offset, 100)) as Record<string, unknown>;
@@ -145,11 +147,25 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
 
         // §OLX Miasto: najpierw z listy; gdy brak (lista bywa uboga) — z detalu ogłoszenia.
         let city = extractLocation(a);
-        if (!city) {
+        let latlng = extractLatLng(a);
+        let cityId = extractCityId(a);
+        if (!city || !latlng) {
           try {
             const detail = (await getAdvert(token, olxId)) as Record<string, unknown>;
-            city = extractLocation(pick(detail, "data") ?? detail);
+            const d = pick(detail, "data") ?? detail;
+            city = city ?? extractLocation(d);
+            latlng = latlng ?? extractLatLng(d);
+            cityId = cityId ?? extractCityId(d);
           } catch { /* brak detalu — zostaje puste */ }
+        }
+        // §OLX OLX nie podaje NAZWY miasta (tylko city_id + lat/lng) — wyłuskujemy nazwę z Google
+        // (reverse geocoding), z cache po city_id, żeby nie geokodować tego samego miasta wielokrotnie.
+        if (!city && latlng) {
+          if (cityId != null && cityByCityId.has(cityId)) city = cityByCityId.get(cityId)!;
+          else {
+            const geoCity = await reverseGeocodeCity(latlng.lat, latlng.lng);
+            if (geoCity) { city = geoCity; if (cityId != null) cityByCityId.set(cityId, geoCity); }
+          }
         }
 
         const { data: prev } = await s.from("olx_adverts").select("views, phones, last_synced_at").eq("olx_id", olxId).maybeSingle();
