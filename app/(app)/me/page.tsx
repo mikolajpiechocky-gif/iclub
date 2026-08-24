@@ -8,6 +8,7 @@ import { getSettings } from "@/lib/data/settings";
 import { getEmployee } from "@/lib/data/employees";
 import { countOccupiedIclubByMonth } from "@/lib/data/jobs";
 import { rulesFromSettings, settlementForRealization, type RealizationSettlement } from "@/lib/domain/iclub-settlement";
+import { hasGastroTent } from "@/lib/domain/tents";
 import { geocode, routeLeg } from "@/lib/integrations/google-maps";
 import { warsawTodayISO } from "@/lib/domain/dates";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -85,7 +86,7 @@ export default async function EmployeeDashboardPage() {
       const prior = (priorByMonth.get(month) ?? 0) + offset;
       const settlement = settlementForRealization(rules, prior, {
         farTrip: km != null && km > 100, // §16.3 daleki wyjazd = powyżej 100 km w jedną stronę
-        hasGastro: j.reservation?.tent_extra === "GASTRO",
+        hasGastro: hasGastroTent(j.reservation?.tent_main, j.reservation?.tent_extra),
         rate: myRate,
       });
       return { j, km, settlement };

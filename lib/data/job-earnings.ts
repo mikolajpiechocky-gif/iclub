@@ -3,6 +3,7 @@
 // późniejsza zmiana stawek NIE zmieniała rozliczeń już zakończonych realizacji.
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
 import { settlementForRealization, rulesFromSettings, numOr, possibleAddonBonuses, type IclubSettlementRules } from "@/lib/domain/iclub-settlement";
+import { hasGastroTent } from "@/lib/domain/tents";
 import { countDoneIclubRealizations } from "./jobs";
 import type { AppSettings } from "./settings";
 import type { BusinessLine, EmployeeRate, JobWithReservation } from "./types";
@@ -27,7 +28,7 @@ export function jobEarningsCtx(job: JobWithReservation, settings: AppSettings, f
     rules: rulesFromSettings(settings),
     monthPrefix: (job.event_date ?? "").slice(0, 7),
     farTrip,
-    hasGastro: job.reservation?.tent_extra === "GASTRO",
+    hasGastro: hasGastroTent(job.reservation?.tent_main, job.reservation?.tent_extra),
     rentalFlat: job.reservation?.rental_settlement_flat != null ? Number(job.reservation.rental_settlement_flat) : null,
     ownerBonus: Number(job.owner_bonus ?? 0) || 0,
     hours: settings.iclub_hours,

@@ -5,6 +5,7 @@ import type { EmployeeRate } from "./types";
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
 import { getSettings } from "./settings";
 import { settlementForRealization, rulesFromSettings, numOr } from "@/lib/domain/iclub-settlement";
+import { hasGastroTent } from "@/lib/domain/tents";
 
 export type AssignmentStatus = "REQUESTED" | "APPROVED";
 
@@ -132,7 +133,7 @@ interface RawSettlementRow {
   reel_given: boolean | null;
   reel_link: string | null;
   fuel_amount: number | string | null;
-  job: { id: string; title: string | null; status: string; business_line: string; event_date: string | null; owner_bonus: number | string | null; reservation: { id: string; event_type: string | null; tent_extra: string | null; rental_settlement_flat: number | string | null; upsell_value: number | string | null; customer: { name: string | null } | null } | null } | null;
+  job: { id: string; title: string | null; status: string; business_line: string; event_date: string | null; owner_bonus: number | string | null; reservation: { id: string; event_type: string | null; tent_main: string | null; tent_extra: string | null; rental_settlement_flat: number | string | null; upsell_value: number | string | null; customer: { name: string | null } | null } | null } | null;
 }
 
 export async function listEmployeeSettlements(profileId: string): Promise<EmployeeSettlementRow[]> {
@@ -141,7 +142,7 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
   const [{ data }, { data: rateData }, settings] = await Promise.all([
     supabase
       .from("job_assignments")
-      .select("id, is_lead, earnings_snapshot, settled_at, status, review_given, reel_given, reel_link, fuel_amount, job:jobs(id, title, status, business_line, event_date, owner_bonus, reservation:reservations(id, event_type, tent_extra, rental_settlement_flat, upsell_value, customer:customers(name)))")
+      .select("id, is_lead, earnings_snapshot, settled_at, status, review_given, reel_given, reel_link, fuel_amount, job:jobs(id, title, status, business_line, event_date, owner_bonus, reservation:reservations(id, event_type, tent_main, tent_extra, rental_settlement_flat, upsell_value, customer:customers(name)))")
       .eq("profile_id", profileId)
       .eq("status", "APPROVED"),
     supabase.from("employee_rates").select("*").eq("profile_id", profileId).maybeSingle(),
@@ -168,7 +169,10 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
     const { data: tc, error: tcErr } = await supabase.from("transport_calculations").select("job_id, one_way_km, distance_km, fuel_cost, amortization").in("job_id", jobIds);
     if (tcErr) console.error("listEmployeeSettlements: transport_calculations select failed", tcErr.message);
     for (const t of (tc ?? []) as { job_id: string; one_way_km: number | string | null; distance_km: number | string | null; fuel_cost: number | string | null; amortization: number | string | null }[]) {
-      if (Number(t.one_way_km ?? 0) > 100) farByJob.set(t.job_id, true);
+      // Daleki wyjazd: preferuj one_way_km; stare wiersze bez niego — szacuj z trasy round-trip (distance_km / 2).
+      const ow = Number(t.one_way_km ?? 0) || 0;
+      const oneWay = ow > 0 ? ow : (Number(t.distance_km ?? 0) || 0) / 2;
+      if (oneWay > 100) farByJob.set(t.job_id, true);
       // Eksploatacja: zapisana wartość (planowane km × stawka); gdy jej brak — wylicz z distance_km (planowane km).
       const amort = t.amortization != null ? (Number(t.amortization) || 0) : (Number(t.distance_km ?? 0) || 0) * settings.amortization_per_km;
       transportCostByJob.set(t.job_id, (transportCostByJob.get(t.job_id) ?? 0) + (Number(t.fuel_cost ?? 0) || 0) + amort);
@@ -192,7 +196,7 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
       if (flat != null) { basePaidOut = true; baseValue = flat; baseLabel = "Ryczałt za zlecenie"; }
       else { basePaidOut = false; baseValue = 0; baseLabel = "Stawka godzinowa (koszt osobno)"; }
     } else if (rate) {
-      const s = settlementForRealization(rules, priorCount, { farTrip: farByJob.get(r.job!.id) ?? false, hasGastro: r.job!.reservation?.tent_extra === "GASTRO", rate });
+      const s = settlementForRealization(rules, priorCount, { farTrip: farByJob.get(r.job!.id) ?? false, hasGastro: hasGastroTent(r.job!.reservation?.tent_main, r.job!.reservation?.tent_extra), rate });
       basePaidOut = s.form === "flat"; // ryczałt (flat) = do wypłaty; czas wolny (free_time) = koszt „w ramach umowy"
       baseValue = s.baseValue;
       baseLabel = s.baseLabel;

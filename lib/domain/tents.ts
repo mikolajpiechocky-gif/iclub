@@ -27,6 +27,11 @@ export interface TentSlots {
 }
 const ZERO: TentSlots = { large: 0, small: 0, backdoor: 0, gastro: 0 };
 
+// §19.3 Namiot gastronomiczny może być głównym LUB dodatkowym — premia „gastro" należy się w obu przypadkach.
+export function hasGastroTent(tentMain: string | null | undefined, tentExtra: string | null | undefined): boolean {
+  return tentMain === "GASTRO" || tentExtra === "GASTRO";
+}
+
 export function slotsFor(choice: TentChoice | "" | null | undefined): TentSlots {
   switch (choice) {
     case "M": return { ...ZERO, small: 1 };
