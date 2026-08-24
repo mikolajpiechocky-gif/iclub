@@ -186,12 +186,12 @@ export default async function EmployeeDashboardPage() {
                     ))}
                   </div>
                   {settlement.possible.length > 0 && (
-                    <div className="mt-0.5 text-[10.5px] text-muted">Możliwe premie: <span className="font-semibold text-ok">+{fmtPLN(settlement.possible.reduce((s, b) => s + b.amount, 0))}</span> ({settlement.possible.map((b) => `${b.label.toLowerCase()} +${fmtPLN(b.amount)}`).join(" · ")})</div>
+                    <div className="mt-0.5 text-[10.5px] text-muted">W tym do zdobycia: {settlement.possible.map((b) => `${b.label.toLowerCase()} +${fmtPLN(b.amount)}`).join(" · ")} — zgarnij opinię i nagraj rolkę!</div>
                   )}
                 </div>
                 <div className="flex-none text-right">
-                  {/* „do zgarnięcia" = tylko realnie płatne przez apkę: dla free_time dniówka to KOSZT poza apką → same premie gwarantowane; dla flat ryczałt JEST do wypłaty. */}
-                  <div className="font-display text-[15px] font-bold text-ok">{fmtPLN2(settlement.form === "free_time" ? settlement.guaranteedTotal : settlement.total)}</div>
+                  {/* „do zgarnięcia" = maksymalny potencjał (motywacja): baza (1 dzień wolny/ryczałt) + gwarantowane (daleki/gastro) + WSZYSTKIE możliwe premie (opinia + rolka). */}
+                  <div className="font-display text-[15px] font-bold text-ok">{fmtPLN2(settlement.total + settlement.possible.reduce((s, b) => s + b.amount, 0))}</div>
                   <div className="text-[9px] font-semibold text-ink-2">do zgarnięcia</div>
                   <div className="mt-1 text-[11px] font-bold text-ok">Zgarnij →</div>
                 </div>

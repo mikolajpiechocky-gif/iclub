@@ -12,7 +12,14 @@ import { listReservations } from "@/lib/data/reservations";
 import { listAddons } from "@/lib/data/resources";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { JOB_STATUS_META, type JobWithReservation } from "@/lib/data/types";
+import { warsawTodayISO } from "@/lib/domain/dates";
 import { BackfillCostsButton } from "./backfill-button";
+
+// Kolor kategorii kosztu (rozbicie w podsumowaniu miesiąca) — reszta na neutralnym.
+const COST_CAT_COLOR: Record<string, string> = {
+  Wynagrodzenie: "#e11d74", Robocizna: "#b98cf5", Paliwo: "#f59e0b", Transport: "#f59e0b",
+  Sprzęt: "#14b8c4", Pojazd: "#3b82f6", Marketing: "#22c55e", Autostrada: "#64748b",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +36,7 @@ const jobMonthNum = (j: JobWithReservation): string =>
   (j.event_date ?? j.reservation?.event_date ?? "").slice(5, 7);
 const MONTHS_PL = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
 
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ year?: string; month?: string }> }) {
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ year?: string; month?: string; view?: string }> }) {
   const profile = await getCurrentProfile();
   if (profile && profile.role !== "OWNER") {
     return (
@@ -43,15 +50,25 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const [jobs, payments, costs, investments, reservations, addons] = await Promise.all([listJobs(), listPayments(), listCosts(), listInvestments(), listReservations(), listAddons()]);
   const demo = !isSupabaseConfigured();
 
-  // Dostępne lata (malejąco) + wybór z URL; domyślnie „Wszystko".
+  // Dwie karty: „Podsumowanie miesiąca" (domyślna) i „Rentowność" (dotychczasowy widok).
+  const { year: yearParam, month: monthParam, view: viewParam } = await searchParams;
+  const view: "summary" | "details" = viewParam === "details" ? "details" : "summary";
+
+  // Dostępne lata (malejąco) + wybór z URL.
   const years = Array.from(new Set(jobs.map(jobYear).filter(Boolean))).sort().reverse();
-  const { year: yearParam, month: monthParam } = await searchParams;
-  const selectedYear = yearParam && years.includes(yearParam) ? yearParam : "all";
+  const today = warsawTodayISO();
+  const curY = today.slice(0, 4);
+  const curM = today.slice(5, 7);
+  // Podsumowanie bez filtrów → domyślnie BIEŻĄCY miesiąc (jeśli ma dane); reszta jak dotąd („Wszystko").
+  const noFilters = !yearParam && !monthParam;
+  const defaultYear = view === "summary" && noFilters && years.includes(curY) ? curY : "all";
+  const selectedYear = yearParam && years.includes(yearParam) ? yearParam : defaultYear;
   // Miesiące z danymi w wybranym roku + wybór miesiąca (tylko gdy rok jest wybrany).
   const monthsInYear = selectedYear === "all"
     ? []
     : Array.from(new Set(jobs.filter((j) => jobYear(j) === selectedYear).map(jobMonthNum).filter(Boolean))).sort();
-  const selectedMonth = selectedYear !== "all" && monthParam && monthsInYear.includes(monthParam) ? monthParam : "";
+  const defaultMonth = view === "summary" && noFilters && selectedYear === curY && monthsInYear.includes(curM) ? curM : "";
+  const selectedMonth = selectedYear !== "all" && monthParam && monthsInYear.includes(monthParam) ? monthParam : defaultMonth;
 
   const paidByJob = new Map<string, number>();
   for (const p of payments) {
@@ -80,6 +97,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const totalCost = rows.reduce((s, r) => s + r.cost, 0);
   const totalProfit = totalRev - totalCost;
 
+  // §podsumowanie Rozbicie kosztów na kategorie (dla wybranego zakresu) — do widoku „Podsumowanie miesiąca".
+  const costByCat = new Map<string, number>();
+  for (const r of rows) {
+    for (const it of costItemsByJob.get(r.job.id) ?? []) {
+      if (it.status === "REJECTED") continue;
+      costByCat.set(it.category, (costByCat.get(it.category) ?? 0) + it.amount);
+    }
+  }
+  const costCats = [...costByCat.entries()].sort((a, b) => b[1] - a[1]);
+  const costCatMax = Math.max(1, ...costCats.map(([, v]) => v));
+
   const byLine = (line: "ICLUB" | "EQUIPMENT_RENTAL") => {
     const rs = rows.filter((r) => r.job.business_line === line);
     const rev = rs.reduce((s, r) => s + r.rev, 0);
@@ -104,6 +132,111 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   const scopeLabel = selectedYear === "all" ? "od początku" : selectedMonth ? `${MONTHS_PL[Number(selectedMonth) - 1]} ${selectedYear}` : `rok ${selectedYear}`;
   const tabs = [{ k: "all", label: "Wszystko" }, ...years.map((y) => ({ k: y, label: y }))];
+
+  // Linki zachowujące bieżącą kartę (view) i filtr; pomijają wartości domyślne (summary, „Wszystko").
+  const hrefFor = (v: "summary" | "details", y?: string, m?: string) => {
+    const p = new URLSearchParams();
+    if (v === "details") p.set("view", "details");
+    if (y && y !== "all") p.set("year", y);
+    if (m) p.set("month", m);
+    const q = p.toString();
+    return q ? `/reports?${q}` : "/reports";
+  };
+
+  const viewTabs = (
+    <div className="mb-4 flex gap-2">
+      {([["summary", "Podsumowanie miesiąca"], ["details", "Rentowność"]] as const).map(([v, label]) => (
+        <a key={v} href={hrefFor(v, selectedYear, selectedMonth)} className={`rounded-full px-4 py-1.5 text-[13px] font-bold transition-colors ${view === v ? "bg-brand text-white" : "border border-border bg-surface text-ink-2 hover:text-white"}`}>{label}</a>
+      ))}
+    </div>
+  );
+
+  const filterUI = (
+    <>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {tabs.map((t) => (
+          <a key={t.k} href={hrefFor(view, t.k)} className={`rounded-full px-4 py-1.5 text-[13px] font-bold transition-colors ${selectedYear === t.k ? "bg-white text-[#0b0c11]" : "border border-border bg-surface text-ink-2 hover:text-white"}`}>{t.label}</a>
+        ))}
+      </div>
+      {selectedYear !== "all" && monthsInYear.length > 0 && (
+        <div className="mb-5 flex flex-wrap gap-1.5">
+          <a href={hrefFor(view, selectedYear)} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition-colors ${!selectedMonth ? "bg-accent text-white" : "border border-border bg-surface text-ink-2 hover:text-white"}`}>Cały rok</a>
+          {monthsInYear.map((m) => (
+            <a key={m} href={hrefFor(view, selectedYear, m)} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition-colors ${selectedMonth === m ? "bg-accent text-white" : "border border-border bg-surface text-ink-2 hover:text-white"}`}>{MONTHS_PL[Number(m) - 1]}</a>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
+  const demoBanner = demo && (
+    <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
+      Tryb demo — dane przykładowe. Uwzględnia płatności o statusie „Zapłacone” i wszystkie koszty.
+    </div>
+  );
+
+  // ═══════════ KARTA 1: Podsumowanie miesiąca ═══════════
+  if (view === "summary") {
+    return (
+      <div className="mx-auto max-w-[1000px] px-5 py-6 md:px-8">
+        <PageHeader title="Podsumowanie miesiąca" subtitle={`Wpływy − koszty = zysk · ${scopeLabel}`} />
+        {demoBanner}
+        {viewTabs}
+        {filterUI}
+
+        <div className="mb-5 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+          <MetricCard label="Wpływy" value={fmtPLN(totalRev)} tone="ok" />
+          <MetricCard label="Koszty" value={fmtPLN(totalCost)} tone="warn" />
+          <MetricCard label="Zysk" value={fmtPLN(totalProfit)} sub={`marża ${pct(totalProfit, totalRev)}`} tone={totalProfit >= 0 ? "ok" : "bad"} />
+          <MetricCard label="Realizacje" value={String(rows.length)} />
+        </div>
+
+        <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {[{ name: "iClub", d: iclub, c: "#e11d74" }, { name: "Wypożyczalnia", d: rental, c: "#14b8c4" }].map((l) => (
+            <div key={l.name} className="rounded-card-lg border border-border bg-surface p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: l.c }} />
+                <h2 className="font-display text-[15px] font-bold text-white">{l.name}</h2>
+                <span className="ml-auto text-[12px] font-semibold text-ink-2">{l.d.count} real.</span>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div><div className="text-[11px] font-semibold text-ink-2">Wpływy</div><div className="mt-0.5 font-display text-[16px] font-bold text-ok">{fmtPLN(l.d.rev)}</div></div>
+                <div><div className="text-[11px] font-semibold text-ink-2">Koszty</div><div className="mt-0.5 font-display text-[16px] font-bold text-warn">{fmtPLN(l.d.cost)}</div></div>
+                <div><div className="text-[11px] font-semibold text-ink-2">Zysk</div><div className="mt-0.5 font-display text-[16px] font-bold" style={{ color: l.d.profit >= 0 ? "#5fd68b" : "#f58585" }}>{fmtPLN(l.d.profit)}</div></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-card-lg border border-border bg-surface p-5">
+          <div className="mb-3 flex items-baseline gap-2">
+            <h2 className="font-display text-[15px] font-bold text-white">Koszty wg kategorii</h2>
+            <span className="ml-auto font-display text-[15px] font-bold text-warn">{fmtPLN(totalCost)}</span>
+          </div>
+          {costCats.length === 0 ? (
+            <p className="text-[12.5px] text-ink-2">Brak kosztów w tym okresie.</p>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {costCats.map(([cat, sum]) => (
+                <div key={cat}>
+                  <div className="mb-1 flex items-center gap-2 text-[13px]">
+                    <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: COST_CAT_COLOR[cat] ?? "#64748b" }} />
+                    <span className="font-semibold text-ink">{cat}</span>
+                    <span className="ml-auto font-bold text-white">{fmtPLN(sum)}</span>
+                    <span className="w-10 text-right text-[11.5px] font-semibold text-ink-2">{pct(sum, totalCost)}</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[#12131a]">
+                    <div className="h-full rounded-full" style={{ width: `${Math.round((sum / costCatMax) * 100)}%`, background: COST_CAT_COLOR[cat] ?? "#64748b" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="mt-3 text-[11px] text-ink-2">Wpływy = płatności „Zapłacone”; koszty = wszystkie poza odrzuconymi, w zakresie {scopeLabel}. Pełna rentowność per realizacja — w karcie „Rentowność”.</p>
+        </div>
+      </div>
+    );
+  }
 
   // §B4 Ranking „co najlepiej się wypożycza": przychód i liczba wypożyczeń per dodatek.
   // Pomija rezerwacje tymczasowe (niepotwierdzone przytrzymania). Respektuje filtr roku.
@@ -131,45 +264,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     <div className="mx-auto max-w-[1200px] px-5 py-6 md:px-8">
       <PageHeader title="Raporty i rentowność" subtitle={`Przychód (zapłacone) − koszty = zysk · ${scopeLabel}`} />
 
-      {demo && (
-        <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
-          Tryb demo — dane przykładowe. Uwzględnia płatności o statusie „Zapłacone” i wszystkie koszty.
-        </div>
-      )}
-
-      {/* Filtr roku */}
-      <div className="mb-3 flex flex-wrap gap-2">
-        {tabs.map((t) => {
-          const active = selectedYear === t.k;
-          const href = t.k === "all" ? "/reports" : `/reports?year=${t.k}`;
-          return (
-            <a
-              key={t.k}
-              href={href}
-              className={`rounded-full px-4 py-1.5 text-[13px] font-bold transition-colors ${
-                active ? "bg-white text-[#0b0c11]" : "border border-border bg-surface text-ink-2 hover:text-white"
-              }`}
-            >
-              {t.label}
-            </a>
-          );
-        })}
-      </div>
-
-      {/* Filtr miesiąca (gdy wybrany rok) */}
-      {selectedYear !== "all" && monthsInYear.length > 0 && (
-        <div className="mb-5 flex flex-wrap gap-1.5">
-          <a href={`/reports?year=${selectedYear}`} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition-colors ${!selectedMonth ? "bg-accent text-white" : "border border-border bg-surface text-ink-2 hover:text-white"}`}>Cały rok</a>
-          {monthsInYear.map((m) => {
-            const active = selectedMonth === m;
-            return (
-              <a key={m} href={`/reports?year=${selectedYear}&month=${m}`} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition-colors ${active ? "bg-accent text-white" : "border border-border bg-surface text-ink-2 hover:text-white"}`}>
-                {MONTHS_PL[Number(m) - 1]}
-              </a>
-            );
-          })}
-        </div>
-      )}
+      {demoBanner}
+      {viewTabs}
+      {filterUI}
 
       <div className="mb-5 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
         <MetricCard label="Przychód" value={fmtPLN(totalRev)} tone="ok" />
