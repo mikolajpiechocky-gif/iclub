@@ -50,6 +50,18 @@ export async function countOlxLeads(): Promise<number> {
   return count ?? 0;
 }
 
+// §OLX Rozmowy OLX przypisane do konkretnego ogłoszenia (olx_advert_id) — do skuteczności/rankingu per ogłoszenie.
+export async function countOlxMessagesByAdvert(): Promise<Record<string, number>> {
+  if (!isSupabaseConfigured()) return {};
+  const supabase = await createClient();
+  const { data } = await supabase.from("inquiries").select("olx_advert_id").eq("source", "OLX").not("olx_advert_id", "is", null);
+  const out: Record<string, number> = {};
+  for (const r of (data ?? []) as { olx_advert_id: string | null }[]) {
+    if (r.olx_advert_id) out[r.olx_advert_id] = (out[r.olx_advert_id] ?? 0) + 1;
+  }
+  return out;
+}
+
 export async function getInquiry(id: string): Promise<InquiryRecord | null> {
   if (!isSupabaseConfigured()) {
     return DEMO_INQUIRIES.find((i) => i.id === id) ?? null;

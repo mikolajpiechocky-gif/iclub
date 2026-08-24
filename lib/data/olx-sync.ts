@@ -165,6 +165,7 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
         const olxData: Record<string, unknown> = {
           contact_name: name,
           contact_email: email,
+          olx_advert_id: advertId, // §OLX ogłoszenie, którego dotyczy rozmowa — do skuteczności per ogłoszenie
           olx_messages: msgs,
           contract_signal: analysis.signal,
           olx_last_message: lastMsg,

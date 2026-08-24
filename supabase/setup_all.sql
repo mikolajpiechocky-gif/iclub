@@ -1546,3 +1546,12 @@ alter table public.jobs add column if not exists departed_at timestamptz;
 -- ================= 0068: znacznik wysłanego alertu „powinien już jechać" =================
 -- Alert wysyłamy RAZ na zlecenie (cron sprawdza co ~30 min), żeby nie zasypywać szefa.
 alter table public.jobs add column if not exists late_depart_alerted_at timestamptz;
+
+-- ================= 0069: OLX statystyki rzetelne + wiadomosci per ogloszenie =================
+-- Suma zyciowa akumulowana przez apke (odporna na resety/pamiec OLX) + surowe statystyki (diagnostyka).
+alter table public.olx_adverts add column if not exists total_views bigint not null default 0;
+alter table public.olx_adverts add column if not exists total_phones bigint not null default 0;
+alter table public.olx_adverts add column if not exists raw_stats jsonb;
+-- Ogloszenie, ktorego dotyczy rozmowa OLX -> skutecznosc/ranking per ogloszenie.
+alter table public.inquiries add column if not exists olx_advert_id text;
+create index if not exists idx_inquiries_olx_advert on public.inquiries (olx_advert_id) where olx_advert_id is not null;

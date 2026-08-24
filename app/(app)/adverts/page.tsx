@@ -6,7 +6,7 @@ import { MetricCard, Alert, Pill } from "@/components/ui";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { listOlxAdverts, getOlxSeasonality } from "@/lib/data/olx-adverts";
 import { getOlxIntegration } from "@/lib/data/olx";
-import { countOlxLeads } from "@/lib/data/inquiries";
+import { countOlxLeads, countOlxMessagesByAdvert } from "@/lib/data/inquiries";
 import { analyzeFleet } from "@/lib/domain/olx-adverts";
 import { AdvertsSyncButton } from "./sync-button";
 import { SeasonalityChart } from "./seasonality-chart";
@@ -36,9 +36,9 @@ export default async function AdvertsPage() {
     );
   }
 
-  const [adverts, integration, seasonality, olxLeads] = await Promise.all([listOlxAdverts(), getOlxIntegration(), getOlxSeasonality(), countOlxLeads()]);
+  const [adverts, integration, seasonality, olxLeads, msgsByAdvert] = await Promise.all([listOlxAdverts(), getOlxIntegration(), getOlxSeasonality(), countOlxLeads(), countOlxMessagesByAdvert()]);
   const connected = Boolean(integration?.refresh_token);
-  const { insights, summary } = analyzeFleet(adverts);
+  const { insights, summary } = analyzeFleet(adverts, msgsByAdvert);
   const toReact = insights.filter((i) => i.expired || i.expiringSoon).sort((a, b) => b.priority - a.priority);
   const podium = insights.filter((i) => i.advert.total_views > 0 || i.advert.total_phones > 0).slice(0, 3);
 
@@ -68,7 +68,7 @@ export default async function AdvertsPage() {
             <MetricCard label="Wyświetlenia" value={summary.totalViews.toLocaleString("pl-PL")} tone="ok" />
             <MetricCard label="Telefony" value={summary.totalPhones.toLocaleString("pl-PL")} tone="ok" />
             <MetricCard label="Wiadomości" value={olxLeads.toLocaleString("pl-PL")} sub="rozmowy z OLX" tone="ok" />
-            <MetricCard label="Skuteczność" value={pct(summary.avgConversion)} sub="telefony / wyświetlenia" />
+            <MetricCard label="Skuteczność" value={pct(summary.avgConversion)} sub="(telefony + wiadomości) / wyświetlenia" />
           </div>
 
           {/* §B3 Sezonowość rok-do-roku */}
@@ -97,7 +97,7 @@ export default async function AdvertsPage() {
                     </div>
                     {expiryPill(i.daysToExpiry, i.expired)}
                   </div>
-                  <div className="mb-2 text-[12px] text-ink-2">👁 {i.advert.total_views.toLocaleString("pl-PL")}{delta(i.deltaViews)} · 📞 {i.advert.total_phones.toLocaleString("pl-PL")}{delta(i.deltaPhones)} · skuteczność {pct(i.conversion)}</div>
+                  <div className="mb-2 text-[12px] text-ink-2">👁 {i.advert.total_views.toLocaleString("pl-PL")}{delta(i.deltaViews)} · 📞 {i.advert.total_phones.toLocaleString("pl-PL")}{delta(i.deltaPhones)} · ✉ {i.messages.toLocaleString("pl-PL")} · skuteczność {pct(i.conversion)}</div>
                   <p className="text-[12.5px] font-semibold text-warn">{i.recommendations[0]}</p>
                   {i.advert.url && <a href={i.advert.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[12.5px] font-bold text-white underline">Otwórz w OLX →</a>}
                 </div>
@@ -123,7 +123,7 @@ export default async function AdvertsPage() {
                     <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
                       <div className="h-full rounded-full" style={{ width: `${i.score}%`, background: scoreColor(i.score) }} />
                     </div>
-                    <div className="mt-2 text-[12px] text-ink-2">👁 {i.advert.total_views.toLocaleString("pl-PL")} · 📞 {i.advert.total_phones.toLocaleString("pl-PL")} · {pct(i.conversion)}</div>
+                    <div className="mt-2 text-[12px] text-ink-2">👁 {i.advert.total_views.toLocaleString("pl-PL")} · 📞 {i.advert.total_phones.toLocaleString("pl-PL")} · ✉ {i.messages.toLocaleString("pl-PL")} · {pct(i.conversion)}</div>
                   </div>
                 ))}
               </div>
@@ -135,7 +135,7 @@ export default async function AdvertsPage() {
           <div className="overflow-x-auto rounded-card border border-border bg-surface">
             <table className="w-full text-left">
               <thead className="border-b border-border bg-[#12131a] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">
-                <tr>{["#", "Ogłoszenie", "Skuteczność (pkt)", "Wyświetlenia", "Telefony", "Konwersja", "Wygasa", "Zalecenia"].map((h) => <th key={h} className="px-4 py-3 font-bold">{h}</th>)}</tr>
+                <tr>{["#", "Ogłoszenie", "Skuteczność (pkt)", "Wyświetlenia", "Telefony", "Wiadomości", "Konwersja", "Wygasa", "Zalecenia"].map((h) => <th key={h} className="px-4 py-3 font-bold">{h}</th>)}</tr>
               </thead>
               <tbody>
                 {insights.map((i) => (
@@ -154,6 +154,7 @@ export default async function AdvertsPage() {
                     </td>
                     <td className="px-4 py-3 text-[13px] text-ink">{i.advert.total_views.toLocaleString("pl-PL")}<span className="text-[11px] text-ink-2">{delta(i.deltaViews)}</span></td>
                     <td className="px-4 py-3 text-[13px] text-ink">{i.advert.total_phones.toLocaleString("pl-PL")}<span className="text-[11px] text-ink-2">{delta(i.deltaPhones)}</span></td>
+                    <td className="px-4 py-3 text-[13px] text-ink">{i.messages.toLocaleString("pl-PL")}</td>
                     <td className="px-4 py-3 text-[13px] font-bold" style={{ color: i.conversion == null ? "#9aa0b2" : i.conversion >= 0.05 ? "#5fd68b" : i.conversion < 0.02 ? "#f58585" : "#e9edf5" }}>{pct(i.conversion)}</td>
                     <td className="px-4 py-3">{expiryPill(i.daysToExpiry, i.expired)}</td>
                     <td className="px-4 py-3">
