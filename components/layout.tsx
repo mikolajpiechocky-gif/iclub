@@ -110,30 +110,43 @@ export function MobileDrawer({ profile }: { profile: ProfileRecord | null }) {
   const [open, setOpen] = useState(false);
   const isOwner = profile?.role === "OWNER";
   const groups = NAV_GROUPS.filter((g) => !g.ownerOnly || isOwner);
-  const homeHref = isOwner ? "/dashboard" : "/me";
 
   // Zamknij przy zmianie ekranu (np. przycisk wstecz / nawigacja programowa; linki i tak zamykają od razu).
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setOpen(false); }, [pathname]);
 
-  // Gest: otwórz przeciągnięciem od lewej krawędzi, zamknij przeciągnięciem w lewo.
+  // Gdy szuflada otwarta — zablokuj scroll tła (inaczej „przesuwała się" warstwa pod spodem).
   useEffect(() => {
-    let startX = 0, startY = 0, tracking = false;
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
+
+  // Gest: otwórz przeciągnięciem od lewej krawędzi, zamknij przeciągnięciem w lewo.
+  // touchmove NIE-pasywny + preventDefault na geście POZIOMYM, żeby nie przesuwać/nie cofać strony pod spodem.
+  useEffect(() => {
+    let startX = 0, startY = 0, tracking = false, horizontal = false;
     const onStart = (e: TouchEvent) => {
       const t = e.touches[0];
       startX = t.clientX; startY = t.clientY;
-      tracking = open || startX < 24; // otwieranie tylko od lewej krawędzi
+      tracking = open || startX < 28; // otwieranie tylko od lewej krawędzi
+      horizontal = false;
     };
     const onMove = (e: TouchEvent) => {
       if (!tracking) return;
       const t = e.touches[0];
       const dx = t.clientX - startX, dy = t.clientY - startY;
-      if (Math.abs(dy) > Math.abs(dx) + 8) { tracking = false; return; } // pionowy scroll — nie reaguj
-      if (!open && dx > 60) { setOpen(true); tracking = false; }
-      else if (open && dx < -60) { setOpen(false); tracking = false; }
+      if (!horizontal) {
+        if (Math.abs(dy) > Math.abs(dx) + 8) { tracking = false; return; } // pionowy scroll — puść
+        if (Math.abs(dx) > 10) horizontal = true; else return; // ustal kierunek
+      }
+      e.preventDefault(); // poziomy gest szuflady → nie przewijaj/cofaj tła
+      if (!open && dx > 55) { setOpen(true); tracking = false; }
+      else if (open && dx < -55) { setOpen(false); tracking = false; }
     };
     document.addEventListener("touchstart", onStart, { passive: true });
-    document.addEventListener("touchmove", onMove, { passive: true });
+    document.addEventListener("touchmove", onMove, { passive: false });
     return () => { document.removeEventListener("touchstart", onStart); document.removeEventListener("touchmove", onMove); };
   }, [open]);
 
@@ -159,10 +172,13 @@ export function MobileDrawer({ profile }: { profile: ProfileRecord | null }) {
             <button type="button" onClick={() => setOpen(false)} aria-label="Zamknij menu" className="flex h-9 w-9 items-center justify-center rounded-field text-ink-2 hover:text-ink"><Icon name="x" className="h-5 w-5" /></button>
           </div>
 
-          <Link href={homeHref} onClick={() => setOpen(false)} className={`mb-1 flex items-center gap-2.5 rounded-[10px] px-2 py-2 text-[14px] font-semibold ${isActive(pathname, homeHref) ? "bg-brand text-white" : "text-[#d3d7e1] hover:bg-surface"}`}>
-            <span className="flex h-7 w-7 flex-none items-center justify-center rounded-[9px] bg-[#14b8c4] text-white"><Icon name="home" className="h-[15px] w-[15px]" /></span>
-            <span className="flex-1">Start</span>
-          </Link>
+          {/* „Start" tylko dla pracownika (→ /me). Szef ma „Pulpit" w grupie Główne — bez duplikatu. */}
+          {!isOwner && (
+            <Link href="/me" onClick={() => setOpen(false)} className={`mb-1 flex items-center gap-2.5 rounded-[10px] px-2 py-2 text-[14px] font-semibold ${isActive(pathname, "/me") ? "bg-brand text-white" : "text-[#d3d7e1] hover:bg-surface"}`}>
+              <span className="flex h-7 w-7 flex-none items-center justify-center rounded-[9px] bg-[#14b8c4] text-white"><Icon name="home" className="h-[15px] w-[15px]" /></span>
+              <span className="flex-1">Start</span>
+            </Link>
+          )}
 
           {groups.map((g) => {
             const items = g.items.filter((it) => !it.ownerOnly || isOwner);
