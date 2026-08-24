@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
 import { StatusBadge } from "./ui";
 import { UserMenu } from "./auth/user-menu";
@@ -48,15 +48,6 @@ const NAV_GROUPS: { group: string; tint: string; ownerOnly?: boolean; items: { h
     { href: "/users", label: "Użytkownicy", icon: "users", ownerOnly: true },
     { href: "/settings", label: "Ustawienia", icon: "gear", ownerOnly: true },
   ]},
-];
-
-/* Dolna nawigacja mobile — 5 kluczowych pozycji. */
-const BOTTOM_NAV: { href: string; label: string; icon: IconName }[] = [
-  { href: "/me", label: "Start", icon: "home" },
-  { href: "/calendar", label: "Kalendarz", icon: "calendar" },
-  { href: "/field", label: "Realizacje", icon: "truck" },
-  { href: "/inventory", label: "Magazyn", icon: "box" },
-  { href: "/more", label: "Więcej", icon: "more" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -110,25 +101,93 @@ export function AppSidebar({ profile, unread = 0 }: { profile: ProfileRecord | n
   );
 }
 
-/* ---------------------- MobileBottomNavigation ------------------------ */
-export function MobileBottomNavigation({ isOwner = false }: { isOwner?: boolean }) {
+/* ---------------------- MobileDrawer (menu z boku) -------------------- */
+// Menu boczne dla mobile: ikona (hamburger) w nagłówku + szuflada wysuwana z lewej.
+// Otwierana gestem (swipe od lewej krawędzi) i zamykana swipe w lewo / tapnięciem tła.
+export function MobileDrawer({ profile }: { profile: ProfileRecord | null }) {
   const pathname = usePathname();
-  // „Start" prowadzi do właściwego ekranu domowego: pulpit (szef) / ekran pracownika.
-  const items = BOTTOM_NAV.map((it) => (it.href === "/me" ? { ...it, href: isOwner ? "/dashboard" : "/me" } : it));
+  const [open, setOpen] = useState(false);
+  const isOwner = profile?.role === "OWNER";
+  const groups = NAV_GROUPS.filter((g) => !g.ownerOnly || isOwner);
+  const homeHref = isOwner ? "/dashboard" : "/me";
+
+  // Zamknij przy zmianie ekranu (np. przycisk wstecz / nawigacja programowa; linki i tak zamykają od razu).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setOpen(false); }, [pathname]);
+
+  // Gest: otwórz przeciągnięciem od lewej krawędzi, zamknij przeciągnięciem w lewo.
+  useEffect(() => {
+    let startX = 0, startY = 0, tracking = false;
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      startX = t.clientX; startY = t.clientY;
+      tracking = open || startX < 24; // otwieranie tylko od lewej krawędzi
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!tracking) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX, dy = t.clientY - startY;
+      if (Math.abs(dy) > Math.abs(dx) + 8) { tracking = false; return; } // pionowy scroll — nie reaguj
+      if (!open && dx > 60) { setOpen(true); tracking = false; }
+      else if (open && dx < -60) { setOpen(false); tracking = false; }
+    };
+    document.addEventListener("touchstart", onStart, { passive: true });
+    document.addEventListener("touchmove", onMove, { passive: true });
+    return () => { document.removeEventListener("touchstart", onStart); document.removeEventListener("touchmove", onMove); };
+  }, [open]);
+
+  const linkCls = (href: string, tint: string) => {
+    const active = isActive(pathname, href);
+    return { active, tint };
+  };
+
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-[#17181f] bg-panel px-2 pt-2 pb-3.5 md:hidden" aria-label="Nawigacja główna">
-      {items.map((it) => {
-        const active = isActive(pathname, it.href);
-        return (
-          <Link key={it.href} href={it.href} className="flex flex-1 flex-col items-center gap-1 py-1.5">
-            <span className={`flex h-8 w-full max-w-[54px] items-center justify-center rounded-[10px] ${active ? "bg-brand text-white" : "text-muted"}`}>
-              <Icon name={it.icon} className="h-[18px] w-[18px]" />
-            </span>
-            <span className="text-[10px] font-bold" style={{ color: active ? "#fff" : "var(--color-muted)" }}>{it.label}</span>
+    <>
+      {/* Ikona menu — tylko mobile, w nagłówku */}
+      <button type="button" onClick={() => setOpen(true)} aria-label="Menu" className="flex h-10 w-10 flex-none items-center justify-center rounded-field border border-border bg-surface-2 text-ink-2 transition hover:text-ink md:hidden">
+        <Icon name="menu" className="h-5 w-5" />
+      </button>
+
+      {/* Nakładka + szuflada (mobile) */}
+      <div className={`fixed inset-0 z-[60] md:hidden ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
+        <div onClick={() => setOpen(false)} className={`absolute inset-0 bg-black/55 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0"}`} />
+        <aside className={`absolute inset-y-0 left-0 flex w-[272px] max-w-[82vw] flex-col overflow-y-auto bg-panel px-3 pb-6 shadow-2xl transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+          <div className="mt-4 mb-2 flex items-center justify-between px-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-iclub.png" alt="iClub" className="h-9 w-auto" />
+            <button type="button" onClick={() => setOpen(false)} aria-label="Zamknij menu" className="flex h-9 w-9 items-center justify-center rounded-field text-ink-2 hover:text-ink"><Icon name="x" className="h-5 w-5" /></button>
+          </div>
+
+          <Link href={homeHref} onClick={() => setOpen(false)} className={`mb-1 flex items-center gap-2.5 rounded-[10px] px-2 py-2 text-[14px] font-semibold ${isActive(pathname, homeHref) ? "bg-brand text-white" : "text-[#d3d7e1] hover:bg-surface"}`}>
+            <span className="flex h-7 w-7 flex-none items-center justify-center rounded-[9px] bg-[#14b8c4] text-white"><Icon name="home" className="h-[15px] w-[15px]" /></span>
+            <span className="flex-1">Start</span>
           </Link>
-        );
-      })}
-    </nav>
+
+          {groups.map((g) => {
+            const items = g.items.filter((it) => !it.ownerOnly || isOwner);
+            if (items.length === 0) return null;
+            return (
+              <div key={g.group}>
+                <div className="mt-3 mb-1.5 px-2.5 text-[10px] font-bold uppercase tracking-[1.2px] text-[#4a4f60]">{g.group}</div>
+                {items.map((it) => {
+                  const { active } = linkCls(it.href, g.tint);
+                  return (
+                    <Link key={it.href} href={it.href} onClick={() => setOpen(false)} className={`mb-0.5 flex items-center gap-2.5 rounded-[10px] px-2 py-2 text-[14px] font-semibold transition ${active ? "bg-brand text-white" : "text-[#d3d7e1] hover:bg-surface"}`}>
+                      <span className="flex h-7 w-7 flex-none items-center justify-center rounded-[9px] text-white" style={{ background: active ? "rgba(255,255,255,0.22)" : g.tint }}>
+                        <Icon name={it.icon} className="h-[15px] w-[15px]" />
+                      </span>
+                      <span className="flex-1">{it.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          })}
+
+          <div className="mt-auto border-t border-border pt-3"><UserMenu profile={profile} /></div>
+        </aside>
+      </div>
+    </>
   );
 }
 
@@ -138,13 +197,13 @@ export function AppShell({ children, profile, unread = 0 }: { children: ReactNod
     <div className="flex min-h-screen bg-workspace">
       <PullToRefresh />
       <AppSidebar profile={profile} unread={unread} />
-      <main className="min-w-0 flex-1 pb-24 md:pb-0">
-        <div className="sticky top-0 z-30 flex items-center justify-end gap-3 border-b border-[#1b1d27] bg-panel px-4 py-2.5 md:px-8">
-          <HeaderBell unread={unread} />
+      <main className="min-w-0 flex-1 pb-6 md:pb-0">
+        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-[#1b1d27] bg-panel px-4 py-2.5 md:px-8">
+          <MobileDrawer profile={profile} />
+          <div className="ml-auto"><HeaderBell unread={unread} /></div>
         </div>
         {children}
       </main>
-      <MobileBottomNavigation isOwner={profile?.role === "OWNER"} />
     </div>
   );
 }
