@@ -27,6 +27,25 @@ function deepNum(root: unknown, keys: string[]): number {
   return 0;
 }
 
+// §OLX Jak deepNum, ale zwraca MAKSIMUM ze wszystkich pasujących kluczy (nie pierwsze trafienie).
+// Dla wyświetleń: OLX bywa {views:0, impressions:500} — pierwsze trafienie łapało 0; max łapie 500.
+function deepNumMax(root: unknown, keys: string[]): number {
+  const set = new Set(keys.map((k) => k.toLowerCase()));
+  const queue: unknown[] = [root];
+  let best = 0;
+  while (queue.length) {
+    const node = queue.shift();
+    if (!node || typeof node !== "object") continue;
+    if (Array.isArray(node)) { for (const it of node) queue.push(it); continue; }
+    const rec = node as Record<string, unknown>;
+    for (const [k, v] of Object.entries(rec)) {
+      if (set.has(k.toLowerCase())) { const n = Number(v); if (Number.isFinite(n) && n > best) best = n; }
+    }
+    for (const v of Object.values(rec)) queue.push(v);
+  }
+  return best;
+}
+
 export interface OlxAdvert {
   olx_id: string;
   title: string | null;
@@ -139,8 +158,8 @@ export async function syncOlxAdverts(): Promise<OlxAdvertsSyncResult> {
         try {
           const st = (await getAdvertStatistics(token, olxId)) as Record<string, unknown>;
           rawStats = st; // §diagnostyka surowa odpowiedź statystyk — do naprawy zliczania wyświetleń
-          // BFS po wszystkich wariantach nazw — dawniej sztywne „views" dawało 0 mimo realnych odsłon.
-          views = deepNum(st, ["views", "impressions", "page_views", "pageviews", "detail_views", "detailviews", "visits", "views_count", "view_count", "displays"]);
+          // Wyświetlenia: MAKSIMUM z pól widokowych (OLX bywa {views:0, impressions:N} — max łapie realną liczbę).
+          views = deepNumMax(st, ["impressions", "views", "page_views", "pageviews", "detail_views", "detailviews", "visits", "views_count", "view_count", "displays", "impressions_count"]);
           phones = deepNum(st, ["phones", "phone_views", "phoneviews", "phone", "calls", "phone_clicks", "phone_reveals", "reveal_phone", "phone_count", "contacts"]);
           statsOk = true;
         } catch {
