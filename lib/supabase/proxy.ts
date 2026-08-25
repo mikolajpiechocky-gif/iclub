@@ -5,8 +5,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from "./config";
 
-// Ścieżki dostępne bez logowania.
-const PUBLIC_PATHS = ["/login", "/auth"];
+// Ścieżki dostępne bez logowania. /umowa/* = publiczna strona podpisu umowy przez klienta.
+const PUBLIC_PATHS = ["/login", "/auth", "/umowa"];
 // Endpointy z WŁASNĄ autoryzacją (sekret crona w handlerze) — proxy nie może ich
 // przekierowywać na /login, bo cron nie ma sesji. Bezpieczeństwo pilnuje sam handler.
 const SELF_AUTH_PATHS = ["/api/olx/sync", "/api/olx/sync-adverts", "/api/notifications/sweep"];
