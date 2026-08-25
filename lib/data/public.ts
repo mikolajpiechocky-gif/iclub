@@ -9,6 +9,34 @@ import { sendPushToOwners } from "@/lib/integrations/push";
 
 const num = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
+interface RentalItem { code: string; name: string; category: string | null; quantity: number; rate_per_day: number; unit: string | null; is_addon: boolean; }
+
+// Krzesła w magazynie są rozdzielone na rodzaje/kolory (KR-01/02/03…). Na stronie chcemy JEDNĄ pozycję
+// „Krzesła" — ilość = suma wszystkich, stawka = wspólna (najwyższa niezerowa). Magazyn zostaje rozdzielony.
+function isChair(e: RentalItem): boolean {
+  return e.code.toUpperCase().startsWith("KR-") || /krzes/i.test(e.name);
+}
+function mergeChairs(items: RentalItem[]): RentalItem[] {
+  const chairs = items.filter(isChair);
+  if (chairs.length <= 1) return items;
+  const merged: RentalItem = {
+    code: "KRZESLA",
+    name: "Krzesła",
+    category: chairs[0].category,
+    quantity: chairs.reduce((s, e) => s + e.quantity, 0),
+    rate_per_day: Math.max(...chairs.map((e) => e.rate_per_day)),
+    unit: chairs[0].unit,
+    is_addon: chairs.some((e) => e.is_addon),
+  };
+  let done = false;
+  return items.flatMap((e) => {
+    if (!isChair(e)) return [e];
+    if (done) return [];
+    done = true;
+    return [merged]; // pierwszy wiersz krzeseł zastępujemy scaloną pozycją, resztę pomijamy
+  });
+}
+
 // Cennik na żywo: pakiety (cena mały/duży + montaż), dodatki, wypożyczalnia, transport, stałe.
 export async function getPublicPricing() {
   if (!isServiceRoleConfigured()) return null;
@@ -18,6 +46,13 @@ export async function getPublicPricing() {
     s.from("addons").select("code, name, price, sort").eq("active", true).order("sort"),
     s.from("equipment").select("code, name, category, quantity, rental_price, unit, is_addon").eq("active", true).eq("is_rentable", true).order("category"),
   ]);
+  const rentalMapped = ((eq.data ?? []) as Record<string, unknown>[]).map((e) => ({
+    code: String(e.code ?? ""), name: String(e.name ?? ""), category: (e.category as string) ?? null,
+    quantity: num(e.quantity), rate_per_day: num(e.rental_price), unit: (e.unit as string) ?? null,
+    is_addon: Boolean(e.is_addon),
+  }));
+  const rental = mergeChairs(rentalMapped);
+
   return {
     currency: "PLN",
     packages: ((pk.data ?? []) as Record<string, unknown>[]).map((p) => ({
@@ -27,10 +62,7 @@ export async function getPublicPricing() {
       assembly_minutes: num(p.assembly_minutes),
     })),
     addons: ((ad.data ?? []) as Record<string, unknown>[]).map((a) => ({ code: a.code, name: a.name, price: num(a.price) })),
-    rental: ((eq.data ?? []) as Record<string, unknown>[]).map((e) => ({
-      code: e.code, name: e.name, category: e.category, quantity: num(e.quantity),
-      rate_per_day: num(e.rental_price), unit: e.unit, is_addon: Boolean(e.is_addon),
-    })),
+    rental,
     transport_brackets: TRANSPORT_BRACKETS, // [{maxKm, price}]; >400 km → wycena indywidualna
     deposit_base: DEFAULT_DEPOSIT_BASE,     // zadatek domyślny (iClub); wypożyczalnia bez zaliczki
     tent_capacity: DEFAULT_TENT_CAPACITIES, // { large, small, backdoor, gastro }
