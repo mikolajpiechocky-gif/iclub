@@ -6,6 +6,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncOlxThreads } from "@/lib/data/olx-sync";
 import { getCurrentProfile } from "@/lib/data/profiles";
 
+// Synchronizacja robi dziesiątki wywołań API OLX (wątki × wiadomości) — bez wydłużonego
+// limitu czasu Vercel ubijał funkcję (504), przez co cron GitHub „czerwienił się" co 15 min.
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 // Cron autoryzowany, gdy nagłówek pasuje do CRON_SECRET (Vercel) lub OLX_CRON_SECRET.
 function isCronAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
