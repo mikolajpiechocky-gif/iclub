@@ -1,6 +1,6 @@
 // §13 Kalkulacja ceny zamówienia rezerwacji (brutto, §22).
 // Cena końcowa = pakiet + dodatki + transport − rabat. Rabat obejmuje CAŁĄ wartość
-// (pakiet + dodatki + transport). Zadatek domyślnie 300 zł + cena transportu (§13.6).
+// (pakiet + dodatki + transport). Zadatek = 300 zł + transport + 15% sumy dodatków (§13.6).
 
 export type DiscountType = "AMOUNT" | "PERCENT";
 
@@ -35,8 +35,14 @@ export function computeOrderPrice(i: OrderPriceInput): OrderPrice {
 }
 
 export const DEFAULT_DEPOSIT_BASE = 300; // §13.6 domyślny zadatek bazowy (zł)
+export const ADDON_DEPOSIT_PCT = 0.15;   // §13.6 zaliczka za dodatki = 15% sumy dodatków
 
-// §13.6 Sugerowany zadatek = baza (300 zł) + cena transportu dla klienta.
-export function suggestedDeposit(transportPrice: number, base: number = DEFAULT_DEPOSIT_BASE): number {
-  return round2(base + Math.max(0, transportPrice || 0));
+// §13.6 Sugerowany zadatek = baza (300 zł) + transport + 15% sumy dodatków.
+// Namiot gastronomiczny, krzesła, stoły itp. — każdy dodatek dokłada 15% swojej wartości do zaliczki.
+export function suggestedDeposit(
+  transportPrice: number,
+  addonsTotal: number = 0,
+  base: number = DEFAULT_DEPOSIT_BASE,
+): number {
+  return round2(base + Math.max(0, transportPrice || 0) + ADDON_DEPOSIT_PCT * Math.max(0, addonsTotal || 0));
 }

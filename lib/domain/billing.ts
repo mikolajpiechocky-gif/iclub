@@ -75,7 +75,7 @@ export function settlementBreakdown(
   const depositRaw = numOr(r.deposit, NaN);
   const hasDeposit = Number.isFinite(depositRaw);
   const depositSuggested = !hasDeposit;
-  const deposit = hasDeposit ? round2(depositRaw) : suggestedDeposit(transport);
+  const deposit = hasDeposit ? round2(depositRaw) : suggestedDeposit(transport, addonsTotal);
   const toPayOnSite = Math.max(0, round2(total - deposit));
 
   return { packageName, packagePrice, addons, addonsTotal, transport, discount, total, deposit, depositSuggested, toPayOnSite };

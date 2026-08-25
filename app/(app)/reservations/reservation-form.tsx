@@ -10,7 +10,7 @@ import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LAB
 import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, checkAddonAvailabilityAction, checkHeatingAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
 import type { AddonShortage, HeatingAvailability } from "@/lib/data/reservations";
 import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
-import { computeOrderPrice } from "@/lib/domain/order-pricing";
+import { computeOrderPrice, ADDON_DEPOSIT_PCT } from "@/lib/domain/order-pricing";
 import { computeSetupTimes, fmtDuration, type AssemblyConfig } from "@/lib/domain/assembly";
 import type { PackageComposition } from "@/lib/domain/package-composition";
 import { AddressAutocomplete } from "./address-autocomplete";
@@ -341,11 +341,13 @@ export function ReservationForm({
   const order = computeOrderPrice({ packagePrice, addonsTotal, transportPrice, discountType: v.discount_type, discountValue: discountValueNum });
   // §21: ręcznie ustawiona wartość końcowa ma priorytet; inaczej używamy wyliczonej.
   const finalPrice = Number(v.price.replace(",", ".")) || order.total;
-  // §13.6 „Zadatek" = bazowa kwota zaliczki (domyślnie 300 zł). Transport to OSOBNA składowa zaliczki
-  // pobieranej przy umowie → cała zaliczka = zadatek + transport, a klientowi pozostaje wartość − zaliczka.
+  // §13.6 „Zadatek" = bazowa kwota zaliczki (domyślnie 300 zł). Transport oraz 15% sumy dodatków to
+  // OSOBNE składowe zaliczki pobieranej przy umowie → cała zaliczka = zadatek + transport + 15% dodatków,
+  // a klientowi pozostaje wartość − zaliczka.
   const depositValue = depositTouched ? v.deposit : "300";
   const depositNum = Number(depositValue.replace(",", ".")) || 0;
-  const fullDeposit = Math.round((depositNum + transportPrice) * 100) / 100; // zaliczka przy umowie = zadatek + transport
+  const addonsDeposit = v.business_line === "ICLUB" ? Math.round(ADDON_DEPOSIT_PCT * addonsTotal * 100) / 100 : 0; // §13.6 15% od dodatków
+  const fullDeposit = Math.round((depositNum + transportPrice + addonsDeposit) * 100) / 100; // zaliczka przy umowie = zadatek + transport + 15% dodatków
   const remaining = Math.max(0, Math.round((finalPrice - fullDeposit) * 100) / 100);
   const depositOverValue = finalPrice > 0 && fullDeposit > finalPrice; // §13.6 ostrzeżenie
 
@@ -637,7 +639,7 @@ export function ReservationForm({
             {v.business_line === "ICLUB" && (
               <div>
                 <TextField label="Zadatek (zł)" inputMode="numeric" placeholder="300" value={depositValue} onChange={(e) => { setDepositTouched(true); set("deposit", e.target.value); }} error={errors.deposit} />
-                <div className="mt-1 text-[11px] text-ink-2">Zaliczka przy umowie = zadatek + transport = <span className="font-semibold text-ink">{fmtPLN(fullDeposit)}</span></div>
+                <div className="mt-1 text-[11px] text-ink-2">Zaliczka przy umowie = zadatek + transport{addonsDeposit > 0 && " + 15% dodatków"} = <span className="font-semibold text-ink">{fmtPLN(fullDeposit)}</span></div>
               </div>
             )}
             <SelectField label="Rabat" value={v.discount_type} onChange={(e) => set("discount_type", e.target.value === "PERCENT" ? "PERCENT" : "AMOUNT")}>
@@ -692,6 +694,7 @@ export function ReservationForm({
             )}
             {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Zadatek</span><span className="font-semibold text-ink">− {fmtPLN(depositNum)}</span></div>}
             {v.business_line === "ICLUB" && !v.self_pickup && <div className="flex justify-between"><span className="text-ink-2">Transport (składowa zaliczki)</span><span className="font-semibold text-ink">− {fmtPLN(transportPrice)}</span></div>}
+            {v.business_line === "ICLUB" && addonsDeposit > 0 && <div className="flex justify-between"><span className="text-ink-2">Zaliczka za dodatki (15%)</span><span className="font-semibold text-ink">− {fmtPLN(addonsDeposit)}</span></div>}
             {v.business_line === "ICLUB" && <div className="mt-1 flex justify-between border-t border-border-soft pt-2 text-[14px] font-bold text-warn"><span>Pozostało do zapłaty</span><span>{fmtPLN(remaining)}</span></div>}
             {depositOverValue && (
               <div className="rounded-[9px] border border-[#3a1c1f] bg-[#251215] px-2.5 py-1.5 text-[11.5px] font-semibold text-bad">Zadatek przekracza wartość rezerwacji — zmniejsz go, aby zapisać.</div>

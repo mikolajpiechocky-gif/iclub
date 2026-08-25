@@ -4,7 +4,7 @@
 import { createAdminClient, isServiceRoleConfigured } from "@/lib/supabase/admin";
 import { TRANSPORT_BRACKETS } from "@/lib/domain/transport";
 import { DEFAULT_DEPOSIT_BASE } from "@/lib/domain/order-pricing";
-import { DEFAULT_TENT_CAPACITIES } from "@/lib/domain/tents";
+import { DEFAULT_TENT_CAPACITIES, sumSlots, choiceFromTent, type TentChoice } from "@/lib/domain/tents";
 import { sendPushToOwners } from "@/lib/integrations/push";
 
 const num = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -41,6 +41,63 @@ export async function getPublicPricing() {
     ],
     self_pickup_transport: 0,
   };
+}
+
+// Wszystkie dni [from..to] (włącznie) jako "YYYY-MM-DD". Guard 800 dni.
+function eachDay(from: string, to: string): string[] {
+  const out: string[] = [];
+  const d = new Date(from + "T12:00:00Z");
+  const end = new Date(to + "T12:00:00Z");
+  let guard = 0;
+  while (d <= end && guard++ < 800) { out.push(d.toISOString().slice(0, 10)); d.setUTCDate(d.getUTCDate() + 1); }
+  return out;
+}
+
+// Realna dostępność z kalendarza iClub: dla każdego dnia w [from..to] ile slotów namiotów/ogrzewania
+// zajmują rezerwacje (TEMPORARY/CONFIRMED, z pominięciem wygasłych blokad). Konfigurator liczy
+// wolne = capacity − used. Ta sama logika pojemności i zakresów co twarda kontrola w apce (§overbooking).
+export async function getPublicAvailability(from: string, to: string) {
+  if (!isServiceRoleConfigured()) return null;
+  const s = createAdminClient();
+  const [resR, htR] = await Promise.all([
+    s.from("reservations")
+      .select("tent_main, tent_extra, setup_date, teardown_date, event_date, status, expires_at, heating, tent:tents!tent_id(size,has_back_door), tent2:tents!tent_id_2(size,has_back_door)")
+      .in("status", ["TEMPORARY", "CONFIRMED"]),
+    s.from("equipment").select("quantity").eq("code", "HT-01").maybeSingle(),
+  ]);
+  const rows = (resR.data ?? []) as unknown as {
+    tent_main: string | null; tent_extra: string | null;
+    setup_date: string | null; teardown_date: string | null; event_date: string | null;
+    status: string; expires_at: string | null; heating: boolean | null;
+    tent: { size: string | null; has_back_door: boolean } | null;
+    tent2: { size: string | null; has_back_door: boolean } | null;
+  }[];
+  const heatingTotal = htR.data ? num((htR.data as { quantity: unknown }).quantity) : 0;
+
+  const nowIso = new Date().toISOString();
+  const days: Record<string, { large: number; small: number; backdoor: number; gastro: number; heating: number }> = {};
+  const ensure = (d: string) => (days[d] ??= { large: 0, small: 0, backdoor: 0, gastro: 0, heating: 0 });
+
+  for (const r of rows) {
+    if (r.status === "TEMPORARY" && r.expires_at && r.expires_at < nowIso) continue; // wygasła blokada nie zajmuje
+    const start0 = r.setup_date ?? r.event_date;
+    if (!start0) continue;
+    const end0 = r.teardown_date ?? r.event_date ?? start0;
+    const sd = String(start0).slice(0, 10);
+    const ed = String(end0).slice(0, 10);
+    const start = sd < from ? from : sd;
+    const end = ed > to ? to : ed;
+    if (start > end) continue;
+    const c1 = (r.tent_main as TentChoice) || (r.tent ? choiceFromTent(r.tent.size, r.tent.has_back_door) : "");
+    const c2 = (r.tent_extra as TentChoice) || (r.tent2 ? choiceFromTent(r.tent2.size, r.tent2.has_back_door) : "");
+    const slots = sumSlots([c1, c2]);
+    for (const d of eachDay(start, end)) {
+      const e = ensure(d);
+      e.large += slots.large; e.small += slots.small; e.backdoor += slots.backdoor; e.gastro += slots.gastro;
+      if (r.heating) e.heating += 1;
+    }
+  }
+  return { capacity: DEFAULT_TENT_CAPACITIES, heating_total: heatingTotal, days };
 }
 
 export interface PublicInquiryInput {
