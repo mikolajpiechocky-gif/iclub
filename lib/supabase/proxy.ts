@@ -12,6 +12,8 @@ const PUBLIC_PATHS = ["/login", "/auth"];
 const SELF_AUTH_PATHS = ["/api/olx/sync", "/api/olx/sync-adverts", "/api/notifications/sweep"];
 
 function isPublic(path: string): boolean {
+  // /api/public/* — publiczne endpointy konfiguratora (własna autoryzacja: CORS + opcjonalny klucz API).
+  if (path.startsWith("/api/public/")) return true;
   return PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/")) || SELF_AUTH_PATHS.includes(path);
 }
 
