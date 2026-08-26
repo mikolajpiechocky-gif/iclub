@@ -6,6 +6,7 @@ import { TRANSPORT_BRACKETS } from "@/lib/domain/transport";
 import { DEFAULT_DEPOSIT_BASE } from "@/lib/domain/order-pricing";
 import { DEFAULT_TENT_CAPACITIES, sumSlots, choiceFromTent, type TentChoice } from "@/lib/domain/tents";
 import { sendPushToOwners } from "@/lib/integrations/push";
+import { listOwnerUserIds } from "@/lib/data/push";
 
 const num = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
@@ -213,6 +214,19 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
     url: "/inquiries",
     tag: "configurator-lead",
   }).catch(() => {});
+
+  // Wpis w panelu powiadomień (per szef) — inaczej lead jest tylko w push, nie na liście.
+  try {
+    const owners = await listOwnerUserIds();
+    if (owners.length) {
+      await s.from("notifications").insert(owners.map((oid) => ({
+        recipient: oid,
+        title: "Nowe zgłoszenie z konfiguratora",
+        body: `${c.name?.trim() || "Klient"} — ${eventType}`,
+        type: "INQUIRY",
+      })));
+    }
+  } catch { /* panel opcjonalny — nie blokuje leada */ }
 
   return { ok: true, id: (data as { id: string }).id };
 }

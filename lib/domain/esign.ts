@@ -1,6 +1,7 @@
 // Reguły domenowe podpisu umowy kodem e-mail (forma dokumentowa, art. 77² k.c.).
 // Kod = 6 cyfr z generatora kryptograficznego (NIE Math.random); w bazie tylko skrót.
 import { randomInt, randomBytes, scryptSync, timingSafeEqual, createHash } from "crypto";
+import { renderContract } from "./esign-contract-template";
 
 // Decyzje biznesowe (§08): godzina montażu z pakietu, BLIK, termin zadatku.
 export const ICLUB_BLIK = "571 029 526";
@@ -57,11 +58,9 @@ export function sha256(text: string): string {
 }
 
 // --- treść umowy (HTML) ---
-// UWAGA: to układ tymczasowy do czasu wgrania szablonu docs/umowa-szablon.md ze strony.
-// Gdy szablon dojdzie, podmieniamy TEN builder — reszta (token/kod/dowód) zostaje.
+// Renderowany z pełnego wzorca umowy (esign-contract-template): część indywidualna + wszystkie
+// paragrafy w jednym dokumencie. Reszta (token/kod/dowód) niezależna.
 
-const esc = (s: unknown): string =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 const fmtPLN = (v: number | null | undefined) =>
   v == null ? "—" : new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
 const fmtDate = (iso: string | null | undefined) =>
@@ -84,35 +83,30 @@ export interface EsignContractInput {
   blik?: string | null;           // numer do BLIK w dokumencie
 }
 
-// Zwraca kompletny dokument HTML umowy (migawka). Zawiera wymagane prawnie elementy:
-// pełna treść przed kodem + informacja o braku prawa odstąpienia (art. 38 pkt 12).
+// Zwraca kompletny dokument HTML umowy (migawka) z pełnego wzorca. Mapuje dane realizacji/leada
+// na pola szablonu. Kwot cząstkowych (pakiet/dodatki/dojazd) na razie nie rozdzielamy — pokazujemy
+// wartość całkowitą, zadatek i pozostało; render sam wstawia „—" tam, gdzie danych brak.
 export function buildEsignContractHtml(i: EsignContractInput): string {
   const remaining = i.amountTotal != null ? Math.max(0, i.amountTotal - (i.amountDeposit ?? 0)) : null;
-  const rows: [string, string][] = [
-    ["Numer zamówienia", esc(i.orderNo || "—")],
-    ["Najemca", esc(i.customerName || "—")],
-    ["E-mail", esc(i.customerEmail || "—")],
-    ["Rodzaj imprezy", esc(i.eventType || "—")],
-    ["Data wydarzenia", esc(fmtDate(i.eventDate))],
-    ["Godzina montażu", esc(i.deliveryHour || "—")],
-    ["Lokalizacja", esc(i.location || "—")],
-    ["Namiot", esc(i.tentName || "—")],
-    ["Pakiet", esc(i.packageName || "—")],
-    ["Dodatki", esc(i.addonsNote || "brak")],
-    ["Wartość umowy (brutto)", esc(fmtPLN(i.amountTotal))],
-    ["Zadatek", esc(fmtPLN(i.amountDeposit))],
-    ["Pozostało do zapłaty", esc(fmtPLN(remaining))],
-    ["Termin zapłaty zadatku", esc(i.depositDue || "—")],
-    ["BLIK / płatność zadatku", esc(i.blik || "—")],
-  ];
-  const table = rows.map(([k, v]) => `<tr><th style="text-align:left;padding:4px 12px 4px 0;color:#555;font-weight:600;vertical-align:top">${k}</th><td style="padding:4px 0">${v}</td></tr>`).join("");
-  return `<!-- SZABLON TYMCZASOWY — do podmiany na docs/umowa-szablon.md -->
-<section>
-  <h1 style="font-size:20px;margin:0 0 4px">Umowa najmu — iClub</h1>
-  <p style="color:#555;margin:0 0 16px">Wynajmujący: iClub, baza: Południowa 9, Dopiewo.</p>
-  <table style="border-collapse:collapse;font-size:14px;width:100%">${table}</table>
-  <h2 style="font-size:15px;margin:20px 0 6px">Warunki</h2>
-  <p style="font-size:13px;color:#444;line-height:1.6">Usługa obejmuje transport, montaż, obsługę techniczną i demontaż zgodnie z ustaleniami. Najemca użytkuje sprzęt zgodnie z przeznaczeniem i ponosi odpowiedzialność za powierzony sprzęt od chwili przekazania do odbioru. Rozliczenie i szczegóły — zgodnie z Regulaminem iClub.</p>
-  <p style="font-size:13px;color:#8a1f1f;font-weight:600;line-height:1.6;margin-top:12px">Informacja o braku prawa odstąpienia: usługa jest ściśle związana z oznaczonym terminem, dlatego zgodnie z art. 38 ust. 1 pkt 12 ustawy o prawach konsumenta Najemcy będącemu konsumentem nie przysługuje prawo odstąpienia od umowy.</p>
-</section>`;
+  const name = (i.customerName ?? "").trim();
+  const sp = name.indexOf(" ");
+  const dodatki = (i.addonsNote ?? "").split(",").map((s) => s.trim()).filter(Boolean).map((n) => ({ nazwa_dodatku: n }));
+  return renderContract({
+    numer_umowy: i.orderNo ?? null,
+    data_zawarcia: null,
+    imie: sp > 0 ? name.slice(0, sp) : name || null,
+    nazwisko: sp > 0 ? name.slice(sp + 1) : null,
+    email: i.customerEmail ?? null,
+    pakiet: i.packageName ?? null,
+    namiot: i.tentName ?? null,
+    dodatki,
+    data_imprezy: i.eventDate ? fmtDate(i.eventDate) : null,
+    adres: i.location ?? null,
+    godzina_dostawy: i.deliveryHour ?? null,
+    cena_calkowita: i.amountTotal != null ? fmtPLN(i.amountTotal) : null,
+    zadatek: i.amountDeposit != null ? fmtPLN(i.amountDeposit) : null,
+    pozostalo: remaining != null ? fmtPLN(remaining) : null,
+    termin_zadatku: i.depositDue ?? null,
+    numer_blik: i.blik ?? null,
+  });
 }
