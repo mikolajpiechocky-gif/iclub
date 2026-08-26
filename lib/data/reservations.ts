@@ -469,10 +469,25 @@ function reservationRange(r: { setup_date: string | null; teardown_date: string 
   return { start, end };
 }
 
-// Porównanie dat ISO (YYYY-MM-DD) działa leksykograficznie.
+// Następny dzień po "YYYY-MM-DD" (bez wpływu strefy).
+function nextDayIso(iso: string): string {
+  const d = new Date(iso + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+// Koniec ZAJĘTOŚCI (wyłączny). Demontaż/zwrot to dzień „turnaround" — namiot zwalnia się tego dnia,
+// więc nie zajmuje puli. Zajętość = [start, endExcl). Dla jednodniowych (end<=start) → start+1.
+function exclusiveEnd(start: string, end: string | null): string {
+  return end && end > start ? end : nextDayIso(start);
+}
+
+// Nakładanie okien zajętości (półotwarte): dzień demontażu jednej rezerwacji NIE koliduje z dniem
+// montażu/imprezy drugiej (dozwolony turnaround). Daty ISO (YYYY-MM-DD) porównujemy leksykograficznie.
 function rangesOverlap(aStart: string, aEnd: string, bStart: string | null, bEnd: string | null): boolean {
   if (!bStart) return false;
-  return aStart <= (bEnd ?? bStart) && aEnd >= bStart;
+  const aE = exclusiveEnd(aStart, aEnd);
+  const bE = exclusiveEnd(bStart, bEnd);
+  return aStart < bE && bStart < aE;
 }
 
 // Zwraca aktywne rezerwacje tego samego namiotu nakładające się terminem.
