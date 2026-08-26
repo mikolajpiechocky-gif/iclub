@@ -91,8 +91,21 @@ export default async function DashboardPage() {
 
   // §pulpit „Wymaga uwagi" — wszystko wymagające decyzji szefa: prośby o przypisanie, koszty do
   // akceptacji, rozliczenia pracowników, faktury, paliwo, ogłoszenia OLX.
-  const attention: { tone: "bad" | "warn"; title: string; desc: string; href: string }[] = [];
+  const attention: { tone: "bad" | "warn" | "info"; title: string; desc: string; href: string }[] = [];
   if (isOwner) {
+    // Nieodpisane leady (konfigurator + OLX) — na samej górze, wyróżnione kolorem. Najstarsze pierwsze.
+    const newLeads = inquiries
+      .filter((q) => q.status === "NEW" && (q.source === "WEBSITE_FORM" || q.source === "OLX"))
+      .sort((a, b) => ((a.created_at ?? "") < (b.created_at ?? "") ? -1 : 1));
+    for (const q of newLeads.slice(0, 6)) {
+      const isConf = q.source === "WEBSITE_FORM";
+      attention.push({
+        tone: "info",
+        title: isConf ? "🌐 Zgłoszenie z konfiguratora — odpisz" : "💬 Nowy lead OLX — odpisz",
+        desc: `${inquiryDisplayName(q)}${q.event_type ? " · " + q.event_type : ""}${q.created_at ? " · " + fmtDate(q.created_at) : ""}`,
+        href: `/inquiries/${q.id}/edit`,
+      });
+    }
     // Prośby pracowników o przypisanie — priorytet (blokują realizację).
     for (const req of assignmentRequests.slice(0, 5)) {
       attention.push({ tone: "bad", title: "Prośba o przypisanie", desc: `${req.employeeName} → ${req.title}${req.eventDate ? " · " + fmtDate(req.eventDate) : ""}`, href: req.reservationId ? `/reservations/${req.reservationId}` : `/jobs/${req.jobId}` });
@@ -152,10 +165,10 @@ export default async function DashboardPage() {
           <p className="px-1 py-3 text-[13px] text-ink-2">Nic nie wymaga uwagi 👍</p>
         ) : (
           attention.map((a, i) => (
-            <Link key={i} href={a.href} className="flex gap-3 border-t border-border-soft py-3 first:border-t-0">
-              <span className="mt-1.5 h-2.5 w-2.5 flex-none rounded-[3px]" style={{ background: a.tone === "bad" ? "#f58585" : "#ebb05a" }} />
+            <Link key={i} href={a.href} className={`flex gap-3 border-t border-border-soft py-3 first:border-t-0 ${a.tone === "info" ? "-mx-2 rounded-[10px] border-t-0 bg-[#111c2e] px-2" : ""}`}>
+              <span className="mt-1.5 h-2.5 w-2.5 flex-none rounded-[3px]" style={{ background: a.tone === "bad" ? "#f58585" : a.tone === "info" ? "#7fa8f5" : "#ebb05a" }} />
               <div className="flex-1">
-                <div className="text-[13px] font-bold text-ink">{a.title}</div>
+                <div className="text-[13px] font-bold text-ink" style={a.tone === "info" ? { color: "#7fa8f5" } : undefined}>{a.title}</div>
                 <div className="mt-0.5 text-[12px] font-medium text-ink-2">{a.desc}</div>
               </div>
             </Link>

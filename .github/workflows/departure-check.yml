@@ -1,8 +1,8 @@
-name: Alert wyjazdu (co 30 min)
+name: Alert wyjazdu + przypomnienia leadów (co 30 min)
 
-# Co 30 minut w godzinach 5–20 UTC (7–22 PL) sprawdza, czy pracownik powinien już
-# wyjechać na dzisiejszą realizację iClub (montaż − dojazd), a jeszcze nie ruszył.
-# Alert wysyłany RAZ na zlecenie. Endpoint chroniony sekretem OLX_CRON_SECRET.
+# Co 30 minut w godzinach 5–20 UTC (7–22 PL): (1) alert wyjazdu pracownika,
+# (2) przypomnienia o nieodpisanych leadach (konfigurator/OLX) — okno pon–sob 7–18 PL
+# pilnuje kod endpointu. Endpoint chroniony sekretem OLX_CRON_SECRET.
 on:
   schedule:
     - cron: "*/30 5-20 * * *"
@@ -18,14 +18,16 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping departure-check endpoint
+      - name: Ping departure + leady
         env:
           CRON_SECRET: ${{ secrets.OLX_CRON_SECRET }}
         run: |
-          code=$(curl -sS -o response.json -w "%{http_code}" -X GET \
-            -H "Authorization: Bearer ${CRON_SECRET}" \
-            "https://app.iclubevents.pl/api/notifications/sweep?mode=departure")
-          echo "HTTP ${code}"
-          cat response.json || true
-          echo ""
-          if [ "${code}" != "200" ]; then echo "::warning::Endpoint zwrócił HTTP ${code} — nie przerywam joba (status biznesowy w body/apce)"; fi
+          for mode in departure leads; do
+            code=$(curl -sS -o response.json -w "%{http_code}" -X GET \
+              -H "Authorization: Bearer ${CRON_SECRET}" \
+              "https://app.iclubevents.pl/api/notifications/sweep?mode=${mode}")
+            echo "[${mode}] HTTP ${code}"
+            cat response.json || true
+            echo ""
+            if [ "${code}" != "200" ]; then echo "::warning::[${mode}] HTTP ${code} — nie przerywam joba (status w body/apce)"; fi
+          done

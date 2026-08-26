@@ -183,6 +183,7 @@ export async function syncOlxThreads(): Promise<OlxSyncResult> {
           // §OLX Reheat LOST→REHEATED TYLKO gdy pojawiła się NOWA wiadomość od ostatniego syncu
           // (lastAt nowszy niż zapisany) — inaczej cron cofał ręczne oznaczenie „przegrany".
           const newMessage = Boolean(lastAt && ex.olx_last_message_at && lastAt > ex.olx_last_message_at);
+          if (newMessage) patch.reminder_stage = 0; // nowa wiadomość klienta → restart cyklu przypomnień
           if (ex.status === "LOST" && newMessage) {
             patch.status = "REHEATED";
             patch.previous_status = "LOST";

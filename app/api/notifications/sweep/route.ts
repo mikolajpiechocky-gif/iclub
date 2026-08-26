@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runNotificationsSweep } from "@/lib/data/notifications-sweep";
 import { runDepartureAlertSweep } from "@/lib/data/departure-alerts";
+import { runLeadReminderSweep } from "@/lib/data/lead-reminders";
 import { sendPushToOwners } from "@/lib/integrations/push";
 
 function isCronAuthorized(req: NextRequest): boolean {
@@ -23,6 +24,11 @@ export async function GET(req: NextRequest) {
   // ?mode=departure → lekki, częsty sprawdzian wyjazdu (bez pełnego, dziennego sweepu).
   if (params.get("mode") === "departure") {
     const result = await runDepartureAlertSweep();
+    return NextResponse.json(result, { status: 200 });
+  }
+  // ?mode=leads → przypomnienia o nieodpisanych leadach (konfigurator/OLX); okno pon–sob 7–18 pilnuje kod.
+  if (params.get("mode") === "leads") {
+    const result = await runLeadReminderSweep();
     return NextResponse.json(result, { status: 200 });
   }
   const result = await runNotificationsSweep();
