@@ -1,13 +1,11 @@
 import type { NextConfig } from "next";
 
-// CSP w trybie RAPORTOWYM (Report-Only): NIC nie blokuje, tylko zgłasza naruszenia na
-// /api/public/csp-report (→ tabela csp_reports). Po zebraniu danych i dostrojeniu listy
-// przełączymy nagłówek na egzekwujący (Content-Security-Policy). Dopuszczone: własna domena,
-// Google Maps (skrypty/kafelki/czcionki), Supabase (auth/API), obrazki data:/blob:.
-// Wąska, dopasowana do faktycznego użycia: własna domena + inline (Next.js/Tailwind) + Supabase
-// (auth, upload i zdjęcia realizacji ze Storage) + obrazki data:/blob:. Mapy Google są WYŁĄCZNIE
-// serwerowe, więc nie ma tu żadnych domen Google.
-const cspReportOnly = [
+// CSP EGZEKWUJĄCY (Content-Security-Policy) — po weryfikacji headless (0 naruszeń na powłoce
+// publicznej i zalogowanych stronach) i analizie kodu. Dopuszczone: własna domena + inline
+// (Next.js/Tailwind) + Supabase (auth, upload i zdjęcia realizacji ze Storage) + obrazki
+// data:/blob:. Mapy Google są WYŁĄCZNIE serwerowe → brak domen Google. report-uri zostaje jako
+// siatka bezpieczeństwa: ewentualne pominięcie nadal trafia do tabeli csp_reports.
+const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
@@ -25,7 +23,7 @@ const cspReportOnly = [
 
 // Nagłówki bezpieczeństwa dla całej aplikacji.
 const securityHeaders = [
-  { key: "Content-Security-Policy-Report-Only", value: cspReportOnly },
+  { key: "Content-Security-Policy", value: contentSecurityPolicy },
   // Wymuś HTTPS w przeglądarce (po pierwszej wizycie).
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   // Zakaz osadzania w ramce (clickjacking).
