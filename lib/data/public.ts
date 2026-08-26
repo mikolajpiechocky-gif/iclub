@@ -7,6 +7,7 @@ import { DEFAULT_DEPOSIT_BASE } from "@/lib/domain/order-pricing";
 import { DEFAULT_TENT_CAPACITIES, sumSlots, choiceFromTent, type TentChoice } from "@/lib/domain/tents";
 import { sendPushToOwners } from "@/lib/integrations/push";
 import { listOwnerUserIds } from "@/lib/data/push";
+import { sendEmail } from "@/lib/integrations/email";
 
 const num = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
@@ -227,6 +228,19 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
       })));
     }
   } catch { /* panel opcjonalny — nie blokuje leada */ }
+
+  // Automatyczne potwierdzenie przyjęcia zgłoszenia dla klienta (Resend; pominięte, gdy poczta niegotowa).
+  if (c.email?.trim()) {
+    sendEmail({
+      to: c.email.trim(),
+      subject: "Dziękujemy — otrzymaliśmy Twoje zgłoszenie · iClub",
+      replyTo: "odpalamy@iclubevents.pl",
+      html: `<p>Dzień dobry${c.name?.trim() ? " " + c.name.trim() : ""},</p>
+        <p>dziękujemy za zgłoszenie przez konfigurator iClub. Przyjęliśmy je i wkrótce potwierdzimy dostępność${input.eventDate ? ` terminu ${input.eventDate}` : " terminu"} oraz prześlemy szczegóły i sposób płatności.</p>
+        <p>To potwierdzenie przyjęcia zgłoszenia — nie jest to jeszcze wiążąca rezerwacja. Możesz odpisać na tę wiadomość, jeśli masz pytania.</p>
+        <p>Zespół iClub</p>`,
+    }).catch(() => {});
+  }
 
   return { ok: true, id: (data as { id: string }).id };
 }
