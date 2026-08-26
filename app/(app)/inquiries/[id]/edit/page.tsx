@@ -3,22 +3,41 @@ import { notFound } from "next/navigation";
 import { getInquiry } from "@/lib/data/inquiries";
 import { listCustomers } from "@/lib/data/customers";
 import { getCurrentProfile } from "@/lib/data/profiles";
+import { getEsignByInquiry } from "@/lib/data/esign";
+import { getPublicAvailability } from "@/lib/data/public";
 import { INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
 import { analyzeConversation, LEAD_STAGE_META } from "@/lib/domain/lead-analysis";
 import { InquiryForm } from "../../inquiry-form";
 import { ReactivateButton, AutoCloseBlockToggle, DeleteInquiryButton } from "../../lead-buttons";
+import { LeadContractPanel } from "../../lead-contract";
 
 export const dynamic = "force-dynamic";
+const APP_BASE_URL = (process.env.APP_BASE_URL || "https://app.iclubevents.pl").replace(/\/$/, "");
 
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "short", year: "numeric" }) : "—");
 const fmtDT = (iso: string | null) => (iso ? new Date(iso).toLocaleString("pl-PL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 
 export default async function EditInquiryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [inquiry, customers, profile] = await Promise.all([getInquiry(id), listCustomers(), getCurrentProfile()]);
+  const [inquiry, customers, profile, contractRow] = await Promise.all([getInquiry(id), listCustomers(), getCurrentProfile(), getEsignByInquiry(id)]);
   if (!inquiry) notFound();
 
   const isOwner = profile?.role === "OWNER";
+
+  // Dostępność na dzień imprezy (z realnego kalendarza) + domyślne kwoty z estymaty konfiguratora.
+  const avail = isOwner && inquiry.event_date ? await getPublicAvailability(inquiry.event_date, inquiry.event_date) : null;
+  const used = avail && inquiry.event_date ? (avail.days[inquiry.event_date] ?? { large: 0, small: 0, backdoor: 0, gastro: 0, heating: 0 }) : null;
+  const freeLarge = avail && used ? avail.capacity.large - used.large : null;
+  const freeSmall = avail && used ? avail.capacity.small - used.small : null;
+  const estTotal = inquiry.notes?.match(/warto[sś][cć][^\d]*(\d+)/i)?.[1] ?? "";
+  const estDeposit = inquiry.notes?.match(/zaliczk\w*[^\d]*(\d+)/i)?.[1] ?? "";
+  const contract = contractRow ? {
+    status: contractRow.status,
+    link: `${APP_BASE_URL}/umowa/${contractRow.access_token}`,
+    signerEmail: contractRow.signer_email,
+    signedAt: contractRow.signed_at,
+    orderNo: contractRow.order_no,
+  } : null;
   const closed = inquiry.status === "LOST" || inquiry.status === "WON";
   const messages = inquiry.olx_messages ?? [];
   const isOlx = inquiry.source === "OLX" || messages.length > 0;
@@ -36,6 +55,9 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
             {inquiry.source && <span>Źródło: <b className="text-ink">{INQUIRY_SOURCE_LABELS[inquiry.source]}</b></span>}
             {(inquiry.contact_name || inquiry.contact_email) && <span>Kontakt: <b className="text-ink">{inquiry.contact_name || inquiry.contact_email}</b>{inquiry.contact_name && inquiry.contact_email ? ` · ${inquiry.contact_email}` : ""}</span>}
             {inquiry.location && <span>Lokalizacja: <b className="text-ink">{inquiry.location}</b></span>}
+            {freeLarge != null && freeSmall != null && (
+              <span>Dostępność {fmtDate(inquiry.event_date)}: <b style={{ color: (freeLarge > 0 || freeSmall > 0) ? "#5fd68b" : "#f58585" }}>{(freeLarge > 0 || freeSmall > 0) ? "są wolne namioty" : "brak wolnych"}</b> (duże {freeLarge}/{avail!.capacity.large}, małe {freeSmall}/{avail!.capacity.small})</span>
+            )}
             <span>Ostatnia aktywność: <b className="text-ink">{fmtDate(inquiry.last_activity_at)}</b></span>
             {inquiry.reactivation_count > 0 && <span>Odgrzewany: <b style={{ color: "#f6a94a" }}>{inquiry.reactivation_count}×</b></span>}
             {inquiry.lost_reason && <span>Powód przegranej: <b className="text-ink">{inquiry.lost_reason === "automatic_inactivity" ? "brak aktywności 21 dni" : inquiry.lost_reason}</b></span>}
@@ -92,6 +114,10 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
             </details>
           )}
         </div>
+
+        {isOwner && (
+          <LeadContractPanel inquiryId={inquiry.id} defaultTotal={estTotal} defaultDeposit={estDeposit} contract={contract} />
+        )}
       </div>
 
       <InquiryForm initial={inquiry} customers={customers.map((c) => ({ id: c.id, name: c.name }))} />

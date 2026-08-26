@@ -103,6 +103,68 @@ export async function createEsignContract(input: CreateEsignInput, createdBy: st
   return { ok: true, id: (data as { id: string }).id, token: (data as { access_token: string }).access_token };
 }
 
+// ---- tworzenie umowy Z ZAPYTANIA (lead z konfiguratora; jeszcze bez zlecenia) ----
+export interface CreateEsignFromInquiryInput {
+  inquiryId: string;
+  amountTotal?: number | null;
+  amountDeposit?: number | null;
+  deliveryHour?: string | null;
+  depositDue?: string | null;
+}
+
+export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput, createdBy: string | null): Promise<{ ok: boolean; id?: string; token?: string; error?: string }> {
+  if (!isServiceRoleConfigured()) return { ok: false, error: "Brak konfiguracji serwera." };
+  const s = createAdminClient();
+  const { data: inq } = await s.from("inquiries").select("*").eq("id", input.inquiryId).maybeSingle();
+  if (!inq) return { ok: false, error: "Nie znaleziono zapytania." };
+  const q = inq as Record<string, unknown>;
+
+  const pkg = (q.package_interest as string) || null;
+  const deliveryHour = input.deliveryHour ?? deliveryHourForPackage(pkg);
+  const depositDue = input.depositDue ?? DEPOSIT_DUE_DEFAULT;
+  const signerEmail = (q.contact_email as string) || null;
+  const orderNo = `IC-${new Date().getFullYear()}-${Math.abs(hashStr(String(q.id))) % 9000 + 1000}`;
+
+  const html = buildEsignContractHtml({
+    orderNo,
+    customerName: (q.contact_name as string) || null,
+    customerEmail: signerEmail,
+    eventType: (q.event_type as string) || null,
+    eventDate: (q.event_date as string) || null,
+    location: (q.location as string) || null,
+    packageName: pkg,
+    tentName: (q.tent_interest as string) || null,
+    addonsNote: (q.addons_note as string) || null,
+    amountTotal: input.amountTotal ?? null,
+    amountDeposit: input.amountDeposit ?? null,
+    deliveryHour, depositDue, blik: ICLUB_BLIK,
+  });
+
+  const { data, error } = await s.from("esign_contracts").insert({
+    inquiry_id: input.inquiryId,
+    order_no: orderNo,
+    status: "draft",
+    document_html: html,
+    signer_email: signerEmail,
+    delivery_hour: deliveryHour,
+    deposit_due: depositDue,
+    amount_total: input.amountTotal ?? null,
+    amount_deposit: input.amountDeposit ?? null,
+    access_token: generateToken(),
+    created_by: createdBy,
+  }).select("id, access_token").single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, id: (data as { id: string }).id, token: (data as { access_token: string }).access_token };
+}
+
+// Ostatnia umowa powiązana z danym zapytaniem (do panelu leada).
+export async function getEsignByInquiry(inquiryId: string): Promise<EsignRow | null> {
+  if (!isServiceRoleConfigured()) return null;
+  const s = createAdminClient();
+  const { data } = await s.from("esign_contracts").select("*").eq("inquiry_id", inquiryId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  return (data as EsignRow) ?? null;
+}
+
 // ---- wysyłka umowy do podpisu (wewnętrzne, owner) ----
 // Zamraża treść + sumę kontrolną, ustawia status sent + ważność tokenu, wysyła mail z linkiem (BEZ kodu).
 export async function sendEsignContract(id: string): Promise<{ ok: boolean; error?: string; emailSkipped?: boolean; link?: string }> {
