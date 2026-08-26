@@ -4,17 +4,20 @@ import type { NextConfig } from "next";
 // /api/public/csp-report (→ tabela csp_reports). Po zebraniu danych i dostrojeniu listy
 // przełączymy nagłówek na egzekwujący (Content-Security-Policy). Dopuszczone: własna domena,
 // Google Maps (skrypty/kafelki/czcionki), Supabase (auth/API), obrazki data:/blob:.
+// Wąska, dopasowana do faktycznego użycia: własna domena + inline (Next.js/Tailwind) + Supabase
+// (auth, upload i zdjęcia realizacji ze Storage) + obrazki data:/blob:. Mapy Google są WYŁĄCZNIE
+// serwerowe, więc nie ma tu żadnych domen Google.
 const cspReportOnly = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  "script-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://maps.google.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://maps.googleapis.com",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://*.supabase.co",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   "report-uri /api/public/csp-report",
