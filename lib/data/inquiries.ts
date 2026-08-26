@@ -101,6 +101,13 @@ export async function updateInquiry(id: string, input: InquiryInput): Promise<vo
   if (error) throw new Error(error.message);
 }
 
+// Trwałe usunięcie zapytania (np. testowe/spam). Decyzja Szefa.
+export async function deleteInquiry(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("inquiries").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // §6.3 „Odgrzanie": przywraca przegrany/inny lead do obsługi, zachowując historię.
 export async function reactivateInquiry(id: string): Promise<void> {
   const supabase = await createClient();

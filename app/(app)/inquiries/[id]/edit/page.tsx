@@ -6,7 +6,7 @@ import { getCurrentProfile } from "@/lib/data/profiles";
 import { INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
 import { analyzeConversation, LEAD_STAGE_META } from "@/lib/domain/lead-analysis";
 import { InquiryForm } from "../../inquiry-form";
-import { ReactivateButton, AutoCloseBlockToggle } from "../../lead-buttons";
+import { ReactivateButton, AutoCloseBlockToggle, DeleteInquiryButton } from "../../lead-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +29,9 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
     <>
       <div className="mx-auto max-w-[820px] px-5 pt-6 md:px-8">
         <div className="rounded-card-lg border border-border bg-surface p-4">
+          {inquiry.source === "WEBSITE_FORM" && (
+            <div className="mb-2.5 inline-flex items-center gap-1.5 rounded-[8px] border border-[#243654] bg-[#141f33] px-2.5 py-1 text-[12px] font-bold text-[#7fa8f5]">🌐 Zgłoszenie z konfiguratora strony</div>
+          )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-ink-2">
             {inquiry.source && <span>Źródło: <b className="text-ink">{INQUIRY_SOURCE_LABELS[inquiry.source]}</b></span>}
             {(inquiry.contact_name || inquiry.contact_email) && <span>Kontakt: <b className="text-ink">{inquiry.contact_name || inquiry.contact_email}</b>{inquiry.contact_name && inquiry.contact_email ? ` · ${inquiry.contact_email}` : ""}</span>}
@@ -78,6 +81,7 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
           <div className="mt-3 flex flex-wrap items-center gap-4">
             {closed && <ReactivateButton id={inquiry.id} />}
             <AutoCloseBlockToggle id={inquiry.id} blocked={inquiry.auto_close_blocked} />
+            {isOwner && <DeleteInquiryButton id={inquiry.id} />}
           </div>
 
           {isOwner && inquiry.olx_raw != null && (

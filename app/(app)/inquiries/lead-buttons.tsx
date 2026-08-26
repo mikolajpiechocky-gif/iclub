@@ -2,7 +2,25 @@
 // Przyciski obsługi leada: odgrzej, blokada auto-zamknięcia, ręczne auto-zamykanie.
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { reactivateInquiryAction, setInquiryAutoCloseBlockedAction, autoCloseStaleLeadsAction } from "./actions";
+import { reactivateInquiryAction, setInquiryAutoCloseBlockedAction, autoCloseStaleLeadsAction, deleteInquiryAction } from "./actions";
+
+export function DeleteInquiryButton({ id }: { id: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const run = () => {
+    if (!window.confirm("Usunąć to zapytanie na stałe? Tej operacji nie można cofnąć.")) return;
+    start(async () => {
+      const r = await deleteInquiryAction(id);
+      if (r.ok) router.push("/inquiries");
+      else window.alert(r.error ?? "Nie udało się usunąć.");
+    });
+  };
+  return (
+    <button onClick={run} disabled={pending} className="rounded-field border border-[#3d1f23] bg-[#251215] px-3.5 py-2 text-[12.5px] font-bold text-bad disabled:opacity-50">
+      {pending ? "Usuwanie…" : "Usuń zapytanie"}
+    </button>
+  );
+}
 
 export function ReactivateButton({ id }: { id: string }) {
   const router = useRouter();

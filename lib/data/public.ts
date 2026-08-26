@@ -193,6 +193,8 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
   const { data, error } = await s.from("inquiries").insert({
     source: "WEBSITE_FORM",
     status: "NEW",
+    contact_name: c.name?.trim() || null,     // §konfigurator: klient widoczny na liście (nie tylko w notatce)
+    contact_email: c.email?.trim() || null,
     event_type: eventType,
     event_date: input.eventDate || null,
     location: input.location || null,

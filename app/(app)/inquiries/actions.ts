@@ -2,7 +2,7 @@
 // Server Actions modułu Zapytania: walidacja + zapis przez warstwę danych.
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createInquiry, updateInquiry, reactivateInquiry, setInquiryAutoCloseBlocked, autoCloseStaleLeads, type InquiryInput } from "@/lib/data/inquiries";
+import { createInquiry, updateInquiry, deleteInquiry, reactivateInquiry, setInquiryAutoCloseBlocked, autoCloseStaleLeads, type InquiryInput } from "@/lib/data/inquiries";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import type { InquiryStatus, InquirySource } from "@/lib/data/types";
 
@@ -98,6 +98,20 @@ export async function reactivateInquiryAction(id: string): Promise<ActionResult>
     return { ok: true, id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się odgrzać leada." };
+  }
+}
+
+// Usunięcie zapytania (np. testowe) — tylko Szef.
+export async function deleteInquiryAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef może usuwać zapytania." };
+  try {
+    await deleteInquiry(id);
+    revalidatePath("/inquiries");
+    return { ok: true, id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się usunąć zapytania." };
   }
 }
 
