@@ -1,5 +1,6 @@
-// POST /api/contracts — generuje umowę ze zgłoszenia (wewnętrzne, tylko owner). Status draft.
-// Body: { inquiryId, godzinaDostawy?, terminZadatku?, amountTotal?, amountDeposit?, blik?, orderNo? }
+// POST /api/contracts — generuje umowę pod zleceniem (wewnętrzne, tylko owner). Status draft.
+// Body: { jobId, godzinaDostawy?, terminZadatku?, amountTotal?, amountDeposit?, blik?, orderNo? }
+// Domyślnie: godzina montażu z pakietu, zadatek 24h, BLIK 571 029 526, kwoty z rezerwacji.
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { createEsignContract } from "@/lib/data/esign";
@@ -10,14 +11,14 @@ export async function POST(req: NextRequest) {
   const p = await getCurrentProfile();
   if (p?.role !== "OWNER") return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   let body: {
-    inquiryId?: string; godzinaDostawy?: string; terminZadatku?: string;
+    jobId?: string; godzinaDostawy?: string; terminZadatku?: string;
     amountTotal?: number; amountDeposit?: number; blik?: string; orderNo?: string;
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "bad_json" }, { status: 400 }); }
-  if (!body.inquiryId) return NextResponse.json({ ok: false, error: "inquiryId_required" }, { status: 400 });
+  if (!body.jobId) return NextResponse.json({ ok: false, error: "jobId_required" }, { status: 400 });
 
   const res = await createEsignContract({
-    inquiryId: body.inquiryId,
+    jobId: body.jobId,
     deliveryHour: body.godzinaDostawy ?? null,
     depositDue: body.terminZadatku ?? null,
     amountTotal: body.amountTotal ?? null,

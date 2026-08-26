@@ -2,6 +2,16 @@
 // Kod = 6 cyfr z generatora kryptograficznego (NIE Math.random); w bazie tylko skrót.
 import { randomInt, randomBytes, scryptSync, timingSafeEqual, createHash } from "crypto";
 
+// Decyzje biznesowe (§08): godzina montażu z pakietu, BLIK, termin zadatku.
+export const ICLUB_BLIK = "571 029 526";
+export const DEPOSIT_DUE_DEFAULT = "24 godziny od zawarcia umowy";
+const DELIVERY_HOUR_BY_PACKAGE: Record<string, string> = { standard: "17:00", premium: "16:00", vip: "15:00" };
+// Godzina montażu wg pakietu (Standard 17:00 / Premium 16:00 / VIP 15:00). null gdy nieznany.
+export function deliveryHourForPackage(pkg: string | null | undefined): string | null {
+  if (!pkg) return null;
+  return DELIVERY_HOUR_BY_PACKAGE[pkg.trim().toLowerCase()] ?? null;
+}
+
 export const CODE_TTL_MIN = 15;          // ważność kodu
 export const CODE_MAX_ATTEMPTS = 5;      // po tylu nieudanych próbach wymagany nowy kod
 export const CODE_WINDOW_MIN = 10;       // okno rate-limit na żądanie kodu
@@ -93,6 +103,7 @@ export function buildEsignContractHtml(i: EsignContractInput): string {
     ["Zadatek", esc(fmtPLN(i.amountDeposit))],
     ["Pozostało do zapłaty", esc(fmtPLN(remaining))],
     ["Termin zapłaty zadatku", esc(i.depositDue || "—")],
+    ["BLIK / płatność zadatku", esc(i.blik || "—")],
   ];
   const table = rows.map(([k, v]) => `<tr><th style="text-align:left;padding:4px 12px 4px 0;color:#555;font-weight:600;vertical-align:top">${k}</th><td style="padding:4px 0">${v}</td></tr>`).join("");
   return `<!-- SZABLON TYMCZASOWY — do podmiany na docs/umowa-szablon.md -->

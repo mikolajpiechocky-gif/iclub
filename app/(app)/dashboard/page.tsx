@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout";
-import { MetricCard, SectionCard, PrimaryButton, SecondaryButton, Pill, EmptyState } from "@/components/ui";
+import { MetricCard, SectionCard, PrimaryButton, Pill, EmptyState } from "@/components/ui";
 import { listReservations } from "@/lib/data/reservations";
 import { listReservationAddons } from "@/lib/data/resources";
 import { listInquiries } from "@/lib/data/inquiries";
@@ -125,10 +125,7 @@ export default async function DashboardPage() {
         title="Pulpit"
         subtitle={new Date(todayStr + "T00:00:00Z").toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}
         actions={
-          <>
-            <Link href="/reservations/new"><SecondaryButton>Nowa rezerwacja</SecondaryButton></Link>
-            <Link href="/inquiries/new"><PrimaryButton icon="plus">Nowe zapytanie</PrimaryButton></Link>
-          </>
+          <Link href="/reservations/new"><PrimaryButton icon="plus">Nowa rezerwacja</PrimaryButton></Link>
         }
       />
 
@@ -170,7 +167,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title="Najnowsze zapytania" action={<Link href="/inquiries" className="text-[12.5px] font-semibold">Wszystkie →</Link>} className="p-1.5 pb-2">
           {recentInquiries.length === 0 ? (
-            <div className="px-3 py-4"><EmptyState title="Brak zapytań" desc="Dodaj pierwsze zapytanie." /></div>
+            <div className="px-3 py-4"><EmptyState title="Brak zapytań" desc="Pojawią się automatycznie z OLX i formularza strony." /></div>
           ) : (
             recentInquiries.map((q) => (
               <Link key={q.id} href={`/inquiries/${q.id}/edit`} className="flex items-center gap-3 rounded-[13px] px-3.5 py-2.5 transition hover:bg-surface-2">

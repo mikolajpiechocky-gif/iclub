@@ -326,6 +326,14 @@ export function ReservationForm({
   // §wypożyczalnia Cena wynajmu = suma pozycji × liczba dób. Dla iClub liczba dób nie dotyczy.
   const rentalDaysNum = Math.max(1, Math.floor(Number(v.rental_days) || 1));
   const addonsTotal = v.business_line === "EQUIPMENT_RENTAL" ? addonsPerDay * rentalDaysNum : addonsPerDay;
+  // Rozbicie na konkretne pozycje do podsumowania (dodatki iClub / sprzęt wypożyczalni).
+  const rentalMult = v.business_line === "EQUIPMENT_RENTAL" ? rentalDaysNum : 1;
+  const lineItems = addons
+    .filter((a) => v.addon_ids.includes(a.id))
+    .map((a) => {
+      const billable = billableOf(a.id);
+      return { id: a.id, name: a.name, qty: qtyOf(a.id), billable, value: Number(a.price || 0) * billable * rentalMult };
+    });
 
   // §13 Kalkulacja na żywo: pakiet + dodatki + transport − rabat = razem; zadatek; pozostało.
   const selectedPackage = packages.find((p) => p.id === v.package_id);
@@ -682,8 +690,24 @@ export function ReservationForm({
             <span className="font-display text-[16px] font-bold text-accent-soft">{fmtPLN(finalPrice)}</span>
           </summary>
           <div className="flex flex-col gap-2 border-t border-border px-4 py-3.5 text-[13px]">
-            {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Pakiet</span><span className="font-semibold text-ink">{fmtPLN(packagePrice)}</span></div>}
-            {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Dodatki</span><span className="font-semibold text-ink">{fmtPLN(addonsTotal)}</span></div>}
+            {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Pakiet{selectedPackage?.name ? ` · ${selectedPackage.name}` : ""}</span><span className="font-semibold text-ink">{fmtPLN(packagePrice)}</span></div>}
+            {/* Konkretne pozycje: dodatki iClub / sprzęt wypożyczalni (nazwa × ilość → wartość) */}
+            {lineItems.map((it) => (
+              <div key={it.id} className="flex justify-between gap-3">
+                <span className="min-w-0 flex-1 truncate text-ink-2">
+                  {it.name}{it.qty > 1 ? ` ×${it.qty}` : ""}
+                  {v.business_line === "EQUIPMENT_RENTAL" && rentalDaysNum > 1 ? ` · ${rentalDaysNum} dni` : ""}
+                  {it.billable === 0 ? " (w pakiecie)" : it.billable < it.qty ? ` (${it.qty - it.billable} w pakiecie)` : ""}
+                </span>
+                <span className="font-semibold text-ink">{fmtPLN(it.value)}</span>
+              </div>
+            ))}
+            {v.business_line === "EQUIPMENT_RENTAL" && lineItems.length === 0 && (
+              <div className="text-[12px] text-ink-2">Brak wybranych pozycji sprzętu.</div>
+            )}
+            {v.business_line === "ICLUB" && lineItems.length > 0 && (
+              <div className="flex justify-between border-t border-border-soft pt-1.5 text-[12px]"><span className="text-ink-2">Dodatki razem</span><span className="font-semibold text-ink-2">{fmtPLN(addonsTotal)}</span></div>
+            )}
             {!v.self_pickup && <div className="flex justify-between"><span className="text-ink-2">Transport</span><span className="font-semibold text-ink">{fmtPLN(transportPrice)}</span></div>}
             {order.discountAmount > 0 && (
               <div className="flex justify-between"><span className="text-ink-2">Rabat{v.discount_type === "PERCENT" ? ` (${discountValueNum}%)` : ""}</span><span className="font-semibold text-ok">− {fmtPLN(order.discountAmount)}</span></div>

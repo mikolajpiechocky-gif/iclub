@@ -4,10 +4,16 @@
 import { createAdminClient, isServiceRoleConfigured } from "@/lib/supabase/admin";
 import { sendPushToOwners } from "@/lib/integrations/push";
 import { sendEmail, isEmailConfigured } from "@/lib/integrations/email";
+import { getJob } from "@/lib/data/jobs";
+import { getCustomer } from "@/lib/data/customers";
+import { listAddons } from "@/lib/data/resources";
 import {
   generateToken, generateCode, hashCode, verifyCode, sha256, buildEsignContractHtml,
+  deliveryHourForPackage, ICLUB_BLIK, DEPOSIT_DUE_DEFAULT,
   CODE_TTL_MIN, CODE_MAX_ATTEMPTS, CODE_WINDOW_MIN, CODE_MAX_PER_WINDOW, TOKEN_TTL_DAYS,
 } from "@/lib/domain/esign";
+
+const numOrNull = (v: unknown): number | null => { if (v == null) return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
 
 const REGULAMIN_VERSION = process.env.REGULAMIN_VERSION || "2026-08";
 const APP_BASE_URL = (process.env.APP_BASE_URL || "https://app.iclubevents.pl").replace(/\/$/, "");
@@ -32,52 +38,64 @@ export interface EsignRow {
 // Wynik z kodem HTTP dla handlerów publicznych.
 export interface OpResult { ok: boolean; error?: string; httpStatus?: number; signedAt?: string; }
 
-// ---- tworzenie umowy ze zgłoszenia (wewnętrzne, owner) ----
+// ---- tworzenie umowy pod ZLECENIEM (wewnętrzne, owner) ----
+// Dane ciągniemy ze zlecenia i rezerwacji; wartości domyślne wg decyzji §08:
+// godzina montażu z pakietu, zadatek 24h, BLIK 571 029 526, kwoty z rezerwacji.
 export interface CreateEsignInput {
-  inquiryId: string;
-  deliveryHour?: string | null;   // godzina montażu
-  depositDue?: string | null;     // termin zadatku
-  amountTotal?: number | null;
-  amountDeposit?: number | null;
-  blik?: string | null;
+  jobId: string;
+  deliveryHour?: string | null;   // override; domyślnie z pakietu
+  depositDue?: string | null;     // override; domyślnie 24h
+  amountTotal?: number | null;    // override; domyślnie cena rezerwacji
+  amountDeposit?: number | null;  // override; domyślnie zadatek rezerwacji
+  blik?: string | null;           // override; domyślnie ICLUB_BLIK
   orderNo?: string | null;
 }
 
 export async function createEsignContract(input: CreateEsignInput, createdBy: string | null): Promise<{ ok: boolean; id?: string; token?: string; error?: string }> {
   if (!isServiceRoleConfigured()) return { ok: false, error: "Brak konfiguracji serwera." };
-  const s = createAdminClient();
-  const { data: inq } = await s.from("inquiries").select("*").eq("id", input.inquiryId).maybeSingle();
-  if (!inq) return { ok: false, error: "Nie znaleziono zgłoszenia." };
-  const q = inq as Record<string, unknown>;
+  const job = await getJob(input.jobId);
+  if (!job) return { ok: false, error: "Nie znaleziono zlecenia." };
+  if (job.business_line !== "ICLUB") return { ok: false, error: "Umowa dotyczy zleceń iClub." };
+  const r = job.reservation;
+  const customer = r?.customer_id ? await getCustomer(r.customer_id) : null;
+  const addons = await listAddons();
+  const addonNames = (r?.addon_ids ?? []).map((id) => addons.find((a) => a.id === id)?.name).filter((n): n is string => Boolean(n)).join(", ");
 
-  const orderNo = input.orderNo || `IC-${new Date().getFullYear()}-${Math.abs(hashStr(String(q.id))) % 9000 + 1000}`;
+  const pkgName = r?.package?.name ?? null;
+  const deliveryHour = input.deliveryHour ?? deliveryHourForPackage(pkgName);
+  const amountTotal = input.amountTotal ?? numOrNull(r?.price);
+  const amountDeposit = input.amountDeposit ?? numOrNull(r?.deposit);
+  const depositDue = input.depositDue ?? DEPOSIT_DUE_DEFAULT;
+  const blik = input.blik ?? ICLUB_BLIK;
+  const signerEmail = customer?.email ?? null;
+  const orderNo = input.orderNo || `IC-${new Date().getFullYear()}-${Math.abs(hashStr(String(job.id))) % 9000 + 1000}`;
+
   const html = buildEsignContractHtml({
     orderNo,
-    customerName: (q.contact_name as string) || null,
-    customerEmail: (q.contact_email as string) || null,
-    eventType: (q.event_type as string) || null,
-    eventDate: (q.event_date as string) || null,
-    location: (q.location as string) || null,
-    packageName: (q.package_interest as string) || null,
-    tentName: (q.tent_interest as string) || null,
-    addonsNote: (q.addons_note as string) || null,
-    amountTotal: input.amountTotal ?? null,
-    amountDeposit: input.amountDeposit ?? null,
-    deliveryHour: input.deliveryHour ?? null,
-    depositDue: input.depositDue ?? null,
-    blik: input.blik ?? null,
+    customerName: customer?.name ?? r?.customer?.name ?? null,
+    customerEmail: signerEmail,
+    eventType: r?.event_type ?? null,
+    eventDate: r?.event_date ?? null,
+    location: r?.location ?? null,
+    packageName: pkgName,
+    tentName: r?.tent?.name ?? null,
+    addonsNote: addonNames || null,
+    amountTotal, amountDeposit, deliveryHour, depositDue, blik,
   });
 
+  const s = createAdminClient();
   const { data, error } = await s.from("esign_contracts").insert({
-    inquiry_id: input.inquiryId,
+    job_id: job.id,
+    reservation_id: r?.id ?? null,
+    inquiry_id: (r as { inquiry_id?: string | null } | null)?.inquiry_id ?? null,
     order_no: orderNo,
     status: "draft",
     document_html: html,          // migawka wstępna; zamrażamy przy /send
-    signer_email: (q.contact_email as string) || null,
-    delivery_hour: input.deliveryHour ?? null,
-    deposit_due: input.depositDue ?? null,
-    amount_total: input.amountTotal ?? null,
-    amount_deposit: input.amountDeposit ?? null,
+    signer_email: signerEmail,
+    delivery_hour: deliveryHour,
+    deposit_due: depositDue,
+    amount_total: amountTotal,
+    amount_deposit: amountDeposit,
     access_token: generateToken(),
     created_by: createdBy,
   }).select("id, access_token").single();
