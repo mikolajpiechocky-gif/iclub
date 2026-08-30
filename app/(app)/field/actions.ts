@@ -3,23 +3,16 @@
 // zgłoszenie odbioru płatności na miejscu (krok „Rozliczenie”).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { setStageStatus, recomputeJobStatus, getJob, getJobStages, setJobStatus } from "@/lib/data/jobs";
-import { createPayment, markJobPlannedPaid } from "@/lib/data/payments";
-import { createCost, listCosts } from "@/lib/data/costs";
-import { writeRealizationCosts } from "@/lib/data/realization-close";
-import { rentalWorkMs, rentalLabor } from "@/lib/domain/rental";
+import { setStageStatus, recomputeJobStatus, getJob, getJobStages, setJobDepartedAt } from "@/lib/data/jobs";
+import { createPayment } from "@/lib/data/payments";
+import { closeRealization } from "@/lib/data/realization-close";
 import { assignVehicle, removeJobVehicle } from "@/lib/data/vehicles";
 import { saveCallDetails, setDepositDeduction, setRentalDeliveryConfirmed } from "@/lib/data/reservations";
 import { syncReservationToCalendar } from "@/lib/data/calendar-sync";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
-import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
-import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
-import { getSettings } from "@/lib/data/settings";
-import { listTransportCalcs } from "@/lib/data/transport";
 import { createIncident } from "@/lib/data/incidents";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { sendPushToOwners } from "@/lib/integrations/push";
-import { setJobDepartedAt } from "@/lib/data/jobs";
 import type { StageStatus, PaymentMethod } from "@/lib/data/types";
 
 // §postęp Skrót tytułu realizacji do powiadomień (klient albo tytuł zlecenia).
@@ -60,31 +53,13 @@ export async function confirmRentalDeliveryAction(reservationId: string, jobId: 
   }
 }
 
-// Wypożyczalnia: gdy wszystkie kroki zrobione — policz wynagrodzenie (ryczałt albo czas × stawka),
-// dodaj je jako zatwierdzony koszt „Robocizna" (raz), oznacz PLANOWANE płatności i zamknij zlecenie.
-async function finalizeRentalIfDone(jobId: string): Promise<void> {
-  const job = await getJob(jobId);
-  if (!job || job.business_line !== "EQUIPMENT_RENTAL" || job.status === "DONE") return;
-  const stages = await getJobStages(jobId);
-  if (!stages.length || stages.some((s) => s.status !== "DONE")) return;
-  try {
-    const settings = await getSettings();
-    const flat = job.reservation?.rental_settlement_flat != null ? Number(job.reservation.rental_settlement_flat) : null;
-    const labor = rentalLabor(rentalWorkMs(stages), { flat, hourlyRate: Number(settings.iclub_hourly_rate ?? 0) });
-    const costs = await listCosts();
-    const already = costs.some((c) => c.job_id === jobId && c.category === "Robocizna");
-    if (!already && labor.amount > 0) {
-      await createCost({
-        job_id: jobId, category: "Robocizna", amount: labor.amount,
-        spent_on: new Date().toISOString().slice(0, 10),
-        note: labor.isFlat ? "Ryczałt za realizację" : `Czas pracy ${labor.hours} h × stawka`,
-        status: "VERIFIED",
-      });
-    }
-  } catch (e) { console.error("Wypożyczalnia: koszt robocizny nie powiódł się", e); }
-  await setJobStatus(jobId, "DONE");
-  await markJobPlannedPaid(jobId);
-  await writeRealizationCosts(jobId).catch(() => {}); // paliwo do kosztów realizacji
+// Auto-domknięcie: gdy WSZYSTKIE etapy realizacji są zrobione (lub pominięte), zamknij ją wspólną
+// procedurą closeRealization (snapshot zarobków + DONE + przychód + koszty). Dotyczy iClub i wypożyczalni.
+async function autoCloseIfAllStagesDone(jobId: string): Promise<void> {
+  const [job, stages] = await Promise.all([getJob(jobId), getJobStages(jobId)]);
+  if (!job || job.status === "DONE" || !stages.length) return;
+  if (stages.some((s) => s.status !== "DONE" && s.status !== "SKIPPED")) return;
+  await closeRealization(jobId);
 }
 
 export async function advanceStageAction(stageId: string, jobId: string, status: StageStatus, reason?: string, stageKey?: string): Promise<ActionResult> {
@@ -108,8 +83,8 @@ export async function advanceStageAction(stageId: string, jobId: string, status:
     }
     // §II.11/§II.15 Zaktualizuj status zlecenia wg postępu etapów (Zaplanowane → W realizacji).
     await recomputeJobStatus(jobId);
-    // Wypożyczalnia: po ostatnim kroku domknij realizację (koszt robocizny + status Zakończone).
-    await finalizeRentalIfDone(jobId).catch(() => {});
+    // Po ostatnim etapie domknij realizację (iClub i wypożyczalnię): snapshot + przychód + koszty.
+    await autoCloseIfAllStagesDone(jobId).catch(() => {});
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath(`/field`);
@@ -176,18 +151,7 @@ export async function finishRealizationAction(jobId: string): Promise<ActionResu
   try {
     const job = await getJob(jobId);
     if (!job) return { ok: false, error: "Brak zlecenia." };
-    try {
-      const [settings, assignments, transportCalcs] = await Promise.all([getSettings(), listJobAssignments(jobId), listTransportCalcs(jobId)]);
-      const ctx = jobEarningsCtx(job, settings, transportCalcs.some((c) => (c.one_way_km ?? 0) > 100));
-      for (const a of assignments) {
-        if (a.status !== "APPROVED") continue;
-        const eb = await buildAssignmentEarnings(ctx, a.rate, a.profile_id, a.is_lead);
-        await setAssignmentEarningsSnapshot(a.id, eb ?? { base: 0, baseLabel: "Brak stawki", ownerBonus: 0, total: 0, possibleBonuses: [] });
-      }
-    } catch (e) { console.error("snapshot", e); }
-    await setJobStatus(jobId, "DONE");
-    await markJobPlannedPaid(jobId);
-    await writeRealizationCosts(jobId).catch(() => {}); // wynagrodzenia + paliwo do kosztów
+    await closeRealization(jobId); // snapshot zarobków + DONE + przychód + koszty (wspólna procedura)
     revalidatePath(`/field/${jobId}`);
     revalidatePath(`/reservations/${job.reservation_id ?? ""}`);
     revalidatePath(`/field`);

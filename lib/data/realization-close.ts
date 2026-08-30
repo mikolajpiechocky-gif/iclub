@@ -3,12 +3,51 @@
 //  - Paliwo (z kalkulacji transportu: paliwo + eksploatacja).
 // Dzięki temu Raporty i ekran Finansów liczą pełne koszty (nie tylko ręcznie dodane),
 // spójnie z kartą Rentowność. Idempotentne: nie dubluje, gdy dana kategoria już istnieje.
-import { listJobAssignments } from "./assignments";
+import { listJobAssignments, setAssignmentEarningsSnapshot } from "./assignments";
 import { listTransportCalcs } from "./transport";
 import { listCosts, createCost, updateCost } from "./costs";
-import { getJob, getJobStages } from "./jobs";
+import { getJob, getJobStages, setJobStatus } from "./jobs";
 import { getSettings } from "./settings";
+import { createPayment, listPayments } from "./payments";
+import { jobEarningsCtx, buildAssignmentEarnings } from "./job-earnings";
 import { rentalWorkMs, rentalLabor } from "@/lib/domain/rental";
+
+// Przychód realizacji: przy domknięciu wartość rezerwacji staje się przychodem (płatność PAID),
+// niezależnie od ręcznego rejestrowania płatności. Idempotentne (nie dubluje „Przychód realizacji").
+// Kwota = cena rezerwacji − już zarejestrowane płatności PAID (zadatek wliczony — nie był płatnością).
+export async function recordRealizationIncome(jobId: string): Promise<void> {
+  const [job, payments] = await Promise.all([getJob(jobId), listPayments()]);
+  const price = Number(job?.reservation?.price ?? 0) || 0;
+  if (price <= 0) return;
+  const jobPaid = payments.filter((p) => p.job_id === jobId && p.status === "PAID");
+  if (jobPaid.some((p) => p.title === "Przychód realizacji")) return; // już zaksięgowany
+  const already = jobPaid.reduce((s, p) => s + (Number(p.amount || 0) || 0), 0);
+  const income = Math.round((price - already) * 100) / 100;
+  if (income > 0) {
+    await createPayment({ job_id: jobId, title: "Przychód realizacji", method: "TRANSFER", amount: income, status: "PAID", note: "Wartość realizacji (auto przy domknięciu)" });
+  }
+}
+
+// Wspólne domknięcie realizacji (iClub i wypożyczalnia): zamraża snapshot zarobków, ustawia DONE,
+// księguje przychód i pisze koszty (wynagrodzenia, paliwo, robocizna wypożyczalni). Idempotentne.
+export async function closeRealization(jobId: string): Promise<void> {
+  const job = await getJob(jobId);
+  if (!job || job.status === "DONE") return;
+  // Zamrożenie rozliczenia zarobków per przypisany pracownik → podstawa kosztu „Wynagrodzenie".
+  try {
+    const [settings, assignments, transportCalcs] = await Promise.all([getSettings(), listJobAssignments(jobId), listTransportCalcs(jobId)]);
+    const ctx = jobEarningsCtx(job, settings, transportCalcs.some((c) => (c.one_way_km ?? 0) > 100));
+    for (const a of assignments) {
+      if (a.status !== "APPROVED") continue;
+      const eb = await buildAssignmentEarnings(ctx, a.rate, a.profile_id, a.is_lead);
+      await setAssignmentEarningsSnapshot(a.id, eb ?? { base: 0, baseLabel: "Brak stawki", ownerBonus: 0, total: 0, possibleBonuses: [] });
+    }
+  } catch (e) { console.error("closeRealization: snapshot", e); }
+  await setJobStatus(jobId, "DONE");
+  await recordRealizationIncome(jobId).catch(() => {});
+  await writeRealizationCosts(jobId).catch(() => {});
+  if (job.business_line === "EQUIPMENT_RENTAL") await syncRentalLaborCost(jobId).catch(() => {});
+}
 
 export async function writeRealizationCosts(jobId: string): Promise<void> {
   const [assignments, transport, costs] = await Promise.all([

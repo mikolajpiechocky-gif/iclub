@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setReservationStatus, getReservation, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, checkHeatingAvailability, type ReservationInput, type AddonShortage, type HeatingAvailability } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
 import { createCustomer, setCustomerPhone } from "@/lib/data/customers";
-import { markJobPlannedPaid, createPayment } from "@/lib/data/payments";
+import { createPayment } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { syncReservationToCalendar, removeReservationFromCalendar } from "@/lib/data/calendar-sync";
 import { sumSlots, type TentChoice } from "@/lib/domain/tents";
@@ -15,7 +15,7 @@ import { clientTransportPrice, tripClass } from "@/lib/domain/transport";
 import { getSettings } from "@/lib/data/settings";
 import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
 import { listTransportCalcs } from "@/lib/data/transport";
-import { writeRealizationCosts, syncRentalLaborCost } from "@/lib/data/realization-close";
+import { writeRealizationCosts, syncRentalLaborCost, recordRealizationIncome } from "@/lib/data/realization-close";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
 import { sendPushToEmployees, sendPushToUsers } from "@/lib/integrations/push";
@@ -433,7 +433,8 @@ export async function markRealizationDoneAction(reservationId: string): Promise<
       console.error("Zamrożenie rozliczeń nie powiodło się:", e);
     }
     await setJobStatus(job.id, "DONE");
-    await markJobPlannedPaid(job.id);
+    // §przychód Wartość realizacji staje się przychodem (auto) — inaczej domknięcie nie wchodziło do przychodów.
+    await recordRealizationIncome(job.id).catch(() => {});
     // §II.17 Zapisz wynagrodzenia + paliwo jako koszty realizacji (do Raportów/Finansów).
     await writeRealizationCosts(job.id).catch(() => {});
     revalidatePath(`/reservations/${reservationId}`);

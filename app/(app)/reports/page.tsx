@@ -20,6 +20,9 @@ const COST_CAT_COLOR: Record<string, string> = {
   Wynagrodzenie: "#e11d74", Robocizna: "#b98cf5", Paliwo: "#f59e0b", Transport: "#f59e0b",
   Sprzęt: "#14b8c4", Pojazd: "#3b82f6", Marketing: "#22c55e", Autostrada: "#64748b",
 };
+const REV_CAT_COLOR: Record<string, string> = {
+  "Realizacje iClub": "#e11d74", "Wypożyczalnia": "#14b8c4", "Inne": "#64748b",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +110,19 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   }
   const costCats = [...costByCat.entries()].sort((a, b) => b[1] - a[1]);
   const costCatMax = Math.max(1, ...costCats.map(([, v]) => v));
+
+  // §podsumowanie Rozbicie PRZYCHODÓW na składowe (po linii biznesowej + „Inne") dla wybranego zakresu.
+  const jobLine = new Map(jobs.map((j) => [j.id, j.business_line]));
+  const inRange = new Set(rows.map((r) => r.job.id));
+  const revByCat = new Map<string, number>();
+  for (const p of payments) {
+    if (p.status !== "PAID" || !p.job_id || !inRange.has(p.job_id)) continue;
+    const line = jobLine.get(p.job_id);
+    const cat = line === "EQUIPMENT_RENTAL" ? "Wypożyczalnia" : line === "ICLUB" ? "Realizacje iClub" : "Inne";
+    revByCat.set(cat, (revByCat.get(cat) ?? 0) + Number(p.amount || 0));
+  }
+  const revCats = [...revByCat.entries()].sort((a, b) => b[1] - a[1]);
+  const revCatMax = Math.max(1, ...revCats.map(([, v]) => v));
 
   const byLine = (line: "ICLUB" | "EQUIPMENT_RENTAL") => {
     const rs = rows.filter((r) => r.job.business_line === line);
@@ -208,32 +224,60 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           ))}
         </div>
 
-        <div className="rounded-card-lg border border-border bg-surface p-5">
-          <div className="mb-3 flex items-baseline gap-2">
-            <h2 className="font-display text-[15px] font-bold text-white">Koszty wg kategorii</h2>
-            <span className="ml-auto font-display text-[15px] font-bold text-warn">{fmtPLN(totalCost)}</span>
-          </div>
-          {costCats.length === 0 ? (
-            <p className="text-[12.5px] text-ink-2">Brak kosztów w tym okresie.</p>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {costCats.map(([cat, sum]) => (
-                <div key={cat}>
-                  <div className="mb-1 flex items-center gap-2 text-[13px]">
-                    <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: COST_CAT_COLOR[cat] ?? "#64748b" }} />
-                    <span className="font-semibold text-ink">{cat}</span>
-                    <span className="ml-auto font-bold text-white">{fmtPLN(sum)}</span>
-                    <span className="w-10 text-right text-[11.5px] font-semibold text-ink-2">{pct(sum, totalCost)}</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-[#12131a]">
-                    <div className="h-full rounded-full" style={{ width: `${Math.round((sum / costCatMax) * 100)}%`, background: COST_CAT_COLOR[cat] ?? "#64748b" }} />
-                  </div>
-                </div>
-              ))}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="rounded-card-lg border border-border bg-surface p-5">
+            <div className="mb-3 flex items-baseline gap-2">
+              <h2 className="font-display text-[15px] font-bold text-white">Przychody wg składowych</h2>
+              <span className="ml-auto font-display text-[15px] font-bold text-ok">{fmtPLN(totalRev)}</span>
             </div>
-          )}
-          <p className="mt-3 text-[11px] text-ink-2">Wpływy = płatności „Zapłacone”; koszty = wszystkie poza odrzuconymi, w zakresie {scopeLabel}. Pełna rentowność per realizacja — w karcie „Rentowność”.</p>
+            {revCats.length === 0 ? (
+              <p className="text-[12.5px] text-ink-2">Brak przychodów w tym okresie.</p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {revCats.map(([cat, sum]) => (
+                  <div key={cat}>
+                    <div className="mb-1 flex items-center gap-2 text-[13px]">
+                      <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: REV_CAT_COLOR[cat] ?? "#5fd68b" }} />
+                      <span className="font-semibold text-ink">{cat}</span>
+                      <span className="ml-auto font-bold text-white">{fmtPLN(sum)}</span>
+                      <span className="w-10 text-right text-[11.5px] font-semibold text-ink-2">{pct(sum, totalRev)}</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-[#12131a]">
+                      <div className="h-full rounded-full" style={{ width: `${Math.round((sum / revCatMax) * 100)}%`, background: REV_CAT_COLOR[cat] ?? "#5fd68b" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-card-lg border border-border bg-surface p-5">
+            <div className="mb-3 flex items-baseline gap-2">
+              <h2 className="font-display text-[15px] font-bold text-white">Koszty wg kategorii</h2>
+              <span className="ml-auto font-display text-[15px] font-bold text-warn">{fmtPLN(totalCost)}</span>
+            </div>
+            {costCats.length === 0 ? (
+              <p className="text-[12.5px] text-ink-2">Brak kosztów w tym okresie.</p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {costCats.map(([cat, sum]) => (
+                  <div key={cat}>
+                    <div className="mb-1 flex items-center gap-2 text-[13px]">
+                      <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: COST_CAT_COLOR[cat] ?? "#64748b" }} />
+                      <span className="font-semibold text-ink">{cat}</span>
+                      <span className="ml-auto font-bold text-white">{fmtPLN(sum)}</span>
+                      <span className="w-10 text-right text-[11.5px] font-semibold text-ink-2">{pct(sum, totalCost)}</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-[#12131a]">
+                      <div className="h-full rounded-full" style={{ width: `${Math.round((sum / costCatMax) * 100)}%`, background: COST_CAT_COLOR[cat] ?? "#64748b" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+        <p className="mt-3 text-[11px] text-ink-2">Przychód = płatności „Zapłacone” (wartość realizacji księguje się automatycznie przy domknięciu); koszty = wszystkie poza odrzuconymi, w zakresie {scopeLabel}. Pełna rentowność per realizacja — w karcie „Rentowność”.</p>
       </div>
     );
   }
