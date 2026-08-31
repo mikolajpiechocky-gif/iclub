@@ -250,3 +250,14 @@ Status: zatwierdzona
 ## Rozwój iteracyjny
 
 Rejestr będzie aktualizowany po każdej ważnej decyzji produktowej lub technicznej.
+
+## 2026-08-31 — Integracja iClub × TAURUS (zatwierdzona)
+
+Użytkownik zatwierdził integrację iClub↔TAURUS w minimalnym zakresie — **nadpisuje** zasadę konstytucji „nie dotykać Taurusa" (wyłącznie dla uzgodnionych przepływów).
+
+- TAURUS i iClub to DWA osobne projekty Supabase (iClub `gnlxfeobetrpzzczmypw`, TAURUS `oxsxrvecvxlwfdrraudm`) — NIE wspólna baza. iClub pisze do bazy TAURUSA drugim klientem (service_role TAURUSA: `TAURUS_SUPABASE_URL` + `TAURUS_SERVICE_ROLE_KEY`, server-only).
+- Zakres: przekazywanie „co do zrobienia / co zrobione / ile kosztowało". Bez mirrorów — używamy istniejących tabel TAURUSA (`jobs`, `iclub_hour_adjustments`) + małego śladu w iClub (`reservations.taurus_event_job_id`). NIE tworzymy 4 tabel `iclub_*` ze spec.
+- Faza 1 (zrobiona): przyszłe eventy iClub → kalendarz TAURUS (`jobs` source=`iclub_event`, company=`iclub`), cron dzienny.
+- Faza 2 (do zrobienia): zadania serwisowe po evencie → `jobs` source=`iclub_service` + checklista.
+- Faza 3 (do zrobienia): odczyt `jobs.elapsed_minutes` → koszt robocizny serwisu do iClub; `iclub_hour_adjustments` → odliczenie godzin iClub z kosztów TAURUS.
+- Model kosztów pracy (wg użytkownika): serwis = start/stop × stawka → koszt iClub + odjęcie w TAURUS; realizacja iClub = koszt znany → info do TAURUS o ile zmniejszyć wynagrodzenie.
