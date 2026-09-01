@@ -55,14 +55,34 @@ const RULES: Rule[] = [
   { label: "NIP / faktura firmowa", weight: 24, side: "any", test: (t) => NIP_RE.test(t) },
   // Adres do dostawy/montażu (ulica lub kod pocztowy).
   { label: "adres do dostawy", weight: 24, side: "theirs", test: (t) => STREET_RE.test(t) || POSTAL_RE.test(t) },
-  // Ustalony konkretny termin.
-  { label: "ustalony termin", weight: 14, side: "any", test: (t) => DATE_RE.test(t) },
+  // Wspomniany termin (klient/my podali datę) — słaby sygnał (nie „ustalony").
+  { label: "wspomniany termin", weight: 14, side: "any", test: (t) => DATE_RE.test(t) },
   // Klient zostawił kontakt (słabszy sygnał — pada często).
   { label: "kontakt klienta", weight: 10, side: "theirs", test: (t) => EMAIL_RE.test(t) || PHONE_RE.test(t) },
 ];
 
 // Sygnały rezygnacji — obniżają wynik i przesuwają do „wystygło".
 const REJECT_RE = /(rezygnuj|nie skorzystam|nie jestem zainteresowan|znalazłem gdzie indziej|znalazlem gdzie indziej|już nie potrzeb|juz nie potrzeb|już nie jestem|juz nie jestem|za drogo|innym razem|może następnym|moze nastepnym|nieaktualne|dziękuję, nie|dziekuje, nie)/i;
+
+// Nasza odmowa / brak terminu — rozmowa faktycznie zamknięta z naszej strony (klient nie kupi).
+const OUR_DECLINE_RE = /(mamy już komplet|mamy komplet|brak wolnych|nie mamy woln|wszystko zajęte|wszystko zajete|termin (jest )?zajęt|termin (jest )?zajet|niestety zajęt|niestety zajet|brak wolnego terminu|nie mamy tego terminu|nie dysponujemy)/i;
+
+// Krótkie domknięcie rozmowy przez klienta (podziękowanie / potwierdzenie odbioru informacji).
+const CLOSING_RE = /^(dzięk|dziek|dzeki|thx|thanks|ok\b|okej|okey|jasne|rozumiem|szkoda|trudno|w porząd|w porzad|spoko|no to trudno|no trudno|to szkoda|pozdraw|super, dzięk|super dzięk)/i;
+
+// Czy lead OLX FAKTYCZNIE wymaga naszej odpowiedzi (dla „Wymaga uwagi" i przypomnień).
+// Nie wymaga, gdy: ostatnia wiadomość jest nasza, albo klient tylko podziękował/domknął,
+// albo odmówiliśmy (brak terminu) a klient tylko odpisał.
+export function olxNeedsResponse(messages: ConvMessage[]): boolean {
+  if (!messages || !messages.length) return false;
+  const last = messages[messages.length - 1];
+  if (last.mine) return false;
+  const t = (last.text || "").trim().toLowerCase();
+  if (CLOSING_RE.test(t) && t.length < 80) return false;
+  const weDeclined = messages.some((m) => m.mine && OUR_DECLINE_RE.test((m.text || "").toLowerCase()));
+  if (weDeclined && t.length < 120) return false;
+  return true;
+}
 
 export function analyzeConversation(messages: ConvMessage[], fallbackText?: string): ConversationAnalysis {
   const msgs = messages && messages.length ? messages : fallbackText ? [{ text: fallbackText, mine: false }] : [];
@@ -87,11 +107,17 @@ export function analyzeConversation(messages: ConvMessage[], fallbackText?: stri
     score = Math.max(0, score - 55);
     reasons.push("sygnał rezygnacji");
   }
+  // Nasza odmowa (brak terminu) — rozmowa domknięta na „nie", nie licz jej jako aktywnej.
+  const declined = mineText ? OUR_DECLINE_RE.test(mineText) : false;
+  if (declined && !paid) {
+    score = Math.max(0, score - 45);
+    reasons.push("odmówiliśmy (brak terminu)");
+  }
 
   score = Math.min(100, score);
 
   let stage: LeadStage;
-  if (rejected && !paid) stage = "COLD";
+  if ((rejected || declined) && !paid) stage = "COLD";
   else if (score >= 58) stage = "CLOSED";
   else if (score >= 34) stage = "LIKELY";
   else if (score >= 12) stage = "NEGOTIATING";

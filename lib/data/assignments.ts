@@ -288,13 +288,27 @@ export async function listPendingAssignmentRequests(): Promise<PendingAssignment
 export async function countUnsettledDoneAssignments(): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
   const supabase = await createClient();
+  // Liczymy PRACOWNIKÓW z realnym saldem do wypłaty: suma zamrożonego wynagrodzenia z zakończonych
+  // realizacji − „wypłacono" (employee_rates.paid_out). Dzięki temu kafelek spada, gdy szef zapisze
+  // wypłatę (wcześniej liczył po settled_at, które nie było nigdzie ustawiane → nigdy nie malał).
   const { data } = await supabase
     .from("job_assignments")
-    .select("id, settled_at, status, job:jobs(status)")
-    .eq("status", "APPROVED")
-    .is("settled_at", null);
-  const rows = (data ?? []) as unknown as { id: string; job: { status: string } | null }[];
-  return rows.filter((r) => r.job?.status === "DONE").length;
+    .select("profile_id, earnings_snapshot, status, job:jobs(status)")
+    .eq("status", "APPROVED");
+  const rows = (data ?? []) as unknown as { profile_id: string; earnings_snapshot: { total?: number } | null; job: { status: string } | null }[];
+  const owedByEmp = new Map<string, number>();
+  for (const r of rows) {
+    if (r.job?.status !== "DONE" || !r.profile_id) continue;
+    owedByEmp.set(r.profile_id, (owedByEmp.get(r.profile_id) ?? 0) + (Number(r.earnings_snapshot?.total ?? 0) || 0));
+  }
+  if (owedByEmp.size === 0) return 0;
+  const { data: rates } = await supabase.from("employee_rates").select("profile_id, paid_out").in("profile_id", [...owedByEmp.keys()]);
+  const paidByEmp = new Map((rates ?? []).map((x) => [(x as { profile_id: string }).profile_id, Number((x as { paid_out: number | null }).paid_out ?? 0) || 0]));
+  let count = 0;
+  for (const [emp, owed] of owedByEmp) {
+    if (owed - (paidByEmp.get(emp) ?? 0) > 0.5) count++;
+  }
+  return count;
 }
 
 export async function setAssignmentSettled(id: string, settled: boolean): Promise<void> {

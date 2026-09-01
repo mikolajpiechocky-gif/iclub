@@ -53,6 +53,7 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-ink-2">
             {inquiry.source && <span>Źródło: <b className="text-ink">{INQUIRY_SOURCE_LABELS[inquiry.source]}</b></span>}
+            {inquiry.created_at && <span>Wpłynęło: <b className="text-ink">{fmtDT(inquiry.created_at)}</b></span>}
             {(inquiry.contact_name || inquiry.contact_email) && <span>Kontakt: <b className="text-ink">{inquiry.contact_name || inquiry.contact_email}</b>{inquiry.contact_name && inquiry.contact_email ? ` · ${inquiry.contact_email}` : ""}</span>}
             {inquiry.location && <span>Lokalizacja: <b className="text-ink">{inquiry.location}</b></span>}
             {freeLarge != null && freeSmall != null && (
@@ -62,6 +63,14 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
             {inquiry.reactivation_count > 0 && <span>Odgrzewany: <b style={{ color: "#f6a94a" }}>{inquiry.reactivation_count}×</b></span>}
             {inquiry.lost_reason && <span>Powód przegranej: <b className="text-ink">{inquiry.lost_reason === "automatic_inactivity" ? "brak aktywności 21 dni" : inquiry.lost_reason}</b></span>}
           </div>
+
+          {inquiry.source === "WEBSITE_FORM" && inquiry.notes && (
+            <div className="mt-2.5 rounded-card border border-border-soft bg-surface-2 p-3">
+              <div className="mb-1 text-[11.5px] font-bold text-ink-2">Zgłoszona konfiguracja (dokładnie co przyszło z formularza)</div>
+              <pre className="max-h-[260px] overflow-auto whitespace-pre-wrap break-words text-[12px] leading-[1.6] text-ink">{inquiry.notes}</pre>
+              {!inquiry.tent_interest && <div className="mt-1.5 rounded-[8px] border border-[#3d3216] bg-[#241e10] px-2 py-1 text-[11.5px] font-semibold text-warn">⚠️ Klient nie wybrał namiotu (albo wybór się nie zapisał) — dopytaj przy potwierdzeniu.</div>}
+            </div>
+          )}
 
           {isOlx && (
             <div className="mt-2.5 flex flex-wrap items-center gap-2">

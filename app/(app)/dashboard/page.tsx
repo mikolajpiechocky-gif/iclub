@@ -14,6 +14,7 @@ import { getCurrentProfile } from "@/lib/data/profiles";
 import { fuelReminderDue } from "@/lib/data/settings";
 import { listOlxAdverts } from "@/lib/data/olx-adverts";
 import { analyzeFleet } from "@/lib/domain/olx-adverts";
+import { olxNeedsResponse } from "@/lib/domain/lead-analysis";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { RESERVATION_STATUS_META, inquiryDisplayName } from "@/lib/data/types";
 import { warsawTodayISO } from "@/lib/domain/dates";
@@ -94,8 +95,9 @@ export default async function DashboardPage() {
   const attention: { tone: "bad" | "warn" | "info"; title: string; desc: string; href: string }[] = [];
   if (isOwner) {
     // Nieodpisane leady (konfigurator + OLX) — na samej górze, wyróżnione kolorem. Najstarsze pierwsze.
+    // OLX: tylko gdy FAKTYCZNIE wymaga odpowiedzi (nie „dziękuję"/po naszej odmowie).
     const newLeads = inquiries
-      .filter((q) => q.status === "NEW" && (q.source === "WEBSITE_FORM" || q.source === "OLX"))
+      .filter((q) => q.status === "NEW" && (q.source === "WEBSITE_FORM" || (q.source === "OLX" && olxNeedsResponse(q.olx_messages ?? []))))
       .sort((a, b) => ((a.created_at ?? "") < (b.created_at ?? "") ? -1 : 1));
     for (const q of newLeads.slice(0, 6)) {
       const isConf = q.source === "WEBSITE_FORM";

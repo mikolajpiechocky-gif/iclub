@@ -4,6 +4,7 @@
 import { createAdminClient, isServiceRoleConfigured } from "@/lib/supabase/admin";
 import { sendPushToOwners } from "@/lib/integrations/push";
 import { listOwnerUserIds } from "@/lib/data/push";
+import { olxNeedsResponse } from "@/lib/domain/lead-analysis";
 
 const THRESHOLDS_H = [24, 4, 2]; // najpierw najwyższy — jeden (najświeższy przekroczony) na przebieg
 
@@ -32,7 +33,7 @@ interface LeadRow {
   location: string | null;
   created_at: string | null;
   olx_last_message_at: string | null;
-  olx_messages: { mine?: boolean }[] | null;
+  olx_messages: { text: string; mine: boolean }[] | null;
   reminder_stage: number | null;
 }
 
@@ -54,12 +55,8 @@ export async function runLeadReminderSweep(): Promise<{ ok: boolean; sent: numbe
 
   for (const r of rows) {
     const isOlx = r.source === "OLX";
-    // OLX: przypominamy tylko, gdy ostatnia wiadomość jest od KLIENTA (nie nasza).
-    if (isOlx) {
-      const msgs = r.olx_messages ?? [];
-      const last = msgs.length ? msgs[msgs.length - 1] : null;
-      if (last && last.mine) continue; // sami odpisaliśmy — nic nie przypominamy
-    }
+    // OLX: przypominamy tylko, gdy rozmowa FAKTYCZNIE czeka na nas (nie po „dziękuję"/naszej odmowie).
+    if (isOlx && !olxNeedsResponse(r.olx_messages ?? [])) continue;
     // Baza czasu: OLX — ostatnia wiadomość; konfigurator — zgłoszenie.
     const base = isOlx ? (r.olx_last_message_at ?? r.created_at) : r.created_at;
     if (!base) continue;

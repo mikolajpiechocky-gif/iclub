@@ -14,6 +14,7 @@ export async function setEmployeePaidOutAction(profileId: string, amount: number
     await setEmployeePaidOut(profileId, amount);
     revalidatePath(`/employees`);
     revalidatePath(`/employees/${profileId}`);
+    revalidatePath("/dashboard"); // kafelek „Rozliczenia pracowników" ma zejść po wypłacie
     return { ok: true as const };
   } catch (e) {
     return { ok: false as const, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
@@ -33,6 +34,7 @@ export async function setAssignmentExtrasAction(
     await setAssignmentExtras(assignmentId, extras);
     revalidatePath(`/employees`);
     revalidatePath(`/employees/${profileId}`);
+    revalidatePath("/dashboard"); // kafelek „Rozliczenia pracowników" ma zejść po wypłacie
     return { ok: true as const };
   } catch (e) {
     return { ok: false as const, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
