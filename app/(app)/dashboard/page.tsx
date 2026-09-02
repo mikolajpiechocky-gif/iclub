@@ -97,7 +97,9 @@ export default async function DashboardPage() {
     // Nieodpisane leady (konfigurator + OLX) — na samej górze, wyróżnione kolorem. Najstarsze pierwsze.
     // OLX: tylko gdy FAKTYCZNIE wymaga odpowiedzi (nie „dziękuję"/po naszej odmowie).
     const newLeads = inquiries
-      .filter((q) => q.status === "NEW" && (q.source === "WEBSITE_FORM" || (q.source === "OLX" && olxNeedsResponse(q.olx_messages ?? []))))
+      .filter((q) => q.status === "NEW"
+        && (q.last_activity_at ?? q.created_at ?? "").slice(0, 10) >= days14Str  // tylko świeże (14 dni) — bez zalewania starą historią
+        && (q.source === "WEBSITE_FORM" || (q.source === "OLX" && olxNeedsResponse(q.olx_messages ?? []))))
       .sort((a, b) => ((a.created_at ?? "") < (b.created_at ?? "") ? -1 : 1));
     for (const q of newLeads.slice(0, 6)) {
       const isConf = q.source === "WEBSITE_FORM";

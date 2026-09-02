@@ -61,6 +61,9 @@ export async function runLeadReminderSweep(): Promise<{ ok: boolean; sent: numbe
     const base = isOlx ? (r.olx_last_message_at ?? r.created_at) : r.created_at;
     if (!base) continue;
     const ageH = (now - new Date(base).getTime()) / 3_600_000;
+    // Okno przypomnień = pierwsze 4 dni. Starsze leady (np. miesiące starej historii OLX) NIE
+    // generują przypomnień — inaczej przy każdym przebiegu zalewają szefa (był realny spam ~112 leadów).
+    if (ageH > 24 * 4) continue;
     const stage = r.reminder_stage ?? 0;
     const t = THRESHOLDS_H.find((th) => ageH >= th && stage < th);
     if (!t) continue;
