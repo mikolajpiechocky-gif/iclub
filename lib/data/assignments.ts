@@ -179,11 +179,14 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
     }
   }
 
+  // §rozliczenie Do progu 4 realizacji (THRESHOLD) liczą się WYŁĄCZNIE realizacje iClub.
+  // Wypożyczalnia (EQUIPMENT_RENTAL) NIE zjada slotu progu i nie przyspiesza wejścia w ryczałt.
   const monthIdx = new Map<string, number>();
   const out = done.map((r) => {
+    const isIclub = r.job!.business_line !== "EQUIPMENT_RENTAL";
     const month = (r.job!.event_date ?? "").slice(0, 7);
-    const priorCount = monthIdx.get(month) ?? 0;
-    monthIdx.set(month, priorCount + 1);
+    const priorCount = isIclub ? (monthIdx.get(month) ?? 0) : 0;
+    if (isIclub) monthIdx.set(month, priorCount + 1);
     const ownerBonus = Number(r.job!.owner_bonus ?? 0) || 0;
 
     let basePaidOut = false;
