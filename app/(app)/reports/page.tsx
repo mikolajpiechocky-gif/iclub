@@ -19,6 +19,7 @@ import { BackfillCostsButton } from "./backfill-button";
 const COST_CAT_COLOR: Record<string, string> = {
   Wynagrodzenie: "#e11d74", Robocizna: "#b98cf5", Paliwo: "#f59e0b", Transport: "#f59e0b",
   Sprzęt: "#14b8c4", Pojazd: "#3b82f6", Marketing: "#22c55e", Autostrada: "#64748b",
+  Szampan: "#eab308", "Pałeczki fluo": "#a3e635", Hotel: "#8b5cf6", Dieta: "#f472b6", Materiały: "#0ea5e9",
 };
 const REV_CAT_COLOR: Record<string, string> = {
   "Realizacje iClub": "#e11d74", "Wypożyczalnia": "#14b8c4", "Inne": "#64748b",
@@ -96,8 +97,21 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       return { job: j, rev, cost, profit: rev - cost };
     });
 
+  // §koszty ogólne Koszty ręczne BEZ zlecenia (ogólne albo przypisane do linii) — w zakresie po DACIE wydatku,
+  // żeby liczyły się do sum i rozbić (dotąd koszt bez job_id był niewidoczny w finansach).
+  const inScopeByDate = (d: string | null): boolean => {
+    if (selectedYear === "all") return true;
+    if (!d) return false;
+    if (d.slice(0, 4) !== selectedYear) return false;
+    if (selectedMonth && d.slice(5, 7) !== selectedMonth) return false;
+    return true;
+  };
+  const manualCosts = costs.filter((c) => !c.job_id && c.status !== "REJECTED" && inScopeByDate(c.spent_on));
+  const manualCostTotal = manualCosts.reduce((s, c) => s + Number(c.amount || 0), 0);
+  const manualByLine = (line: string) => manualCosts.filter((c) => c.business_line === line).reduce((s, c) => s + Number(c.amount || 0), 0);
+
   const totalRev = rows.reduce((s, r) => s + r.rev, 0);
-  const totalCost = rows.reduce((s, r) => s + r.cost, 0);
+  const totalCost = rows.reduce((s, r) => s + r.cost, 0) + manualCostTotal;
   const totalProfit = totalRev - totalCost;
 
   // §podsumowanie Rozbicie kosztów na kategorie (dla wybranego zakresu) — do widoku „Podsumowanie miesiąca".
@@ -108,6 +122,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       costByCat.set(it.category, (costByCat.get(it.category) ?? 0) + it.amount);
     }
   }
+  for (const c of manualCosts) costByCat.set(c.category, (costByCat.get(c.category) ?? 0) + Number(c.amount || 0)); // koszty ręczne bez zlecenia
   const costCats = [...costByCat.entries()].sort((a, b) => b[1] - a[1]);
   const costCatMax = Math.max(1, ...costCats.map(([, v]) => v));
 
@@ -127,7 +142,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const byLine = (line: "ICLUB" | "EQUIPMENT_RENTAL") => {
     const rs = rows.filter((r) => r.job.business_line === line);
     const rev = rs.reduce((s, r) => s + r.rev, 0);
-    const cost = rs.reduce((s, r) => s + r.cost, 0);
+    const cost = rs.reduce((s, r) => s + r.cost, 0) + manualByLine(line); // + koszty ręczne przypisane do linii
     return { rev, cost, profit: rev - cost, count: rs.length };
   };
   const iclub = byLine("ICLUB");

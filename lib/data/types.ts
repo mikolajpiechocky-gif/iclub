@@ -518,7 +518,7 @@ export const COST_STATUS_META: Record<CostStatus, { label: string; fg: string; b
 
 export const COST_CATEGORIES = [
   "Paliwo", "Autostrada", "Parking", "Hotel", "Dieta", "Wynagrodzenie",
-  "Premia", "Serwis", "Czyszczenie", "Zakup", "Materiały", "Inne",
+  "Premia", "Szampan", "Pałeczki fluo", "Serwis", "Czyszczenie", "Zakup", "Materiały", "Inne",
 ];
 
 export interface PaymentRecord {
@@ -540,6 +540,7 @@ export interface PaymentWithJob extends PaymentRecord {
 export interface CostRecord {
   id: string;
   job_id: string | null;
+  business_line: BusinessLine | null;   // ręczne przypisanie do iClub/wypożyczalni (gdy brak zlecenia lub nadpisanie)
   category: string;
   amount: number;
   spent_on: string | null;

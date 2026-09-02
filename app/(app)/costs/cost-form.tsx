@@ -10,7 +10,7 @@ import { createCostAction, type CostFormValues } from "./actions";
 export function CostForm({ jobs }: { jobs: { id: string; label: string }[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [v, setV] = useState<CostFormValues>({ job_id: jobs[0]?.id ?? "", category: "Paliwo", amount: "", spent_on: "", note: "" });
+  const [v, setV] = useState<CostFormValues>({ job_id: jobs[0]?.id ?? "", business_line: "", category: "Paliwo", amount: "", spent_on: "", note: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -62,6 +62,11 @@ export function CostForm({ jobs }: { jobs: { id: string; label: string }[] }) {
           <SelectField label="Zlecenie" value={v.job_id} onChange={(e) => set("job_id", e.target.value)}>
             <option value="">— bez zlecenia —</option>
             {jobs.map((j) => <option key={j.id} value={j.id}>{j.label}</option>)}
+          </SelectField>
+          <SelectField label="Linia (dla kosztu bez zlecenia lub do nadpisania)" value={v.business_line} onChange={(e) => set("business_line", e.target.value)}>
+            <option value="">— wg zlecenia / ogólny —</option>
+            <option value="ICLUB">iClub</option>
+            <option value="EQUIPMENT_RENTAL">Wypożyczalnia</option>
           </SelectField>
           <TextField label="Data" type="date" value={v.spent_on} onChange={(e) => set("spent_on", e.target.value)} />
           <TextField label="Opis (opcjonalnie)" placeholder="Np. tankowanie Orlen" value={v.note} onChange={(e) => set("note", e.target.value)} />

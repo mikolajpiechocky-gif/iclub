@@ -7,6 +7,7 @@ import { createCost, setCostStatus } from "@/lib/data/costs";
 
 export interface CostFormValues {
   job_id: string;
+  business_line: string;   // "" (z zlecenia / ogólny) | "ICLUB" | "EQUIPMENT_RENTAL"
   category: string;
   amount: string;
   spent_on: string;
@@ -35,6 +36,7 @@ export async function createCostAction(v: CostFormValues): Promise<ActionResult>
   try {
     await createCost({
       job_id: v.job_id || null,
+      business_line: v.business_line === "ICLUB" || v.business_line === "EQUIPMENT_RENTAL" ? v.business_line : null,
       category: v.category || "Inne",
       amount,
       spent_on: v.spent_on || null,
