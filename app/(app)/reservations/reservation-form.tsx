@@ -722,7 +722,7 @@ export function ReservationForm({
               <div className="flex justify-between text-[11px] text-ink-2"><span>Wyliczona (pakiet+dodatki+transport−rabat)</span><span>{fmtPLN(order.total)}</span></div>
             )}
             {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Zadatek</span><span className="font-semibold text-ink">− {fmtPLN(depositNum)}</span></div>}
-            {v.business_line === "ICLUB" && !v.self_pickup && <div className="flex justify-between"><span className="text-ink-2">Transport (składowa zaliczki)</span><span className="font-semibold text-ink">− {fmtPLN(transportPrice)}</span></div>}
+            {v.business_line === "ICLUB" && !v.self_pickup && <div className="flex justify-between"><span className="text-ink-2">Transport (składowa zadatku)</span><span className="font-semibold text-ink">− {fmtPLN(transportPrice)}</span></div>}
             {v.business_line === "ICLUB" && addonsDeposit > 0 && <div className="flex justify-between"><span className="text-ink-2">Zaliczka za dodatki (15%)</span><span className="font-semibold text-ink">− {fmtPLN(addonsDeposit)}</span></div>}
             {v.business_line === "ICLUB" && <div className="mt-1 flex justify-between border-t border-border-soft pt-2 text-[14px] font-bold text-warn"><span>Pozostało do zapłaty</span><span>{fmtPLN(remaining)}</span></div>}
             {depositOverValue && (

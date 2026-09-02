@@ -38,6 +38,10 @@ interface LeadRow {
 }
 
 export async function runLeadReminderSweep(): Promise<{ ok: boolean; sent: number; skipped?: string }> {
+  // §powiadomienia: cykliczne przypominajki o nieodpisanych leadach są DOMYŚLNIE WYŁĄCZONE
+  // (szef dostaje push od razu przy nowym zgłoszeniu — to jest sygnał; nagabywanie co 30 min to spam).
+  // Włączenie świadome: LEAD_REMINDERS_ENABLED=1.
+  if (process.env.LEAD_REMINDERS_ENABLED !== "1") return { ok: true, sent: 0, skipped: "przypomnienia leadów wyłączone" };
   if (!isServiceRoleConfigured()) return { ok: false, sent: 0 };
   if (!inWorkWindow()) return { ok: true, sent: 0, skipped: "poza oknem roboczym (pon–sob 7–18)" };
 

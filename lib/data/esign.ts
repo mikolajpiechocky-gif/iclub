@@ -7,6 +7,7 @@ import { sendEmail, isEmailConfigured } from "@/lib/integrations/email";
 import { getJob } from "@/lib/data/jobs";
 import { getCustomer } from "@/lib/data/customers";
 import { listAddons } from "@/lib/data/resources";
+import { materializeReservationFromContract } from "@/lib/data/reservation-from-contract";
 import {
   generateToken, generateCode, hashCode, verifyCode, sha256, buildEsignContractHtml,
   deliveryHourForPackage, ICLUB_BLIK, DEPOSIT_DUE_DEFAULT,
@@ -24,7 +25,7 @@ const nowIso = () => new Date().toISOString();
 export type EsignStatus = "draft" | "sent" | "signed" | "expired" | "cancelled";
 
 export interface EsignRow {
-  id: string; inquiry_id: string | null; order_no: string | null; status: EsignStatus;
+  id: string; inquiry_id: string | null; reservation_id: string | null; job_id: string | null; order_no: string | null; status: EsignStatus;
   document_html: string | null; document_sha256: string | null; regulamin_version: string | null;
   signer_email: string | null; delivery_hour: string | null; deposit_due: string | null;
   amount_total: number | null; amount_deposit: number | null;
@@ -317,6 +318,14 @@ export async function signEsignContract(
     url: "/inquiries",
     tag: "esign-signed",
   }).catch(() => {});
+
+  // Zawarcie umowy zakłada/potwierdza rezerwację i wpis w kalendarzu (best-effort — nie wywraca podpisu).
+  try {
+    await materializeReservationFromContract({
+      id: c.id, inquiry_id: c.inquiry_id, reservation_id: c.reservation_id,
+      order_no: c.order_no, amount_total: c.amount_total, amount_deposit: c.amount_deposit,
+    });
+  } catch (e) { console.error("materializeReservationFromContract:", e); }
 
   return { ok: true, signedAt, httpStatus: 200 };
 }

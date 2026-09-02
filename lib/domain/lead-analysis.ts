@@ -45,7 +45,7 @@ const has = (t: string, ...frags: string[]) => frags.some((f) => t.includes(f));
 
 const RULES: Rule[] = [
   // Płatność — najmocniejszy dowód domknięcia (zaliczka/zadatek/przelew/konto).
-  { label: "wpłata / zaliczka", weight: 42, side: "any", test: (t) => has(t, "zaliczk", "zadatek", "wpłac", "wplac", "przelew", "blik", "opłac", "oplac", "zapłac", "zaplac", "numer konta", "nr konta", "dane do przelewu", "zaksięgow", "zaksiegow") },
+  { label: "wpłata / zadatek", weight: 42, side: "any", test: (t) => has(t, "zaliczk", "zadatek", "wpłac", "wplac", "przelew", "blik", "opłac", "oplac", "zapłac", "zaplac", "numer konta", "nr konta", "dane do przelewu", "zaksięgow", "zaksiegow") },
   // Klient jednoznacznie rezerwuje / bierze.
   { label: "klient potwierdza rezerwację", weight: 34, side: "theirs", test: (t) => has(t, "rezerwuj", "biorę", "biore", "bierzemy", "zamawiam", "zamawiamy", "potwierdzam", "decyduj", "wchodzę", "wchodze", "umawiam", "chcę zarezerwow", "chce zarezerwow", "tak, pobier", "tak pobier") },
   // Potwierdzenie z naszej strony (termin zaklepany, umowa wysłana).
@@ -102,7 +102,7 @@ export function analyzeConversation(messages: ConvMessage[], fallbackText?: stri
 
   // Rezygnacja klienta zbija wynik (chyba że wcześniej realnie wpłacił).
   const rejected = theirText ? REJECT_RE.test(theirText) : false;
-  const paid = reasons.includes("wpłata / zaliczka");
+  const paid = reasons.includes("wpłata / zadatek");
   if (rejected && !paid) {
     score = Math.max(0, score - 55);
     reasons.push("sygnał rezygnacji");

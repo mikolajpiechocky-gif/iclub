@@ -53,9 +53,11 @@ export interface InquiryRecord {
   // §6 Kontakt (dla leadów bez klienta — nick/mail z OLX) + historia rozmowy + analiza.
   contact_name: string | null;
   contact_email: string | null;
+  contact_phone: string | null;          // §konfigurator: telefon jako pole (nie tylko w notatce)
   olx_messages: OlxMessage[] | null;
   contract_signal: boolean;
   olx_raw: unknown | null; // surowy sample z OLX (diagnostyka mapowania pól)
+  config_json: InquiryConfig | null;     // §konfigurator: pełna konfiguracja ze strony (do czytelnej karty)
   created_at: string;
   updated_at: string;
 }
@@ -65,6 +67,27 @@ export interface OlxMessage {
   text: string;
   at: string | null;
   mine: boolean; // true = wiadomość wychodząca (my), false = od klienta
+}
+
+// §konfigurator: strukturalna konfiguracja ze strony (zapisywana przy leadzie do czytelnej karty).
+export interface InquiryConfig {
+  line?: string | null;                  // "ICLUB" | "RENTAL"
+  eventDate?: string | null;
+  eventStartTime?: string | null;
+  location?: string | null;
+  guests?: number | null;
+  tentMain?: string | null;
+  tentExtra?: string | null;
+  package?: string | null;
+  addons?: { code?: string; name?: string; qty?: number }[] | null;
+  rentalItems?: { code?: string; name?: string; qty?: number }[] | null;
+  rentalDays?: number | null;
+  heating?: boolean | null;
+  selfPickup?: boolean | null;
+  estimate?: { value?: number; transport?: number; deposit?: number; remaining?: number } | null;
+  contact?: { name?: string; phone?: string; email?: string } | null;
+  message?: string | null;
+  configNo?: string | null;              // nr z konfiguratora (np. IC-2026-9619), jeśli przyszedł
 }
 
 // Zapytanie z dołączoną nazwą klienta (do list).

@@ -187,16 +187,33 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
     isRental && input.rentalDays != null && `Liczba dób: ${input.rentalDays}`,
     itemsStr && `${isRental ? "Sprzęt" : "Dodatki"}: ${itemsStr}`,
     input.selfPickup && "Odbiór własny: tak",
-    input.estimate && `Wycena konfiguratora: wartość ${zl(input.estimate.value)}, transport ${zl(input.estimate.transport)}, zaliczka ${zl(input.estimate.deposit)}, pozostało ${zl(input.estimate.remaining)}`,
+    input.estimate && `Wycena konfiguratora: wartość ${zl(input.estimate.value)}, transport ${zl(input.estimate.transport)}, zadatek ${zl(input.estimate.deposit)}, pozostało ${zl(input.estimate.remaining)}`,
     input.message?.trim() && `Wiadomość: ${input.message.trim()}`,
     "(Wycena orientacyjna — do potwierdzenia; bez wiążącej rezerwacji.)",
   ].filter(Boolean).join("\n");
+
+  // Nr z konfiguratora (jeśli klient/konfigurator wpisał go w wiadomości, np. „IC-2026-9619").
+  const configNo = input.message?.match(/\b([A-Z]{2}-\d{4}-\d{3,})\b/)?.[1] ?? null;
+  // Pełna konfiguracja zapisana strukturalnie → czytelna karta leada (bez parsowania notatki).
+  const config = {
+    line: isRental ? "RENTAL" : "ICLUB",
+    eventDate: input.eventDate ?? null, eventStartTime: input.eventStartTime ?? null,
+    location: input.location ?? null, guests: input.guests ?? null,
+    tentMain: input.tentMain ?? null, tentExtra: input.tentExtra ?? null,
+    package: input.package ?? null,
+    addons: input.addons ?? null, rentalItems: input.rentalItems ?? null, rentalDays: input.rentalDays ?? null,
+    heating: input.heating ?? null, selfPickup: input.selfPickup ?? null,
+    estimate: input.estimate ?? null,
+    contact: { name: c.name?.trim() || undefined, phone: c.phone?.trim() || undefined, email: c.email?.trim() || undefined },
+    message: input.message?.trim() || null, configNo,
+  };
 
   const { data, error } = await s.from("inquiries").insert({
     source: "WEBSITE_FORM",
     status: "NEW",
     contact_name: c.name?.trim() || null,     // §konfigurator: klient widoczny na liście (nie tylko w notatce)
     contact_email: c.email?.trim() || null,
+    contact_phone: c.phone?.trim() || null,   // §konfigurator: telefon jako pole (kliknij, by zadzwonić)
     event_type: eventType,
     event_date: input.eventDate || null,
     location: input.location || null,
@@ -205,15 +222,17 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
     package_interest: input.package || null,
     addons_note: itemsStr || null,
     notes,
+    config_json: config,
   }).select("id").single();
 
   if (error) return { ok: false, error: error.message };
+  const newId = (data as { id: string }).id;
 
   sendPushToOwners({
     title: "Nowe zgłoszenie z konfiguratora",
-    body: `${c.name?.trim() || "Klient"} — ${eventType}`,
-    url: "/inquiries",
-    tag: "configurator-lead",
+    body: `${c.name?.trim() || "Klient"}${c.phone?.trim() ? ` · ${c.phone.trim()}` : ""} — ${eventType}`,
+    url: `/inquiries/${newId}/edit`,
+    tag: `configurator-lead-${newId}`,      // unikalny tag — kolejne zgłoszenia nie nadpisują poprzednich
   }).catch(() => {});
 
   // Wpis w panelu powiadomień (per szef) — inaczej lead jest tylko w push, nie na liście.
@@ -242,5 +261,5 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
     }).catch(() => {});
   }
 
-  return { ok: true, id: (data as { id: string }).id };
+  return { ok: true, id: newId };
 }
