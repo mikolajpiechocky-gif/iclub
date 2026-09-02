@@ -165,6 +165,14 @@ export async function getEsignByInquiry(inquiryId: string): Promise<EsignRow | n
   return (data as EsignRow) ?? null;
 }
 
+// Ostatnia umowa powiązana ze zleceniem (do panelu na rezerwacji).
+export async function getEsignByJob(jobId: string): Promise<EsignRow | null> {
+  if (!isServiceRoleConfigured()) return null;
+  const s = createAdminClient();
+  const { data } = await s.from("esign_contracts").select("*").eq("job_id", jobId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  return (data as EsignRow) ?? null;
+}
+
 // ---- wysyłka umowy do podpisu (wewnętrzne, owner) ----
 // Zamraża treść + sumę kontrolną, ustawia status sent + ważność tokenu, wysyła mail z linkiem (BEZ kodu).
 export async function sendEsignContract(id: string): Promise<{ ok: boolean; error?: string; emailSkipped?: boolean; link?: string }> {

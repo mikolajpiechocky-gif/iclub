@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setReservationStatus, getReservation, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, checkHeatingAvailability, type ReservationInput, type AddonShortage, type HeatingAvailability } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
-import { createCustomer, setCustomerPhone } from "@/lib/data/customers";
+import { createCustomer, setCustomerPhone, setCustomerEmail } from "@/lib/data/customers";
 import { createPayment } from "@/lib/data/payments";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { syncReservationToCalendar, removeReservationFromCalendar } from "@/lib/data/calendar-sync";
@@ -16,6 +16,7 @@ import { getSettings } from "@/lib/data/settings";
 import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
 import { listTransportCalcs } from "@/lib/data/transport";
 import { writeRealizationCosts, syncRentalLaborCost, recordRealizationIncome } from "@/lib/data/realization-close";
+import { createEsignContract, sendEsignContract } from "@/lib/data/esign";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
 import { sendPushToEmployees, sendPushToUsers } from "@/lib/integrations/push";
@@ -28,6 +29,7 @@ export interface ReservationFormValues {
   customer_id: string;            // id z listy, "" = bez klienta, "__new__" = nowy wpisany z ręki
   new_customer_name: string;      // §klient nowy klient wpisany w formularzu rezerwacji
   new_customer_phone: string;
+  new_customer_email: string;     // §umowa e-mail klienta (do wysyłki umowy/podpisu)
   self_pickup: boolean;           // §transport odbiór własny (klient odbiera sam — bez transportu)
   event_type: string;
   event_date: string;
@@ -299,18 +301,37 @@ export async function computeReservationTransportAction(location: string): Promi
   return { ok: true, km, price: clientTransportPrice(km), farTrip: tripClass(km) === "far" };
 }
 
+// §umowa Utwórz umowę ze zlecenia (rezerwacja) i wyślij do podpisu — tylko Szef.
+// E-mail idzie automatycznie (Resend); bez poczty zwracamy link do ręcznego wysłania.
+export async function sendContractForJobAction(
+  jobId: string, amountTotal: number | null, amountDeposit: number | null,
+): Promise<{ ok: boolean; error?: string; link?: string; emailSkipped?: boolean }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef wysyła umowy." };
+  const created = await createEsignContract({ jobId, amountTotal, amountDeposit }, me.id ?? null);
+  if (!created.ok || !created.id) return { ok: false, error: created.error ?? "Nie udało się utworzyć umowy." };
+  const sent = await sendEsignContract(created.id);
+  if (!sent.ok) return { ok: false, error: sent.error ?? "Nie udało się wysłać umowy." };
+  revalidatePath("/reservations");
+  return { ok: true, link: sent.link, emailSkipped: sent.emailSkipped };
+}
+
 // §klient Nowy klient wpisany z ręki (customer_id="__new__") → utwórz go i podmień id.
 // Istniejący klient z podanym telefonem → zaktualizuj jego numer (edycja telefonu z rezerwacji).
 async function resolveNewCustomer(values: ReservationFormValues): Promise<ReservationFormValues> {
   if (values.customer_id === "__new__") {
     const name = values.new_customer_name.trim();
     if (!name) return { ...values, customer_id: "" }; // brak nazwy → traktuj jak „bez klienta"
-    const { id } = await createCustomer({ type: "PRIVATE", name, phone: values.new_customer_phone.trim() || null });
+    const { id } = await createCustomer({ type: "PRIVATE", name, phone: values.new_customer_phone.trim() || null, email: values.new_customer_email.trim() || null });
     return { ...values, customer_id: id };
   }
   const existingId = values.customer_id.trim();
   if (existingId && values.new_customer_phone.trim()) {
     try { await setCustomerPhone(existingId, values.new_customer_phone.trim()); } catch { /* nie blokuje zapisu rezerwacji */ }
+  }
+  if (existingId && values.new_customer_email.trim()) {
+    try { await setCustomerEmail(existingId, values.new_customer_email.trim()); } catch { /* nie blokuje zapisu rezerwacji */ }
   }
   return values;
 }

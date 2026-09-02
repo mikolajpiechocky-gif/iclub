@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { sendContractForInquiryAction } from "./actions";
+import { sendContractForJobAction } from "../reservations/actions";
 
 const STATUS_PL: Record<string, { label: string; fg: string; bg: string }> = {
   draft: { label: "Szkic", fg: "#9aa0b2", bg: "#22242e" },
@@ -30,8 +31,9 @@ function CopyLink({ link }: { link: string }) {
   );
 }
 
-export function LeadContractPanel({ inquiryId, defaultTotal, defaultDeposit, contract }: {
-  inquiryId: string;
+export function LeadContractPanel({ inquiryId, jobId, defaultTotal, defaultDeposit, contract }: {
+  inquiryId?: string;
+  jobId?: string;   // gdy podane → umowa ze zlecenia (rezerwacji), inaczej z zapytania
   defaultTotal: string;
   defaultDeposit: string;
   contract: ExistingContract | null;
@@ -48,7 +50,7 @@ export function LeadContractPanel({ inquiryId, defaultTotal, defaultDeposit, con
     const t = Number(total.replace(",", ".")) || null;
     const d = Number(deposit.replace(",", ".")) || null;
     start(async () => {
-      const r = await sendContractForInquiryAction(inquiryId, t, d);
+      const r = jobId ? await sendContractForJobAction(jobId, t, d) : await sendContractForInquiryAction(inquiryId ?? "", t, d);
       if (!r.ok) { setErr(r.error ?? "Nie udało się wysłać."); return; }
       setResult({ link: r.link, emailSkipped: r.emailSkipped });
       router.refresh();

@@ -17,7 +17,7 @@ import { AddressAutocomplete } from "./address-autocomplete";
 
 const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = { bufferMinutes: 30, addonMinutes: 10, gastroMinutes: 60 };
 
-type CustomerOption = { id: string; name: string; phone?: string | null };
+type CustomerOption = { id: string; name: string; phone?: string | null; email?: string | null };
 
 const fmtPLN = (v: number) =>
   new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
@@ -33,9 +33,9 @@ const nextDay = (iso: string): string => {
 
 // Klient jako pole tekstowe z klikalnymi podpowiedziami. Dokładne dopasowanie → istniejący
 // klient; inaczej nowy (utworzony przy zapisie). Zastępuje sztywną listę.
-function CustomerPicker({ customers, customerId, newName, newPhone, set }: {
-  customers: CustomerOption[]; customerId: string; newName: string; newPhone: string;
-  set: (k: "customer_id" | "new_customer_name" | "new_customer_phone", v: string) => void;
+function CustomerPicker({ customers, customerId, newName, newPhone, newEmail, set }: {
+  customers: CustomerOption[]; customerId: string; newName: string; newPhone: string; newEmail: string;
+  set: (k: "customer_id" | "new_customer_name" | "new_customer_phone" | "new_customer_email", v: string) => void;
 }) {
   const initName = customerId && customerId !== "__new__" ? (customers.find((c) => c.id === customerId)?.name ?? "") : newName;
   const [query, setQuery] = useState(initName);
@@ -47,10 +47,10 @@ function CustomerPicker({ customers, customerId, newName, newPhone, set }: {
   const onType = (val: string) => {
     setQuery(val); setOpen(true);
     const ex = customers.find((c) => c.name.trim().toLowerCase() === val.trim().toLowerCase());
-    if (ex) { set("customer_id", ex.id); set("new_customer_name", ""); set("new_customer_phone", ex.phone ?? ""); }
+    if (ex) { set("customer_id", ex.id); set("new_customer_name", ""); set("new_customer_phone", ex.phone ?? ""); set("new_customer_email", ex.email ?? ""); }
     else { set("customer_id", val.trim() ? "__new__" : ""); set("new_customer_name", val); }
   };
-  const pick = (c: CustomerOption) => { setQuery(c.name); set("customer_id", c.id); set("new_customer_name", ""); set("new_customer_phone", c.phone ?? ""); setOpen(false); };
+  const pick = (c: CustomerOption) => { setQuery(c.name); set("customer_id", c.id); set("new_customer_name", ""); set("new_customer_phone", c.phone ?? ""); set("new_customer_email", c.email ?? ""); setOpen(false); };
   const existingSelected = Boolean(customerId) && customerId !== "__new__";
 
   return (
@@ -68,12 +68,15 @@ function CustomerPicker({ customers, customerId, newName, newPhone, set }: {
         <div className="mt-2">
           <div className="mb-1 text-[11.5px] text-ok">✚ Nowy klient „{query.trim()}” — dodamy przy zapisie.</div>
           <input value={newPhone} onChange={(e) => set("new_customer_phone", e.target.value)} placeholder="Telefon (opcjonalnie)" inputMode="tel" className="w-full rounded-field border border-border bg-surface-2 px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-accent" />
+          <input value={newEmail} onChange={(e) => set("new_customer_email", e.target.value)} placeholder="E-mail (do umowy i podpisu)" inputMode="email" className="mt-2 w-full rounded-field border border-border bg-surface-2 px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-accent" />
         </div>
       )}
       {existingSelected && (
         <div className="mt-2">
           <label className="mb-1 block text-[11.5px] font-semibold text-ink-2">Telefon do klienta</label>
           <input value={newPhone} onChange={(e) => set("new_customer_phone", e.target.value)} placeholder="Telefon" inputMode="tel" className="w-full rounded-field border border-border bg-surface-2 px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-accent" />
+          <label className="mb-1 mt-2 block text-[11.5px] font-semibold text-ink-2">E-mail do klienta (do umowy i podpisu)</label>
+          <input value={newEmail} onChange={(e) => set("new_customer_email", e.target.value)} placeholder="E-mail" inputMode="email" className="w-full rounded-field border border-border bg-surface-2 px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-accent" />
         </div>
       )}
     </div>
@@ -176,12 +179,14 @@ export function ReservationForm({
 
   // Telefon do klienta w edycji: pre-fill z wybranego istniejącego klienta (regresja — dawniej znikał).
   const initialPhone = initial?.customer_id ? (customers.find((c) => c.id === initial.customer_id)?.phone ?? "") : "";
+  const initialEmail = initial?.customer_id ? (customers.find((c) => c.id === initial.customer_id)?.email ?? "") : "";
 
   const [v, setV] = useState<ReservationFormValues>({
     business_line: initial?.business_line ?? "ICLUB",
     customer_id: initial?.customer_id ?? "",
     new_customer_name: "",
     new_customer_phone: initialPhone,
+    new_customer_email: initialEmail,
     self_pickup: initial?.self_pickup ?? false,
     event_type: initial?.event_type ?? "",
     event_date: initial?.event_date ?? "",
@@ -441,7 +446,7 @@ export function ReservationForm({
               <option value="ICLUB">iClub</option>
               <option value="EQUIPMENT_RENTAL">Wypożyczalnia sprzętu</option>
             </SelectField>
-            <CustomerPicker customers={customers} customerId={v.customer_id} newName={v.new_customer_name} newPhone={v.new_customer_phone} set={set} />
+            <CustomerPicker customers={customers} customerId={v.customer_id} newName={v.new_customer_name} newPhone={v.new_customer_phone} newEmail={v.new_customer_email} set={set} />
             {isEdit && (
               <SelectField label="Status" value={v.status} onChange={(e) => set("status", e.target.value as ReservationStatus)}>
                 {RESERVATION_STATUS_ORDER.map((s) => <option key={s} value={s}>{RESERVATION_STATUS_LABELS[s]}</option>)}

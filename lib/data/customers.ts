@@ -74,3 +74,9 @@ export async function setCustomerPhone(id: string, phone: string | null): Promis
   const { error } = await supabase.from("customers").update({ phone }).eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+export async function setCustomerEmail(id: string, email: string | null): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("customers").update({ email }).eq("id", id);
+  if (error) throw new Error(error.message);
+}

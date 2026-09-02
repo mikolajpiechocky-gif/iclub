@@ -19,7 +19,7 @@ export default async function NewReservationPage() {
   ]);
   return (
     <ReservationForm
-      customers={customers.map((c) => ({ id: c.id, name: c.name, phone: c.phone }))}
+      customers={customers.map((c) => ({ id: c.id, name: c.name, phone: c.phone, email: c.email }))}
       tents={tents}
       packages={packages}
       addons={addons}

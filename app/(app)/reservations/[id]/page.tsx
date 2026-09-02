@@ -32,8 +32,11 @@ import { CancelReservationButton } from "../cancel-reservation";
 import { JobTeam, type AssignmentView } from "../../jobs/job-team";
 import { JobVehicles, type JobVehicleView } from "../../jobs/job-vehicles";
 import { JobTransport } from "../../jobs/job-transport";
+import { getEsignByJob } from "@/lib/data/esign";
+import { LeadContractPanel } from "../../inquiries/lead-contract";
 
 export const dynamic = "force-dynamic";
+const APP_BASE_URL = (process.env.APP_BASE_URL || "https://app.iclubevents.pl").replace(/\/$/, "");
 
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "long", year: "numeric" }) : "—";
@@ -83,6 +86,18 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
     ? await Promise.all([reservation.customer_id ? getCustomer(reservation.customer_id) : Promise.resolve(null), getSettings()])
     : [null, null];
 
+  // §umowa Umowa do podpisu (e-sign) — dla iClub. Kwoty domyślne z rezerwacji.
+  const contractRow = !isRental && job ? await getEsignByJob(job.id) : null;
+  const esignContract = contractRow ? {
+    status: contractRow.status,
+    link: `${APP_BASE_URL}/umowa/${contractRow.access_token}`,
+    signerEmail: contractRow.signer_email,
+    signedAt: contractRow.signed_at,
+    orderNo: contractRow.order_no,
+  } : null;
+  const esignTotal = reservation.price != null ? String(Math.round(Number(reservation.price))) : "";
+  const esignDeposit = reservation.deposit != null ? String(Math.round(Number(reservation.deposit))) : "";
+
   const clientName = (r as { customer?: { name?: string } }).customer?.name ?? "—";
   // §wypożyczalnia Karty dopasowane do linii: wynajem nie ma namiotu/pakietu/gości ani montażu —
   // pokazujemy wypożyczony sprzęt, odbiór/zwrot i godzinę dostawy.
@@ -130,6 +145,10 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
           </span>
         )}
       </div>
+
+      {isOwner && !isRental && job && reservation.status !== "CANCELLED" && (
+        <LeadContractPanel jobId={job.id} defaultTotal={esignTotal} defaultDeposit={esignDeposit} contract={esignContract} />
+      )}
 
       {isOwner && !isRental && (
         <ClientConfirmToggle

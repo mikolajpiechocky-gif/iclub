@@ -31,7 +31,7 @@ export default async function EditReservationPage({ params }: { params: Promise<
   return (
     <ReservationForm
       initial={reservation}
-      customers={customers.map((c) => ({ id: c.id, name: c.name, phone: c.phone }))}
+      customers={customers.map((c) => ({ id: c.id, name: c.name, phone: c.phone, email: c.email }))}
       tents={tents}
       packages={allPackages}
       addons={addons}
