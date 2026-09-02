@@ -71,6 +71,14 @@ export default async function DashboardPage() {
   const newInquiries = inquiries.filter((q) => q.status === "NEW" && (q.created_at ?? "").slice(0, 10) >= days14Str).length;
   const plannedJobs = jobs.filter((j) => j.status === "PLANNED").length;
 
+  // §pulpit Zgłoszenia z konfiguratora dostają WŁASNE, wyróżnione miejsce na górze (gorące leady
+  // gotowe do założenia rezerwacji). Najnowsze pierwsze; pełne dane kontaktowe od razu widoczne.
+  const configLeads = inquiries
+    .filter((q) => q.source === "WEBSITE_FORM" && q.status === "NEW")
+    .sort((a, b) => ((a.created_at ?? "") < (b.created_at ?? "") ? 1 : -1));
+  const configEstValue = (q: (typeof configLeads)[number]): number | null =>
+    (q.config_json as { estimate?: { value?: number } } | null)?.estimate?.value ?? null;
+
   // §pulpit Zysk w tym miesiącu = przychód − koszty realizacji, których DATA (event_date) wypada
   // w tym miesiącu. Po dacie realizacji (a nie wpisania płatności) — inaczej świeżo wprowadzone
   // dane z całego okresu wpadały do „tego miesiąca".
@@ -94,18 +102,17 @@ export default async function DashboardPage() {
   // akceptacji, rozliczenia pracowników, faktury, paliwo, ogłoszenia OLX.
   const attention: { tone: "bad" | "warn" | "info"; title: string; desc: string; href: string }[] = [];
   if (isOwner) {
-    // Nieodpisane leady (konfigurator + OLX) — na samej górze, wyróżnione kolorem. Najstarsze pierwsze.
-    // OLX: tylko gdy FAKTYCZNIE wymaga odpowiedzi (nie „dziękuję"/po naszej odmowie).
-    const newLeads = inquiries
-      .filter((q) => q.status === "NEW"
-        && (q.last_activity_at ?? q.created_at ?? "").slice(0, 10) >= days14Str  // tylko świeże (14 dni) — bez zalewania starą historią
-        && (q.source === "WEBSITE_FORM" || (q.source === "OLX" && olxNeedsResponse(q.olx_messages ?? []))))
+    // Nieodpisane leady OLX (konfigurator ma własną sekcję na górze). Tylko gdy FAKTYCZNIE
+    // wymagają odpowiedzi (nie „dziękuję"/po naszej odmowie) i tylko świeże (14 dni).
+    const olxLeads = inquiries
+      .filter((q) => q.status === "NEW" && q.source === "OLX"
+        && (q.last_activity_at ?? q.created_at ?? "").slice(0, 10) >= days14Str
+        && olxNeedsResponse(q.olx_messages ?? []))
       .sort((a, b) => ((a.created_at ?? "") < (b.created_at ?? "") ? -1 : 1));
-    for (const q of newLeads.slice(0, 6)) {
-      const isConf = q.source === "WEBSITE_FORM";
+    for (const q of olxLeads.slice(0, 6)) {
       attention.push({
         tone: "info",
-        title: isConf ? "🌐 Zgłoszenie z konfiguratora — odpisz" : "💬 Nowy lead OLX — odpisz",
+        title: "💬 Nowy lead OLX — odpisz",
         desc: `${inquiryDisplayName(q)}${q.event_type ? " · " + q.event_type : ""}${q.created_at ? " · " + fmtDate(q.created_at) : ""}`,
         href: `/inquiries/${q.id}/edit`,
       });
@@ -149,6 +156,42 @@ export default async function DashboardPage() {
       {demo && (
         <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12.5px] text-warn">
           Tryb demo — dane przykładowe. Po skonfigurowaniu Supabase pulpit liczy z prawdziwych danych.
+        </div>
+      )}
+
+      {/* §pulpit Zgłoszenia z konfiguratora — wyróżnione miejsce na samej górze (gorące leady). */}
+      {isOwner && configLeads.length > 0 && (
+        <div className="mb-5 rounded-card-lg border border-[#274063] bg-gradient-to-b from-[#12203a] to-[#0e1826] p-4 shadow-[0_10px_30px_rgba(20,40,80,0.35)]">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-[16px]">🌐</span>
+            <h2 className="font-display text-[15px] font-bold text-white">Zgłoszenia z konfiguratora</h2>
+            <span className="rounded-[7px] bg-[#1b2f4d] px-2 py-0.5 text-[12px] font-bold text-[#9fc0ff]">{configLeads.length}</span>
+            <Link href="/inquiries?status=NEW" className="ml-auto text-[12.5px] font-semibold text-[#9fc0ff]">Wszystkie →</Link>
+          </div>
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+            {configLeads.slice(0, 6).map((q) => {
+              const est = configEstValue(q);
+              return (
+                <Link key={q.id} href={`/inquiries/${q.id}/edit`} className="flex items-start gap-3 rounded-[12px] border border-[#243654] bg-[#0f1a2b] px-3.5 py-3 transition hover:border-[#37527e] hover:bg-[#132238]">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="truncate text-[14px] font-bold text-white">{inquiryDisplayName(q)}</span>
+                      {q.contact_phone && <span className="text-[12.5px] font-semibold text-[#9fc0ff]">{q.contact_phone}</span>}
+                    </div>
+                    <div className="mt-0.5 truncate text-[12px] text-ink-2">
+                      {[q.event_type, q.location, q.guests ? `${q.guests} os.` : null].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                    {q.contact_email && <div className="mt-0.5 truncate text-[11.5px] text-ink-2">{q.contact_email}</div>}
+                  </div>
+                  <div className="flex-none text-right">
+                    <div className="font-display text-[13px] font-bold text-accent-soft">{fmtDate(q.event_date)}</div>
+                    {est != null && <div className="mt-0.5 text-[11.5px] font-semibold text-[#9fc0ff]">{fmtPLN(est)}</div>}
+                    <div className="mt-1 text-[11px] font-semibold text-[#7fa8f5]">Otwórz →</div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       )}
 
