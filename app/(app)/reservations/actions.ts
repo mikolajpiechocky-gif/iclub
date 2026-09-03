@@ -17,6 +17,7 @@ import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/as
 import { listTransportCalcs } from "@/lib/data/transport";
 import { writeRealizationCosts, syncRentalLaborCost, recordRealizationIncome } from "@/lib/data/realization-close";
 import { createEsignContract, sendEsignContract } from "@/lib/data/esign";
+import { buildReservationFromInquiry } from "@/lib/data/reservation-from-contract";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
 import { sendPushToEmployees, sendPushToUsers } from "@/lib/integrations/push";
@@ -315,6 +316,21 @@ export async function sendContractForJobAction(
   if (!sent.ok) return { ok: false, error: sent.error ?? "Nie udało się wysłać umowy." };
   revalidatePath("/reservations");
   return { ok: true, link: sent.link, emailSkipped: sent.emailSkipped };
+}
+
+// §konfigurator „Utwórz rezerwację (bez umowy)" — z zapytania z konfiguratora zakłada od razu
+// rezerwację iClub (CONFIRMED, w kalendarzu) + zlecenie + etapy, zamyka lead jako wygrany.
+// Kwoty z wyceny konfiguratora (orientacyjne) — Szef potwierdza je na ekranie edycji rezerwacji.
+export async function createReservationFromInquiryAction(inquiryId: string): Promise<{ ok: boolean; error?: string; reservationId?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef tworzy rezerwacje z zapytań." };
+  const built = await buildReservationFromInquiry(inquiryId, { noteReason: "z zapytania (bez umowy)", pushTitle: "Rezerwacja z zapytania" });
+  if (!built) return { ok: false, error: "Nie udało się utworzyć rezerwacji (brak zapytania lub konfiguracji serwera)." };
+  revalidatePath("/reservations");
+  revalidatePath("/dashboard");
+  revalidatePath(`/inquiries/${inquiryId}/edit`);
+  return { ok: true, reservationId: built.reservationId };
 }
 
 // §klient Nowy klient wpisany z ręki (customer_id="__new__") → utwórz go i podmień id.

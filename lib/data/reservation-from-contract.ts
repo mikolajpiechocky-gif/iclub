@@ -23,36 +23,23 @@ function resolveTentId(choice: string | null | undefined, tents: TentRow[]): str
   return null;
 }
 
-export interface ContractForReservation {
-  id: string;
-  inquiry_id: string | null;
-  reservation_id?: string | null;
-  order_no: string | null;
-  amount_total: number | null;
-  amount_deposit: number | null;
+// Wspólny builder: z zapytania (lead) zakłada rezerwację iClub (CONFIRMED) + zlecenie + etapy,
+// zakłada/łączy klienta i zamyka lead jako wygrany. Używany i przez podpis umowy, i przez ręczne
+// „Utwórz rezerwację (bez umowy)". Kwoty: override z umowy albo z wyceny konfiguratora.
+export interface BuildFromInquiryOpts {
+  amountTotal?: number | null;
+  amountDeposit?: number | null;
+  noteReason?: string;   // np. „po podpisaniu umowy IC-…" albo „z zapytania (bez umowy)"
+  pushTitle?: string;
 }
 
-export async function materializeReservationFromContract(c: ContractForReservation): Promise<{ created: boolean; confirmed: boolean; reservationId?: string }> {
-  if (!isServiceRoleConfigured()) return { created: false, confirmed: false };
+export async function buildReservationFromInquiry(inquiryId: string, opts: BuildFromInquiryOpts = {}): Promise<{ reservationId: string; jobId: string | null } | null> {
+  if (!isServiceRoleConfigured()) return null;
   const s = createAdminClient();
   const now = new Date().toISOString();
 
-  // (1) Umowa ze zlecenia — rezerwacja już jest. Podpis = twarde potwierdzenie terminu.
-  if (c.reservation_id) {
-    await s.from("reservations").update({ status: "CONFIRMED", client_confirmed: true, client_confirmed_at: now }).eq("id", c.reservation_id);
-    return { created: false, confirmed: true, reservationId: c.reservation_id };
-  }
-  if (!c.inquiry_id) return { created: false, confirmed: false };
-
-  // (2) Umowa z zapytania — zakładamy rezerwację. Zabezpieczenie przed dublem: jeśli ta umowa
-  // ma już przypiętą rezerwację (np. ponowne wywołanie), nic nie robimy.
-  const { data: self } = await s.from("esign_contracts").select("reservation_id").eq("id", c.id).maybeSingle();
-  if ((self as { reservation_id: string | null } | null)?.reservation_id) {
-    return { created: false, confirmed: true, reservationId: (self as { reservation_id: string }).reservation_id };
-  }
-
-  const { data: inq } = await s.from("inquiries").select("*").eq("id", c.inquiry_id).maybeSingle();
-  if (!inq) return { created: false, confirmed: false };
+  const { data: inq } = await s.from("inquiries").select("*").eq("id", inquiryId).maybeSingle();
+  if (!inq) return null;
   const q = inq as Record<string, unknown>;
   const cfg = (q.config_json ?? null) as InquiryConfig | null;
 
@@ -95,15 +82,15 @@ export async function materializeReservationFromContract(c: ContractForReservati
     event_start_time: (cfg?.eventStartTime as string) || null,
     heating: Boolean(cfg?.heating),
     self_pickup: selfPickup,
-    price: c.amount_total ?? cfg?.estimate?.value ?? null,
-    deposit: c.amount_deposit ?? cfg?.estimate?.deposit ?? null,
+    price: opts.amountTotal ?? cfg?.estimate?.value ?? null,
+    deposit: opts.amountDeposit ?? cfg?.estimate?.deposit ?? null,
     transport_price: cfg?.estimate?.transport ?? null,
     source: "WEBSITE_FORM",
     client_confirmed: true, client_confirmed_at: now,
-    notes: `Utworzona automatycznie po podpisaniu umowy ${c.order_no ?? ""}. Zweryfikuj pakiet, dodatki i wycenę.`.trim(),
+    notes: `Utworzona ${opts.noteReason ?? "z zapytania"}. Zweryfikuj pakiet, dodatki i wycenę.`.trim(),
   };
   const { data: rez, error: rErr } = await s.from("reservations").insert(insert).select("id, business_line, event_type, event_date").maybeSingle();
-  if (rErr || !rez) { console.error("materializeReservation insert:", rErr); return { created: false, confirmed: false }; }
+  if (rErr || !rez) { console.error("buildReservationFromInquiry insert:", rErr); return null; }
   const rr = rez as { id: string; business_line: string; event_type: string | null; event_date: string | null };
 
   const { data: job } = await s.from("jobs").insert({
@@ -116,16 +103,54 @@ export async function materializeReservationFromContract(c: ContractForReservati
     await s.from("job_stages").insert(stages);
   }
 
-  // Spinamy umowę z rezerwacją/zleceniem i zamykamy lead jako wygrany.
-  await s.from("esign_contracts").update({ reservation_id: rr.id, job_id: jobId }).eq("id", c.id);
-  await s.from("inquiries").update({ status: "WON", last_activity_at: now }).eq("id", c.inquiry_id);
+  // Zamykamy lead jako wygrany.
+  await s.from("inquiries").update({ status: "WON", last_activity_at: now }).eq("id", inquiryId);
 
   sendPushToOwners({
-    title: "Rezerwacja z podpisanej umowy",
+    title: opts.pushTitle ?? "Rezerwacja z zapytania",
     body: `${name}${eventDate ? ` — ${eventDate}` : ""}. Sprawdź pakiet, dodatki i wycenę.`,
     url: `/reservations/${rr.id}`,
-    tag: `contract-reservation-${rr.id}`,
+    tag: `inquiry-reservation-${rr.id}`,
   }).catch(() => {});
 
-  return { created: true, confirmed: true, reservationId: rr.id };
+  return { reservationId: rr.id, jobId };
+}
+
+export interface ContractForReservation {
+  id: string;
+  inquiry_id: string | null;
+  reservation_id?: string | null;
+  order_no: string | null;
+  amount_total: number | null;
+  amount_deposit: number | null;
+}
+
+export async function materializeReservationFromContract(c: ContractForReservation): Promise<{ created: boolean; confirmed: boolean; reservationId?: string }> {
+  if (!isServiceRoleConfigured()) return { created: false, confirmed: false };
+  const s = createAdminClient();
+  const now = new Date().toISOString();
+
+  // (1) Umowa ze zlecenia — rezerwacja już jest. Podpis = twarde potwierdzenie terminu.
+  if (c.reservation_id) {
+    await s.from("reservations").update({ status: "CONFIRMED", client_confirmed: true, client_confirmed_at: now }).eq("id", c.reservation_id);
+    return { created: false, confirmed: true, reservationId: c.reservation_id };
+  }
+  if (!c.inquiry_id) return { created: false, confirmed: false };
+
+  // (2) Umowa z zapytania — zakładamy rezerwację. Zabezpieczenie przed dublem: jeśli ta umowa
+  // ma już przypiętą rezerwację (np. ponowne wywołanie), nic nie robimy.
+  const { data: self } = await s.from("esign_contracts").select("reservation_id").eq("id", c.id).maybeSingle();
+  if ((self as { reservation_id: string | null } | null)?.reservation_id) {
+    return { created: false, confirmed: true, reservationId: (self as { reservation_id: string }).reservation_id };
+  }
+
+  const built = await buildReservationFromInquiry(c.inquiry_id, {
+    amountTotal: c.amount_total, amountDeposit: c.amount_deposit,
+    noteReason: `po podpisaniu umowy ${c.order_no ?? ""}`.trim(),
+    pushTitle: "Rezerwacja z podpisanej umowy",
+  });
+  if (!built) return { created: false, confirmed: false };
+
+  await s.from("esign_contracts").update({ reservation_id: built.reservationId, job_id: built.jobId }).eq("id", c.id);
+  return { created: true, confirmed: true, reservationId: built.reservationId };
 }

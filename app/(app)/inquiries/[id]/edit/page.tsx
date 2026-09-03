@@ -8,7 +8,7 @@ import { getPublicAvailability } from "@/lib/data/public";
 import { INQUIRY_SOURCE_LABELS } from "@/lib/data/types";
 import { analyzeConversation, LEAD_STAGE_META } from "@/lib/domain/lead-analysis";
 import { InquiryForm } from "../../inquiry-form";
-import { ReactivateButton, AutoCloseBlockToggle, DeleteInquiryButton } from "../../lead-buttons";
+import { ReactivateButton, AutoCloseBlockToggle, DeleteInquiryButton, CreateReservationButton } from "../../lead-buttons";
 import { LeadContractPanel } from "../../lead-contract";
 
 export const dynamic = "force-dynamic";
@@ -203,6 +203,7 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-4">
+            {isOwner && inquiry.source === "WEBSITE_FORM" && inquiry.status !== "WON" && <CreateReservationButton id={inquiry.id} />}
             {closed && <ReactivateButton id={inquiry.id} />}
             <AutoCloseBlockToggle id={inquiry.id} blocked={inquiry.auto_close_blocked} />
             {isOwner && <DeleteInquiryButton id={inquiry.id} />}

@@ -3,6 +3,30 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { reactivateInquiryAction, setInquiryAutoCloseBlockedAction, autoCloseStaleLeadsAction, deleteInquiryAction } from "./actions";
+import { createReservationFromInquiryAction } from "../reservations/actions";
+
+// §konfigurator „Utwórz rezerwację (bez umowy)" — zakłada rezerwację z zapytania i przenosi do edycji.
+export function CreateReservationButton({ id }: { id: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const run = () => {
+    setErr(null);
+    start(async () => {
+      const r = await createReservationFromInquiryAction(id);
+      if (r.ok && r.reservationId) { router.push(`/reservations/${r.reservationId}/edit`); return; }
+      setErr(r.error ?? "Nie udało się utworzyć rezerwacji.");
+    });
+  };
+  return (
+    <div className="flex flex-col gap-1">
+      <button onClick={run} disabled={pending} className="rounded-field bg-brand px-3.5 py-2 text-[12.5px] font-bold text-white shadow-[0_6px_18px_rgba(225,29,116,0.4)] disabled:opacity-50">
+        {pending ? "Tworzę rezerwację…" : "✅ Utwórz rezerwację (bez umowy)"}
+      </button>
+      {err && <span className="text-[11.5px] font-semibold text-bad">{err}</span>}
+    </div>
+  );
+}
 
 export function DeleteInquiryButton({ id }: { id: string }) {
   const router = useRouter();
