@@ -151,6 +151,27 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const revCats = [...revByCat.entries()].sort((a, b) => b[1] - a[1]);
   const revCatMax = Math.max(1, ...revCats.map(([, v]) => v));
 
+  // §podsumowanie Szczegółowa lista przychodów: każda realizacja osobno (nazwa D/M + pakiet,
+  // miejscowość, termin, kwota, id) — do rozwinięcia pod słupkami składowych.
+  const tentShort = (t: string | null | undefined) => (t === "D_BACKDOOR" ? "D↩" : (t ?? ""));
+  const revItems = rows
+    .filter((row) => row.rev > 0)
+    .map((row) => {
+      const res = row.job.reservation?.id ? resById.get(row.job.reservation.id) : null;
+      const isRental = row.job.business_line === "EQUIPMENT_RENTAL";
+      const tents = res ? [res.tent_main, res.tent_extra].filter(Boolean).map(tentShort).join("+") : "";
+      const pkg = res?.package?.name ?? res?.pricing_snapshot?.package?.name ?? "";
+      const label = isRental
+        ? (res?.rental_items || "Wypożyczalnia")
+        : ([tents, pkg].filter(Boolean).join(" ") || res?.event_type || "Realizacja iClub");
+      const place = res?.location ?? row.job.reservation?.location ?? null;
+      const date = row.job.event_date ?? row.job.reservation?.event_date ?? null;
+      const rid = row.job.reservation?.id ?? row.job.id;
+      return { rid, label, place, date, amount: row.rev, isRental };
+    })
+    .sort((a, b) => (a.date ?? "") < (b.date ?? "") ? 1 : -1);
+  const fmtD = (iso: string | null) => (iso ? new Date(iso + "T00:00:00Z").toLocaleDateString("pl-PL", { day: "2-digit", month: "short", year: "2-digit", timeZone: "UTC" }) : "");
+
   const byLine = (line: "ICLUB" | "EQUIPMENT_RENTAL") => {
     const rs = rows.filter((r) => r.job.business_line === line);
     const rev = rs.reduce((s, r) => s + r.rev, 0);
@@ -275,6 +296,22 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   </div>
                 ))}
               </div>
+            )}
+            {revItems.length > 0 && (
+              <details className="mt-3 border-t border-border-soft pt-2.5">
+                <summary className="cursor-pointer text-[12px] font-semibold text-ink-2">Wyszczególnij realizacje ({revItems.length})</summary>
+                <div className="mt-2 flex flex-col gap-0.5">
+                  {revItems.map((it) => (
+                    <a key={it.rid} href={`/reservations/${it.rid}`} className="flex items-center gap-2 rounded-[8px] px-1.5 py-1.5 text-[12.5px] transition hover:bg-surface-2">
+                      <span className="h-2 w-2 flex-none rounded-full" style={{ background: it.isRental ? "#14b8c4" : "#e11d74" }} />
+                      <span className="flex-none font-bold text-ink">{it.label}</span>
+                      <span className="min-w-0 flex-1 truncate text-ink-2">{[it.place, fmtD(it.date)].filter(Boolean).join(" · ")}</span>
+                      <span className="flex-none font-bold text-white">{fmtPLN(it.amount)}</span>
+                      <span className="w-[70px] flex-none truncate text-right text-[10px] text-muted">#{it.rid.slice(0, 8)}</span>
+                    </a>
+                  ))}
+                </div>
+              </details>
             )}
           </div>
 

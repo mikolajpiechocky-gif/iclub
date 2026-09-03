@@ -18,20 +18,27 @@ export function tentsCode(sizes: (string | null)[]): string {
 }
 
 // Miejscowość do tytułu kalendarza. Priorytet: miasto klienta (pole „city"). Gdy brak —
-// wyciągamy miasto z adresu: segment po kodzie pocztowym „NN-NNN Miasto", inaczej drugi
-// segment (zwykle miasto po ulicy), a w ostateczności pierwszy. NIE bierzemy już ulicy
-// (dawniej split(",")[0] dawał ulicę zamiast miejscowości).
+// wyciągamy SAMĄ miejscowość z adresu, odrzucając ulicę i kod pocztowy:
+//  - „05-500 Piaseczno" → „Piaseczno" (miasto po kodzie),
+//  - „Rusiec 97-438" → „Rusiec" (kod po nazwie — usuwamy kod),
+//  - „Rusiec, ul. Kwiatowa 5" → „Rusiec" (segment bez cech ulicy),
+//  - „Kliny 18" → „Kliny" (ostatecznie: obcinamy numer/prefiks ulicy).
 export function cityFrom(location: string | null, customerCity: string | null): string {
   const cc = customerCity?.trim();
   if (cc) return cc;
-  const loc = location?.trim();
-  if (!loc) return "";
-  const parts = loc.split(",").map((s) => s.trim()).filter(Boolean);
-  for (const p of parts) {
-    const m = p.match(/\d{2}-\d{3}\s+(.+)/); // „05-500 Piaseczno" → „Piaseczno"
-    if (m) return m[1].trim();
-  }
-  return (parts[1] || parts[0] || loc).trim();
+  const raw = location?.trim();
+  if (!raw) return "";
+  // 1) „NN-NNN Miasto" → Miasto (miasto zapisane PO kodzie pocztowym)
+  const afterPc = raw.match(/\d{2}-\d{3}\s+([^,]+)/);
+  if (afterPc) return afterPc[1].trim();
+  // 2) usuń kod pocztowy i rozbij na segmenty; wybierz ostatni segment bez cech ulicy (prefiks/numer)
+  const parts = raw.replace(/\d{2}-\d{3}/g, "").split(",").map((s) => s.trim()).filter(Boolean);
+  const looksLikeStreet = (s: string) => /^(ul|al|pl|os)\.?\s/i.test(s) || /\d/.test(s);
+  const cityLike = [...parts].reverse().find((s) => !looksLikeStreet(s));
+  if (cityLike) return cityLike;
+  // 3) fallback: oczyść najlepszy segment z prefiksu ulicy i numeru domu
+  const seg = parts[parts.length - 1] || raw;
+  return seg.replace(/^(ul|al|pl|os)\.?\s+/i, "").replace(/\s*\d+[a-z]?(\/\d+[a-z]?)?\s*$/i, "").trim() || seg;
 }
 
 export interface CalendarTitleInput {

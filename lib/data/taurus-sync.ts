@@ -4,29 +4,43 @@
 import { createAdminClient, isServiceRoleConfigured } from "@/lib/supabase/admin";
 import { createTaurusJob, updateTaurusJob, isTaurusConfigured, type TaurusCheckItem } from "@/lib/integrations/taurus";
 import { listAddons } from "@/lib/data/resources";
+import { cityFrom, tentSizeCode } from "@/lib/domain/calendar";
 
 interface UpcomingRow {
   id: string; event_type: string | null; event_date: string | null; location: string | null;
   business_line: string; guests: number | null; event_start_time: string | null; heating: boolean | null;
   addon_ids: string[] | null; notes: string | null; taurus_event_job_id: string | null;
-  package: { name: string | null } | null; tent: { name: string | null } | null; tent2: { name: string | null } | null;
+  package: { name: string | null } | null;
+  tent: { name: string | null; size: string | null } | null; tent2: { name: string | null; size: string | null } | null;
+  customer: { city: string | null } | null;
 }
 
-// Etykieta wyróżniająca wpis pochodzący z aplikacji iClub w kalendarzu TAURUS + pełny opis
-// (namiot, pakiet, goście, dodatki, notatka), żeby ekipa TAURUS wiedziała co szykować.
+// Kod namiotów z rozmiarów (M przed D): M, D, MD, DD…
+function tentsCode(sizes: (string | null | undefined)[]): string {
+  const codes = sizes.filter((s): s is string => Boolean(s)).map(tentSizeCode);
+  codes.sort((a, b) => (a === b ? 0 : a === "M" ? -1 : 1));
+  return codes.join("");
+}
+
+// Etykieta wyróżniająca wpis z aplikacji iClub w kalendarzu TAURUS: „--- Apka iClub --- D VIP - Miejscowość"
+// + pełny opis (namiot, pakiet, goście, dodatki, notatka), żeby ekipa TAURUS wiedziała co szykować.
 function taurusEventPayload(r: UpcomingRow, addonName: Map<string, string>) {
   const isRental = r.business_line === "EQUIPMENT_RENTAL";
-  const tents = [r.tent?.name, r.tent2?.name].filter(Boolean).join(" + ");
+  const tentNames = [r.tent?.name, r.tent2?.name].filter(Boolean).join(" + ");
   const addons = (r.addon_ids ?? []).map((id) => addonName.get(id)).filter((n): n is string => Boolean(n)).join(", ");
-  const head = [tents, r.package?.name].filter(Boolean).join(" · ") || r.event_type || (isRental ? "Wypożyczenie" : "Realizacja");
-  const title = `--- Apka iClub --- ${head}${r.location ? " · " + r.location : ""}`;
+  const city = cityFrom(r.location, r.customer?.city ?? null);
+  const code = tentsCode([r.tent?.size, r.tent2?.size]);
+  const head = isRental
+    ? (r.event_type || "Wypożyczenie")
+    : ([code, r.package?.name].filter(Boolean).join(" ") || r.event_type || "Realizacja");
+  const title = `--- Apka iClub --- ${[head, city].filter(Boolean).join(" - ")}`;
   const notes = [
     isRental ? "Wypożyczenie (z aplikacji iClub)" : "Realizacja iClub (z aplikacji iClub)",
     r.event_type && `Typ: ${r.event_type}`,
     `Data: ${r.event_date}${r.event_start_time ? ` · start ${r.event_start_time}` : ""}`,
     r.location && `Lokalizacja: ${r.location}`,
     r.guests != null && `Goście: ${r.guests}`,
-    tents && `Namiot: ${tents}`,
+    tentNames && `Namiot: ${tentNames}`,
     r.package?.name && `Pakiet: ${r.package.name}`,
     !isRental && `Ogrzewanie: ${r.heating ? "tak" : "nie"}`,
     addons && `Dodatki: ${addons}`,
@@ -45,7 +59,7 @@ export async function syncUpcomingEventsToTaurus(): Promise<{ ok: boolean; creat
   // Wszystkie nadchodzące, potwierdzone eventy — NOWE (bez taurus_event_job_id) tworzymy,
   // ISTNIEJĄCE odświeżamy (etykieta/opis/data mogły się zmienić albo powstały przed wzbogaceniem).
   const { data } = await s.from("reservations")
-    .select("id, event_type, event_date, location, business_line, status, guests, event_start_time, heating, addon_ids, notes, taurus_event_job_id, package:packages(name), tent:tents!tent_id(name), tent2:tents!tent_id_2(name)")
+    .select("id, event_type, event_date, location, business_line, status, guests, event_start_time, heating, addon_ids, notes, taurus_event_job_id, package:packages(name), tent:tents!tent_id(name,size), tent2:tents!tent_id_2(name,size), customer:customers(city)")
     .eq("status", "CONFIRMED").gte("event_date", today);
   const rows = (data ?? []) as unknown as UpcomingRow[];
   if (!rows.length) return { ok: true, created: 0, updated: 0 };
