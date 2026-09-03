@@ -119,7 +119,7 @@ export const INQUIRY_STATUS_LABELS: Record<InquiryStatus, string> = {
 export const INQUIRY_SOURCE_LABELS: Record<InquirySource, string> = {
   OLX: "OLX",
   PHONE: "Telefon",
-  WEBSITE_FORM: "Formularz strony",
+  WEBSITE_FORM: "Konfigurator",
   REFERRAL: "Polecenie",
   FACEBOOK: "Facebook Marketplace",
   INSTAGRAM: "Instagram",

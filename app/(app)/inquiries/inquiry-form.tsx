@@ -19,6 +19,9 @@ export function InquiryForm({ initial, customers }: { initial?: InquiryRecord; c
 
   const [v, setV] = useState<InquiryFormValues>({
     customer_id: initial?.customer_id ?? "",
+    contact_name: initial?.contact_name ?? "",
+    contact_phone: initial?.contact_phone ?? "",
+    contact_email: initial?.contact_email ?? "",
     event_type: initial?.event_type ?? "",
     event_date: initial?.event_date ?? "",
     location: initial?.location ?? "",
@@ -79,12 +82,15 @@ export function InquiryForm({ initial, customers }: { initial?: InquiryRecord; c
       <form onSubmit={submit}>
         <SectionCard title="Dane zapytania" className="p-5">
           <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
-            <SelectField label="Klient" value={v.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
-              <option value="">— bez klienta —</option>
+            <TextField label="Imię i nazwisko" placeholder="Jan Kowalski" value={v.contact_name} onChange={(e) => set("contact_name", e.target.value)} />
+            <SelectField label="Klient (konto w bazie — opcjonalnie)" value={v.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
+              <option value="">— bez konta —</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </SelectField>
+            <TextField label="Telefon" inputMode="tel" placeholder="+48…" value={v.contact_phone} onChange={(e) => set("contact_phone", e.target.value)} />
+            <TextField label="E-mail" type="email" placeholder="klient@example.com" value={v.contact_email} onChange={(e) => set("contact_email", e.target.value)} />
             <SelectField label="Status" value={v.status} onChange={(e) => set("status", e.target.value as InquiryStatus)}>
               {INQUIRY_STATUS_ORDER.map((s) => (
                 <option key={s} value={s}>{INQUIRY_STATUS_LABELS[s]}</option>

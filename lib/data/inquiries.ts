@@ -17,6 +17,9 @@ const OPEN_STATUSES: InquiryStatus[] = ["NEW", "CONTACTED", "OFFER_SENT", "WAITI
 
 export interface InquiryInput {
   customer_id: string | null;
+  contact_name?: string | null;    // imię i nazwisko kontaktu (lead bez konta klienta, np. z konfiguratora)
+  contact_phone?: string | null;
+  contact_email?: string | null;
   event_type?: string | null;
   event_date?: string | null;
   location?: string | null;

@@ -9,6 +9,9 @@ import type { InquiryStatus, InquirySource } from "@/lib/data/types";
 
 export interface InquiryFormValues {
   customer_id: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_email: string;
   event_type: string;
   event_date: string;
   location: string;
@@ -49,6 +52,9 @@ function toInput(v: InquiryFormValues): InquiryInput {
   };
   return {
     customer_id: v.customer_id.trim() ? v.customer_id.trim() : null,
+    contact_name: clean(v.contact_name),
+    contact_phone: clean(v.contact_phone),
+    contact_email: clean(v.contact_email),
     event_type: clean(v.event_type),
     event_date: clean(v.event_date),
     location: clean(v.location),
