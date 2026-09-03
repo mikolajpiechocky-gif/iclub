@@ -9,7 +9,8 @@ import { listPayments } from "@/lib/data/payments";
 import { listCosts } from "@/lib/data/costs";
 import { listInvestments } from "@/lib/data/investments";
 import { listReservations } from "@/lib/data/reservations";
-import { listAddons } from "@/lib/data/resources";
+import { listAddons, listReservationAddons } from "@/lib/data/resources";
+import { settlementBreakdown, type AddonPriceMap } from "@/lib/domain/billing";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { JOB_STATUS_META, type JobWithReservation } from "@/lib/data/types";
 import { warsawTodayISO } from "@/lib/domain/dates";
@@ -22,7 +23,8 @@ const COST_CAT_COLOR: Record<string, string> = {
   Szampan: "#eab308", "Pałeczki fluo": "#a3e635", Hotel: "#8b5cf6", Dieta: "#f472b6", Materiały: "#0ea5e9",
 };
 const REV_CAT_COLOR: Record<string, string> = {
-  "Realizacje iClub": "#e11d74", "Wypożyczalnia": "#14b8c4", "Inne": "#64748b",
+  Pakiet: "#e11d74", Dodatki: "#b98cf5", Transport: "#f59e0b", "Wypożyczalnia": "#14b8c4",
+  "Realizacje iClub": "#e11d74", "Inne": "#64748b",
 };
 
 export const dynamic = "force-dynamic";
@@ -51,7 +53,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     );
   }
 
-  const [jobs, payments, costs, investments, reservations, addons] = await Promise.all([listJobs(), listPayments(), listCosts(), listInvestments(), listReservations(), listAddons()]);
+  const [jobs, payments, costs, investments, reservations, addons, resAddons] = await Promise.all([listJobs(), listPayments(), listCosts(), listInvestments(), listReservations(), listAddons(), listReservationAddons()]);
   const demo = !isSupabaseConfigured();
 
   // Dwie karty: „Podsumowanie miesiąca" (domyślna) i „Rentowność" (dotychczasowy widok).
@@ -126,15 +128,25 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const costCats = [...costByCat.entries()].sort((a, b) => b[1] - a[1]);
   const costCatMax = Math.max(1, ...costCats.map(([, v]) => v));
 
-  // §podsumowanie Rozbicie PRZYCHODÓW na składowe (po linii biznesowej + „Inne") dla wybranego zakresu.
-  const jobLine = new Map(jobs.map((j) => [j.id, j.business_line]));
-  const inRange = new Set(rows.map((r) => r.job.id));
+  // §podsumowanie Rozbicie PRZYCHODÓW na REALNE składowe: Pakiet / Dodatki / Transport (iClub) + Wypożyczalnia.
+  // Kwotę ZAPŁACONĄ danej realizacji dzielimy proporcjonalnie do jej składu wyceny, więc suma
+  // składowych = Wpływy (nie mieszamy wyceny teoretycznej z realnie zapłaconym).
+  const addonPrice: AddonPriceMap = new Map(resAddons.map((a) => [a.id, { name: a.name, price: Number(a.price ?? 0) }]));
+  const resById = new Map(reservations.map((r) => [r.id, r]));
   const revByCat = new Map<string, number>();
-  for (const p of payments) {
-    if (p.status !== "PAID" || !p.job_id || !inRange.has(p.job_id)) continue;
-    const line = jobLine.get(p.job_id);
-    const cat = line === "EQUIPMENT_RENTAL" ? "Wypożyczalnia" : line === "ICLUB" ? "Realizacje iClub" : "Inne";
-    revByCat.set(cat, (revByCat.get(cat) ?? 0) + Number(p.amount || 0));
+  const addRev = (k: string, v: number) => { if (v > 0.005) revByCat.set(k, (revByCat.get(k) ?? 0) + Math.round(v * 100) / 100); };
+  for (const row of rows) {
+    const paid = row.rev;
+    if (paid <= 0) continue;
+    if (row.job.business_line === "EQUIPMENT_RENTAL") { addRev("Wypożyczalnia", paid); continue; }
+    const res = row.job.reservation?.id ? resById.get(row.job.reservation.id) : null;
+    if (!res) { addRev("Realizacje iClub", paid); continue; }
+    const b = settlementBreakdown(res, addonPrice);
+    const gross = b.packagePrice + b.addonsTotal + b.transport;
+    if (gross <= 0) { addRev("Realizacje iClub", paid); continue; }
+    addRev("Pakiet", paid * (b.packagePrice / gross));
+    addRev("Dodatki", paid * (b.addonsTotal / gross));
+    addRev("Transport", paid * (b.transport / gross));
   }
   const revCats = [...revByCat.entries()].sort((a, b) => b[1] - a[1]);
   const revCatMax = Math.max(1, ...revCats.map(([, v]) => v));
