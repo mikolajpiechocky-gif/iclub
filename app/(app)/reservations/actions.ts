@@ -318,6 +318,15 @@ export async function sendContractForJobAction(
   return { ok: true, link: sent.link, emailSkipped: sent.emailSkipped };
 }
 
+// Podgląd umowy ze zlecenia (bez zapisu i wysyłki) — Szef sprawdza treść przed wysłaniem.
+export async function previewContractForJobAction(jobId: string, ov: EsignFieldOverrides): Promise<{ ok: boolean; html?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef." };
+  const r = await createEsignContract({ jobId, ...ov, preview: true }, null);
+  return { ok: r.ok, html: r.html, error: r.error };
+}
+
 // §konfigurator „Utwórz rezerwację (bez umowy)" — z zapytania z konfiguratora zakłada od razu
 // rezerwację iClub (CONFIRMED, w kalendarzu) + zlecenie + etapy, zamyka lead jako wygrany.
 // Kwoty z wyceny konfiguratora (orientacyjne) — Szef potwierdza je na ekranie edycji rezerwacji.

@@ -29,8 +29,8 @@ export function emailShell(o: EmailShellOpts): string {
 ${pre}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0f1016" style="background:#0f1016"><tr><td align="center">
   <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:560px">
-    <tr><td bgcolor="#14151b" align="center" style="background:#14151b;background-color:#14151b;padding:24px 28px;text-align:center;border-radius:14px 14px 0 0">
-      <img src="https://app.iclubevents.pl/logo-iclub.png" alt="iClub" width="150" height="53" style="width:150px;height:auto;max-width:70%;display:block;margin:0 auto;border:0;outline:none">
+    <tr><td bgcolor="#14151b" align="center" style="background:#14151b;background-color:#14151b;padding:0;text-align:center;border-radius:14px 14px 0 0;font-size:0;line-height:0">
+      <img src="https://app.iclubevents.pl/logo-iclub-email.png" alt="iClub" width="560" style="width:100%;max-width:560px;height:auto;display:block;border:0;outline:none;border-radius:14px 14px 0 0">
     </td></tr>
     <tr><td bgcolor="${BRAND}" style="background:${BRAND};height:4px;line-height:4px;font-size:0">&nbsp;</td></tr>
     <tr><td bgcolor="#ffffff" style="background:#ffffff;padding:30px 28px;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${INK}">

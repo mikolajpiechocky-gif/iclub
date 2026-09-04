@@ -3,8 +3,8 @@
 // (składowe §5, godziny, termin zadatku, dane imprezy, namiot/pakiet/dodatki, dane klienta) do zmiany.
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { sendContractForInquiryAction } from "./actions";
-import { sendContractForJobAction } from "../reservations/actions";
+import { sendContractForInquiryAction, previewContractForInquiryAction } from "./actions";
+import { sendContractForJobAction, previewContractForJobAction } from "../reservations/actions";
 
 const STATUS_PL: Record<string, { label: string; fg: string; bg: string }> = {
   draft: { label: "Szkic", fg: "#9aa0b2", bg: "#22242e" },
@@ -63,11 +63,10 @@ export function LeadContractPanel({ inquiryId, jobId, defaultTotal, defaultDepos
   const [result, setResult] = useState<{ link?: string; emailSkipped?: boolean } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const send = () => {
-    setErr(null); setResult(null);
+  const buildOv = () => {
     const num = (s?: string) => { const n = Number((s ?? "").replace(",", ".")); return s && Number.isFinite(n) ? n : undefined; };
     const str = (s?: string) => { const t = (s ?? "").trim(); return t ? t : undefined; };
-    const ov = {
+    return {
       amountTotal: num(total) ?? null,
       amountDeposit: num(deposit) ?? null,
       packagePrice: num(d.packagePrice), addonsTotal: num(d.addonsTotal), transport: num(d.transport),
@@ -76,11 +75,30 @@ export function LeadContractPanel({ inquiryId, jobId, defaultTotal, defaultDepos
       tentName: str(d.tentName), packageName: str(d.packageName), addonsNote: str(d.addonsNote),
       customerName: str(d.customerName), customerEmail: str(d.customerEmail),
     };
+  };
+
+  const send = () => {
+    setErr(null); setResult(null);
+    const ov = buildOv();
     start(async () => {
       const r = jobId ? await sendContractForJobAction(jobId, ov) : await sendContractForInquiryAction(inquiryId ?? "", ov);
       if (!r.ok) { setErr(r.error ?? "Nie udało się wysłać."); return; }
       setResult({ link: r.link, emailSkipped: r.emailSkipped });
       router.refresh();
+    });
+  };
+
+  const preview = () => {
+    setErr(null);
+    // Otwieramy kartę od razu (gest użytkownika), by uniknąć blokady popupów; treść wstawiamy po odpowiedzi.
+    const w = window.open("", "_blank");
+    if (w) w.document.write('<!doctype html><meta charset="utf-8"><title>Podgląd umowy</title><div style="font:600 14px sans-serif;color:#555;padding:24px">Generuję podgląd umowy…</div>');
+    const ov = buildOv();
+    start(async () => {
+      const r = jobId ? await previewContractForJobAction(jobId, ov) : await previewContractForInquiryAction(inquiryId ?? "", ov);
+      if (!r.ok || !r.html) { setErr(r.error ?? "Nie udało się wygenerować podglądu."); if (w) w.close(); return; }
+      const doc = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Podgląd umowy — iClub</title></head><body style="margin:0;background:#e9eaee;padding:24px 12px"><div style="max-width:720px;margin:0 auto;background:#fff;border-radius:14px;padding:28px 24px;box-shadow:0 10px 40px rgba(0,0,0,.15)"><div style="margin:0 0 14px;padding:8px 12px;border-radius:8px;background:#fff3cd;color:#7a5b00;font:600 12.5px sans-serif">PODGLĄD — tak umowę zobaczy klient. To NIE jest jeszcze wysłane ani podpisane.</div>${r.html}</div></body></html>`;
+      if (w) { w.document.open(); w.document.write(doc); w.document.close(); }
     });
   };
 
@@ -113,6 +131,9 @@ export function LeadContractPanel({ inquiryId, jobId, defaultTotal, defaultDepos
         <label className="text-[12px] font-semibold text-ink-2">Zadatek (zł)
           <input inputMode="numeric" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="—" className="mt-1 block w-28 rounded-field border border-border bg-surface-2 px-3 py-2 text-[14px] text-ink" />
         </label>
+        <button onClick={preview} disabled={pending} className="min-h-[40px] rounded-field border border-border bg-surface-2 px-4 text-[13px] font-bold text-ink disabled:opacity-50">
+          👁 Podgląd
+        </button>
         <button onClick={send} disabled={pending} className="bg-brand min-h-[40px] rounded-field px-4 text-[13px] font-bold text-white shadow-[0_6px_18px_rgba(225,29,116,0.4)] disabled:opacity-50">
           {pending ? "Wysyłanie…" : contract && contract.status !== "draft" ? "Wyślij nową umowę" : "Utwórz i wyślij umowę"}
         </button>

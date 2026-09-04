@@ -128,6 +128,15 @@ export async function sendContractForInquiryAction(
   return { ok: true, link: sent.link, emailSkipped: sent.emailSkipped };
 }
 
+// Podgląd umowy z zapytania (bez zapisu i wysyłki) — Szef sprawdza treść przed wysłaniem.
+export async function previewContractForInquiryAction(inquiryId: string, ov: EsignFieldOverrides): Promise<{ ok: boolean; html?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef." };
+  const r = await createEsignFromInquiry({ inquiryId, ...ov, preview: true }, null);
+  return { ok: r.ok, html: r.html, error: r.error };
+}
+
 // Usunięcie zapytania (np. testowe) — tylko Szef.
 export async function deleteInquiryAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };

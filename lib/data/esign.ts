@@ -66,9 +66,10 @@ export interface EsignFieldOverrides {
 // ---- tworzenie umowy pod ZLECENIEM (wewnętrzne, owner) ----
 export interface CreateEsignInput extends EsignFieldOverrides {
   jobId: string;
+  preview?: boolean;   // true → tylko zwróć HTML do podglądu, nie zapisuj
 }
 
-export async function createEsignContract(input: CreateEsignInput, createdBy: string | null): Promise<{ ok: boolean; id?: string; token?: string; error?: string }> {
+export async function createEsignContract(input: CreateEsignInput, createdBy: string | null): Promise<{ ok: boolean; id?: string; token?: string; error?: string; html?: string }> {
   if (!isServiceRoleConfigured()) return { ok: false, error: "Brak konfiguracji serwera." };
   const job = await getJob(input.jobId);
   if (!job) return { ok: false, error: "Nie znaleziono zlecenia." };
@@ -120,6 +121,7 @@ export async function createEsignContract(input: CreateEsignInput, createdBy: st
     discount: bd?.discount ?? null,
     amountTotal, amountDeposit, deliveryHour, depositDue, blik,
   });
+  if (input.preview) return { ok: true, html };
 
   const { data, error } = await s.from("esign_contracts").insert({
     job_id: job.id,
@@ -143,9 +145,10 @@ export async function createEsignContract(input: CreateEsignInput, createdBy: st
 // ---- tworzenie umowy Z ZAPYTANIA (lead z konfiguratora; jeszcze bez zlecenia) ----
 export interface CreateEsignFromInquiryInput extends EsignFieldOverrides {
   inquiryId: string;
+  preview?: boolean;   // true → tylko zwróć HTML do podglądu, nie zapisuj
 }
 
-export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput, createdBy: string | null): Promise<{ ok: boolean; id?: string; token?: string; error?: string }> {
+export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput, createdBy: string | null): Promise<{ ok: boolean; id?: string; token?: string; error?: string; html?: string }> {
   if (!isServiceRoleConfigured()) return { ok: false, error: "Brak konfiguracji serwera." };
   const s = createAdminClient();
   const { data: inq } = await s.from("inquiries").select("*").eq("id", input.inquiryId).maybeSingle();
@@ -200,6 +203,7 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
     amountDeposit,
     deliveryHour, depositDue, blik: input.blik ?? ICLUB_BLIK,
   });
+  if (input.preview) return { ok: true, html };
 
   const { data, error } = await s.from("esign_contracts").insert({
     inquiry_id: input.inquiryId,

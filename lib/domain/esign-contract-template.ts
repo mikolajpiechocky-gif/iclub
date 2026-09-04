@@ -48,8 +48,8 @@ export function renderTemplate(tpl: string, data: Ctx): string {
 const BODY = `
 <style>
 .umowa{max-width:680px;margin:0 auto;color:#2b2b30;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.62}
-.umowa .logoband{background:#14151b;border-radius:14px;padding:16px;text-align:center;margin:0 0 16px}
-.umowa .logoband img{height:50px;width:auto;max-width:80%;display:block;margin:0 auto}
+.umowa .logoband{background:#14151b;border-radius:14px;overflow:hidden;text-align:center;margin:0 0 16px}
+.umowa .logoband img{width:100%;max-width:420px;height:auto;display:block;margin:0 auto}
 .umowa .head{text-align:center;margin:0 0 20px}
 .umowa .dtitle{font-size:19px;font-weight:700;margin-top:0;color:#14151b}
 .umowa .dsub{color:#6b6f7a;font-size:12px;margin-top:3px}
@@ -66,7 +66,7 @@ const BODY = `
 .umowa .term{font-weight:700;color:#14151b}
 </style>
 <section class="umowa">
-  <div class="logoband"><img src="https://app.iclubevents.pl/logo-iclub.png" alt="iClub"></div>
+  <div class="logoband"><img src="https://app.iclubevents.pl/logo-iclub-email.png" alt="iClub"></div>
   <div class="head">
     <div class="dtitle">Umowa świadczenia usług</div>
     <div class="dsub">nr {{numer_umowy}} · {{#data_zawarcia}}zawarta {{data_zawarcia}} {{/data_zawarcia}}w formie dokumentowej (art. 77² k.c.)</div>
