@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createInquiry, updateInquiry, deleteInquiry, reactivateInquiry, setInquiryAutoCloseBlocked, setInquiryStatus, autoCloseStaleLeads, type InquiryInput } from "@/lib/data/inquiries";
-import { createEsignFromInquiry, sendEsignContract } from "@/lib/data/esign";
+import { createEsignFromInquiry, sendEsignContract, type EsignFieldOverrides } from "@/lib/data/esign";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import type { InquiryStatus, InquirySource } from "@/lib/data/types";
 
@@ -111,12 +111,12 @@ export async function reactivateInquiryAction(id: string): Promise<ActionResult>
 // Utwórz umowę z zapytania (lead) i wyślij do podpisu — tylko Szef.
 // E-mail idzie automatycznie, gdy skonfigurowany (Resend); inaczej zwracamy link do ręcznego wysłania.
 export async function sendContractForInquiryAction(
-  inquiryId: string, amountTotal: number | null, amountDeposit: number | null,
+  inquiryId: string, ov: EsignFieldOverrides,
 ): Promise<{ ok: boolean; error?: string; link?: string; emailSkipped?: boolean }> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
   const me = await getCurrentProfile();
   if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef wysyła umowy." };
-  const created = await createEsignFromInquiry({ inquiryId, amountTotal, amountDeposit }, me.id ?? null);
+  const created = await createEsignFromInquiry({ inquiryId, ...ov }, me.id ?? null);
   if (!created.ok || !created.id) return { ok: false, error: created.error ?? "Nie udało się utworzyć umowy." };
   const sent = await sendEsignContract(created.id);
   if (!sent.ok) return { ok: false, error: sent.error ?? "Nie udało się wysłać umowy." };

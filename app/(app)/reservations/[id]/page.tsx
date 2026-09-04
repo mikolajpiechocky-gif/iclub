@@ -147,7 +147,13 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
       </div>
 
       {isOwner && !isRental && job && reservation.status !== "CANCELLED" && (
-        <LeadContractPanel jobId={job.id} defaultTotal={esignTotal} defaultDeposit={esignDeposit} contract={esignContract} />
+        <LeadContractPanel jobId={job.id} defaultTotal={esignTotal} defaultDeposit={esignDeposit} contract={esignContract}
+          defaults={{
+            eventDate: reservation.event_date ?? undefined,
+            eventStartTime: reservation.event_start_time ?? undefined,
+            location: reservation.location ?? undefined,
+            transport: reservation.transport_price != null ? String(Math.round(Number(reservation.transport_price))) : undefined,
+          }} />
       )}
 
       {isOwner && !isRental && (

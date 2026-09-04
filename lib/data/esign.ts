@@ -42,17 +42,30 @@ export interface EsignRow {
 // Wynik z kodem HTTP dla handlerów publicznych.
 export interface OpResult { ok: boolean; error?: string; httpStatus?: number; signedAt?: string; }
 
-// ---- tworzenie umowy pod ZLECENIEM (wewnętrzne, owner) ----
-// Dane ciągniemy ze zlecenia i rezerwacji; wartości domyślne wg decyzji §08:
-// godzina montażu z pakietu, zadatek 24h, BLIK 571 029 526, kwoty z rezerwacji.
-export interface CreateEsignInput {
-  jobId: string;
-  deliveryHour?: string | null;   // override; domyślnie z pakietu
-  depositDue?: string | null;     // override; domyślnie 24h
-  amountTotal?: number | null;    // override; domyślnie cena rezerwacji
-  amountDeposit?: number | null;  // override; domyślnie zadatek rezerwacji
-  blik?: string | null;           // override; domyślnie ICLUB_BLIK
+// Nadpisania pól umowy (Szef może zmienić w rozwijanej sekcji panelu). Puste = domyślne z danych.
+export interface EsignFieldOverrides {
+  deliveryHour?: string | null;   // godzina montażu (domyślnie z pakietu)
+  depositDue?: string | null;     // termin zadatku (domyślnie 24h)
+  amountTotal?: number | null;    // wartość całkowita
+  amountDeposit?: number | null;  // zadatek
+  packagePrice?: number | null;   // §5 cena pakietu
+  addonsTotal?: number | null;    // §5 suma dodatków
+  transport?: number | null;      // §5 koszt dojazdu
+  eventDate?: string | null;      // data imprezy (YYYY-MM-DD)
+  eventStartTime?: string | null; // godzina imprezy
+  location?: string | null;       // miejsce
+  tentName?: string | null;       // namiot (opis)
+  packageName?: string | null;    // pakiet
+  addonsNote?: string | null;     // dodatki (opis §3.2)
+  customerName?: string | null;   // imię i nazwisko
+  customerEmail?: string | null;  // e-mail (adres podpisu)
+  blik?: string | null;           // domyślnie ICLUB_BLIK
   orderNo?: string | null;
+}
+
+// ---- tworzenie umowy pod ZLECENIEM (wewnętrzne, owner) ----
+export interface CreateEsignInput extends EsignFieldOverrides {
+  jobId: string;
 }
 
 export async function createEsignContract(input: CreateEsignInput, createdBy: string | null): Promise<{ ok: boolean; id?: string; token?: string; error?: string }> {
@@ -80,29 +93,30 @@ export async function createEsignContract(input: CreateEsignInput, createdBy: st
   }
   const bd = r ? settlementBreakdown(r, addonPrice, included) : null;
 
-  const pkgName = r?.package?.name ?? null;
+  const pkgName = input.packageName ?? r?.package?.name ?? null;
   const deliveryHour = input.deliveryHour ?? deliveryHourForPackage(pkgName);
   const amountTotal = input.amountTotal ?? numOrNull(r?.price) ?? (bd ? bd.total : null);
   const amountDeposit = input.amountDeposit ?? numOrNull(r?.deposit) ?? (bd ? bd.deposit : null);
   const depositDue = input.depositDue ?? DEPOSIT_DUE_DEFAULT;
   const blik = input.blik ?? ICLUB_BLIK;
-  const signerEmail = customer?.email ?? null;
+  const signerEmail = input.customerEmail ?? customer?.email ?? null;
   const orderNo = input.orderNo || `IC-${new Date().getFullYear()}-${Math.abs(hashStr(String(job.id))) % 9000 + 1000}`;
 
   const html = buildEsignContractHtml({
     orderNo,
-    customerName: customer?.name ?? r?.customer?.name ?? null,
+    customerName: input.customerName ?? customer?.name ?? r?.customer?.name ?? null,
     customerEmail: signerEmail,
     eventType: r?.event_type ?? null,
-    eventDate: r?.event_date ?? null,
-    location: r?.location ?? null,
+    eventDate: input.eventDate ?? r?.event_date ?? null,
+    eventStartTime: input.eventStartTime ?? r?.event_start_time ?? null,
+    location: input.location ?? r?.location ?? null,
     packageName: pkgName,
-    tentName: r?.tent_main ?? r?.tent?.name ?? null,
-    addonsNote: addonNames || null,
+    tentName: input.tentName ?? r?.tent_main ?? r?.tent?.name ?? null,
+    addonsNote: input.addonsNote ?? (addonNames || null),
     packageItems,
-    packagePrice: bd?.packagePrice ?? null,
-    addonsTotal: bd?.addonsTotal ?? null,
-    transport: bd?.transport ?? null,
+    packagePrice: input.packagePrice ?? bd?.packagePrice ?? null,
+    addonsTotal: input.addonsTotal ?? bd?.addonsTotal ?? null,
+    transport: input.transport ?? bd?.transport ?? null,
     discount: bd?.discount ?? null,
     amountTotal, amountDeposit, deliveryHour, depositDue, blik,
   });
@@ -127,12 +141,8 @@ export async function createEsignContract(input: CreateEsignInput, createdBy: st
 }
 
 // ---- tworzenie umowy Z ZAPYTANIA (lead z konfiguratora; jeszcze bez zlecenia) ----
-export interface CreateEsignFromInquiryInput {
+export interface CreateEsignFromInquiryInput extends EsignFieldOverrides {
   inquiryId: string;
-  amountTotal?: number | null;
-  amountDeposit?: number | null;
-  deliveryHour?: string | null;
-  depositDue?: string | null;
 }
 
 export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput, createdBy: string | null): Promise<{ ok: boolean; id?: string; token?: string; error?: string }> {
@@ -143,11 +153,11 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
   const q = inq as Record<string, unknown>;
   const cfg = effectiveConfig(q);
 
-  const pkg = (cfg?.package ?? (q.package_interest as string)) || null;
+  const pkg = (input.packageName ?? cfg?.package ?? (q.package_interest as string)) || null;
   const deliveryHour = input.deliveryHour ?? deliveryHourForPackage(pkg);
   const depositDue = input.depositDue ?? DEPOSIT_DUE_DEFAULT;
-  const signerEmail = (cfg?.contact?.email as string) || (q.contact_email as string) || null;
-  const orderNo = `IC-${new Date().getFullYear()}-${Math.abs(hashStr(String(q.id))) % 9000 + 1000}`;
+  const signerEmail = (input.customerEmail ?? (cfg?.contact?.email as string)) || (q.contact_email as string) || null;
+  const orderNo = input.orderNo || `IC-${new Date().getFullYear()}-${Math.abs(hashStr(String(q.id))) % 9000 + 1000}`;
 
   // Skład pakietu do §3.1 (pakiet mapuje się po kodzie/nazwie — PREMIUM/VIP).
   const comp = await resolveInquiryComposition(s, cfg, cfg?.tentMain ?? null, cfg?.tentExtra ?? null);
@@ -159,34 +169,36 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
 
   // §5 suma dodatków = WYPROWADZONA z zadatku (zadatek = 300 + transport + 15% dodatków). Łapie WSZYSTKO,
   // co policzył konfigurator (stoły + krzesła + ogrzewanie), niezależnie od mapowania kodów na magazyn.
-  let addonsTotal = amountDeposit != null
-    ? Math.max(0, Math.round((amountDeposit - DEFAULT_DEPOSIT_BASE - transport) / ADDON_DEPOSIT_PCT))
-    : comp.addonsTotal;
+  const effTransport = input.transport ?? transport;
+  let addonsTotal = input.addonsTotal ?? (amountDeposit != null
+    ? Math.max(0, Math.round((amountDeposit - DEFAULT_DEPOSIT_BASE - effTransport) / ADDON_DEPOSIT_PCT))
+    : comp.addonsTotal);
   if (amountTotal != null && addonsTotal > amountTotal) addonsTotal = comp.addonsTotal; // bezpiecznik
-  const cenaPakietu = amountTotal != null ? Math.max(0, Math.round(amountTotal - transport - addonsTotal)) : null;
+  const cenaPakietu = input.packagePrice ?? (amountTotal != null ? Math.max(0, Math.round(amountTotal - effTransport - addonsTotal)) : null);
 
-  const tentLabelSrc = [cfg?.tentMain, cfg?.tentExtra].filter(Boolean).join(" + ") || (q.tent_interest as string) || null;
+  const tentLabelSrc = input.tentName ?? ([cfg?.tentMain, cfg?.tentExtra].filter(Boolean).join(" + ") || (q.tent_interest as string) || null);
   // §3.2 nazwy: WSZYSTKIE dodatki z konfiguracji (łącznie z ogrzewaniem), nie tylko dopasowane do magazynu.
-  const addonsNote = (cfg?.addons ?? []).map((a) => `${(a.qty ?? 1) > 1 ? `${a.qty} × ` : ""}${a.name ?? a.code ?? "dodatek"}`).filter(Boolean).join(", ")
-    || (comp.addonNames.length ? comp.addonNames.join(", ") : ((q.addons_note as string) || null));
+  const addonsNote = input.addonsNote ?? ((cfg?.addons ?? []).map((a) => `${(a.qty ?? 1) > 1 ? `${a.qty} × ` : ""}${a.name ?? a.code ?? "dodatek"}`).filter(Boolean).join(", ")
+    || (comp.addonNames.length ? comp.addonNames.join(", ") : ((q.addons_note as string) || null)));
 
   const html = buildEsignContractHtml({
     orderNo,
-    customerName: (cfg?.contact?.name as string) || (q.contact_name as string) || null,
+    customerName: (input.customerName ?? (cfg?.contact?.name as string)) || (q.contact_name as string) || null,
     customerEmail: signerEmail,
     eventType: (q.event_type as string) || null,
-    eventDate: (cfg?.eventDate as string) || (q.event_date as string) || null,
-    location: (cfg?.location as string) || (q.location as string) || null,
+    eventDate: (input.eventDate ?? (cfg?.eventDate as string)) || (q.event_date as string) || null,
+    eventStartTime: (input.eventStartTime ?? (cfg?.eventStartTime as string)) || null,
+    location: (input.location ?? (cfg?.location as string)) || (q.location as string) || null,
     packageName: pkg,
     tentName: tentLabelSrc,
     addonsNote,
     packageItems: comp.packageItems,
     packagePrice: cenaPakietu,
     addonsTotal,
-    transport,
+    transport: effTransport,
     amountTotal,
     amountDeposit,
-    deliveryHour, depositDue, blik: ICLUB_BLIK,
+    deliveryHour, depositDue, blik: input.blik ?? ICLUB_BLIK,
   });
 
   const { data, error } = await s.from("esign_contracts").insert({

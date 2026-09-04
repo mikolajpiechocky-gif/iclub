@@ -16,7 +16,7 @@ import { getSettings } from "@/lib/data/settings";
 import { listJobAssignments, setAssignmentEarningsSnapshot } from "@/lib/data/assignments";
 import { listTransportCalcs } from "@/lib/data/transport";
 import { writeRealizationCosts, syncRentalLaborCost, recordRealizationIncome } from "@/lib/data/realization-close";
-import { createEsignContract, sendEsignContract } from "@/lib/data/esign";
+import { createEsignContract, sendEsignContract, type EsignFieldOverrides } from "@/lib/data/esign";
 import { buildReservationFromInquiry } from "@/lib/data/reservation-from-contract";
 import { jobEarningsCtx, buildAssignmentEarnings } from "@/lib/data/job-earnings";
 import { generateChecklistForJob } from "@/lib/data/checklist-gen";
@@ -305,12 +305,12 @@ export async function computeReservationTransportAction(location: string): Promi
 // §umowa Utwórz umowę ze zlecenia (rezerwacja) i wyślij do podpisu — tylko Szef.
 // E-mail idzie automatycznie (Resend); bez poczty zwracamy link do ręcznego wysłania.
 export async function sendContractForJobAction(
-  jobId: string, amountTotal: number | null, amountDeposit: number | null,
+  jobId: string, ov: EsignFieldOverrides,
 ): Promise<{ ok: boolean; error?: string; link?: string; emailSkipped?: boolean }> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
   const me = await getCurrentProfile();
   if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef wysyła umowy." };
-  const created = await createEsignContract({ jobId, amountTotal, amountDeposit }, me.id ?? null);
+  const created = await createEsignContract({ jobId, ...ov }, me.id ?? null);
   if (!created.ok || !created.id) return { ok: false, error: created.error ?? "Nie udało się utworzyć umowy." };
   const sent = await sendEsignContract(created.id);
   if (!sent.ok) return { ok: false, error: sent.error ?? "Nie udało się wysłać umowy." };

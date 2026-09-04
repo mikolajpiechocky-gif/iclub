@@ -87,6 +87,7 @@ export interface EsignContractInput {
   customerEmail?: string | null;
   eventType?: string | null;
   eventDate?: string | null;
+  eventStartTime?: string | null;
   location?: string | null;
   packageName?: string | null;
   tentName?: string | null;
@@ -122,6 +123,7 @@ export function buildEsignContractHtml(i: EsignContractInput): string {
     pozycje_pakietu,
     dodatki,
     data_imprezy: i.eventDate ? fmtDate(i.eventDate) : null,
+    godzina_startu: i.eventStartTime ?? null,
     adres: i.location ?? null,
     godzina_dostawy: i.deliveryHour ?? null,
     cena_pakietu: i.packagePrice != null ? fmtPLN(i.packagePrice) : null,

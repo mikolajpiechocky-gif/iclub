@@ -220,7 +220,18 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
         </div>
 
         {isOwner && (
-          <LeadContractPanel inquiryId={inquiry.id} defaultTotal={estTotal} defaultDeposit={estDeposit} contract={contract} />
+          <LeadContractPanel inquiryId={inquiry.id} defaultTotal={estTotal} defaultDeposit={estDeposit} contract={contract}
+            defaults={{
+              eventDate: view.eventDate ?? undefined,
+              eventStartTime: view.startTime ?? undefined,
+              location: view.location ?? undefined,
+              tentName: view.tent ?? undefined,
+              packageName: view.pkg ?? undefined,
+              addonsNote: view.addons ?? undefined,
+              customerName: inquiry.contact_name ?? undefined,
+              customerEmail: inquiry.contact_email ?? undefined,
+              transport: view.est?.transport != null ? String(Math.round(view.est.transport)) : undefined,
+            }} />
         )}
       </div>
 
