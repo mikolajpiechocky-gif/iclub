@@ -29,9 +29,8 @@ export function emailShell(o: EmailShellOpts): string {
 ${pre}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35)">
-    <tr><td style="background:#14151b;padding:22px 28px;text-align:center">
-      <img src="https://app.iclubevents.pl/logo-iclub.png" alt="iClub" width="150" style="height:auto;width:150px;max-width:70%;display:inline-block">
-      <div style="margin-top:8px;font:600 10px/1 Arial,sans-serif;letter-spacing:.32em;text-transform:uppercase;color:#8a8f9c">Namioty i eventy</div>
+    <tr><td bgcolor="#14151b" align="center" style="background:#14151b;padding:22px 28px;text-align:center">
+      <img src="https://app.iclubevents.pl/logo-iclub.png" alt="iClub" width="150" style="height:auto;width:150px;max-width:70%;display:block;margin:0 auto">
     </td></tr>
     <tr><td style="height:4px;background:${BRAND}"></td></tr>
     <tr><td style="padding:30px 28px;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${INK}">

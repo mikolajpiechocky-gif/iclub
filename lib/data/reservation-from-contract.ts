@@ -187,13 +187,12 @@ export async function buildReservationFromInquiry(inquiryId: string, opts: Build
   const comp = await resolveInquiryComposition(s, cfg, tentMain, tentExtra);
   const { packageId, packagePrice, addonIds, addonQty, addonsTotal } = comp;
 
-  const transport = selfPickup ? 0 : Number(cfg?.estimate?.transport ?? 0) || 0;
-  const computedOk = packagePrice > 0 || addonsTotal > 0;
+  const transport = selfPickup ? 0 : (Number(cfg?.estimate?.transport ?? 0) || 0);
   const computedTotal = computeOrderPrice({ packagePrice, addonsTotal, transportPrice: transport, discountType: "AMOUNT", discountValue: 0 }).total;
-  // Umowa (opts.amount*) ma pierwszeństwo (kwota podpisana); inaczej liczymy z rozwiązanych składowych,
-  // a gdy nic nie udało się rozwiązać — fallback do orientacyjnej wyceny konfiguratora.
-  const price = opts.amountTotal ?? (computedOk ? computedTotal : (cfg?.estimate?.value ?? null));
-  const deposit = opts.amountDeposit ?? (computedOk ? suggestedDeposit(transport, addonsTotal) : (cfg?.estimate?.deposit ?? null));
+  // Pieniądze: kwota z umowy (opts) → wycena konfiguratora (co klient zaakceptował) → wyliczenie ze składników.
+  // Wycena konfiguratora jest pewniejsza niż nasze mapowanie dodatków (scalone krzesła, ogrzewanie, inne kody).
+  const price = opts.amountTotal ?? cfg?.estimate?.value ?? (computedTotal || null);
+  const deposit = opts.amountDeposit ?? cfg?.estimate?.deposit ?? suggestedDeposit(transport, addonsTotal);
 
   const insert = {
     business_line: "ICLUB",

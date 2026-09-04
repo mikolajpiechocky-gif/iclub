@@ -9,7 +9,7 @@ import { getJob } from "@/lib/data/jobs";
 import { getCustomer } from "@/lib/data/customers";
 import { listReservationAddons } from "@/lib/data/resources";
 import { settlementBreakdown } from "@/lib/domain/billing";
-import { suggestedDeposit } from "@/lib/domain/order-pricing";
+import { suggestedDeposit, DEFAULT_DEPOSIT_BASE, ADDON_DEPOSIT_PCT } from "@/lib/domain/order-pricing";
 import { materializeReservationFromContract, resolveInquiryComposition, effectiveConfig } from "@/lib/data/reservation-from-contract";
 import {
   generateToken, generateCode, hashCode, verifyCode, sha256, buildEsignContractHtml,
@@ -149,18 +149,26 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
   const signerEmail = (cfg?.contact?.email as string) || (q.contact_email as string) || null;
   const orderNo = `IC-${new Date().getFullYear()}-${Math.abs(hashStr(String(q.id))) % 9000 + 1000}`;
 
-  // Skład i ceny z konfiguracji leada (pakiet + dodatki), by §3.1/§5 były wypełnione.
+  // Skład pakietu do §3.1 (pakiet mapuje się po kodzie/nazwie — PREMIUM/VIP).
   const comp = await resolveInquiryComposition(s, cfg, cfg?.tentMain ?? null, cfg?.tentExtra ?? null);
-  const transport = cfg?.selfPickup ? 0 : Number(cfg?.estimate?.transport ?? 0) || 0;
-  const total = comp.packagePrice + comp.addonsTotal + transport;
-  const computedOk = comp.packagePrice > 0 || comp.addonsTotal > 0;
-  const amountTotal = input.amountTotal ?? (computedOk ? total : (cfg?.estimate?.value ?? null));
-  const amountDeposit = input.amountDeposit ?? (computedOk ? suggestedDeposit(transport, comp.addonsTotal) : (cfg?.estimate?.deposit ?? null));
-  const tentLabelSrc = [cfg?.tentMain, cfg?.tentExtra].filter(Boolean).join(" + ") || (q.tent_interest as string) || null;
+  const transport = cfg?.selfPickup ? 0 : (Number(cfg?.estimate?.transport ?? 0) || 0);
 
-  // §5 musi się sumować do „Razem": pakiet zakotwiczamy do wartości całkowitej (pakiet = Razem − transport − dodatki).
-  const effTransport = computedOk ? transport : (Number(cfg?.estimate?.transport ?? 0) || 0);
-  const cenaPakietu = amountTotal != null ? Math.max(0, Math.round(amountTotal - effTransport - comp.addonsTotal)) : (computedOk ? comp.packagePrice : null);
+  // Kwoty: priorytet ma to, co widział i zaakceptował klient (wycena konfiguratora) lub override Szefa.
+  const amountTotal = input.amountTotal ?? cfg?.estimate?.value ?? ((comp.packagePrice + comp.addonsTotal + transport) || null);
+  const amountDeposit = input.amountDeposit ?? cfg?.estimate?.deposit ?? suggestedDeposit(transport, comp.addonsTotal);
+
+  // §5 suma dodatków = WYPROWADZONA z zadatku (zadatek = 300 + transport + 15% dodatków). Łapie WSZYSTKO,
+  // co policzył konfigurator (stoły + krzesła + ogrzewanie), niezależnie od mapowania kodów na magazyn.
+  let addonsTotal = amountDeposit != null
+    ? Math.max(0, Math.round((amountDeposit - DEFAULT_DEPOSIT_BASE - transport) / ADDON_DEPOSIT_PCT))
+    : comp.addonsTotal;
+  if (amountTotal != null && addonsTotal > amountTotal) addonsTotal = comp.addonsTotal; // bezpiecznik
+  const cenaPakietu = amountTotal != null ? Math.max(0, Math.round(amountTotal - transport - addonsTotal)) : null;
+
+  const tentLabelSrc = [cfg?.tentMain, cfg?.tentExtra].filter(Boolean).join(" + ") || (q.tent_interest as string) || null;
+  // §3.2 nazwy: WSZYSTKIE dodatki z konfiguracji (łącznie z ogrzewaniem), nie tylko dopasowane do magazynu.
+  const addonsNote = (cfg?.addons ?? []).map((a) => `${(a.qty ?? 1) > 1 ? `${a.qty} × ` : ""}${a.name ?? a.code ?? "dodatek"}`).filter(Boolean).join(", ")
+    || (comp.addonNames.length ? comp.addonNames.join(", ") : ((q.addons_note as string) || null));
 
   const html = buildEsignContractHtml({
     orderNo,
@@ -171,11 +179,11 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
     location: (cfg?.location as string) || (q.location as string) || null,
     packageName: pkg,
     tentName: tentLabelSrc,
-    addonsNote: comp.addonNames.length ? comp.addonNames.join(", ") : ((q.addons_note as string) || null),
+    addonsNote,
     packageItems: comp.packageItems,
     packagePrice: cenaPakietu,
-    addonsTotal: comp.addonsTotal,
-    transport: effTransport,
+    addonsTotal,
+    transport,
     amountTotal,
     amountDeposit,
     deliveryHour, depositDue, blik: ICLUB_BLIK,
