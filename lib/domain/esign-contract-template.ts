@@ -48,10 +48,10 @@ export function renderTemplate(tpl: string, data: Ctx): string {
 const BODY = `
 <style>
 .umowa{max-width:680px;margin:0 auto;color:#2b2b30;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.62}
+.umowa .logoband{background:#14151b;border-radius:14px;padding:16px;text-align:center;margin:0 0 16px}
+.umowa .logoband img{height:50px;width:auto;max-width:80%}
 .umowa .head{text-align:center;margin:0 0 20px}
-.umowa .brand{font-size:30px;font-weight:800;letter-spacing:-.5px;color:#14151b}
-.umowa .brand span{color:#e11d74}
-.umowa .dtitle{font-size:19px;font-weight:700;margin-top:6px;color:#14151b}
+.umowa .dtitle{font-size:19px;font-weight:700;margin-top:0;color:#14151b}
 .umowa .dsub{color:#6b6f7a;font-size:12px;margin-top:3px}
 .umowa .rule{height:3px;width:60px;background:#e11d74;border-radius:3px;margin:13px auto 0}
 .umowa .parties{display:flex;gap:32px;justify-content:center;flex-wrap:wrap;text-align:center;margin:0 0 8px}
@@ -66,8 +66,8 @@ const BODY = `
 .umowa .term{font-weight:700;color:#14151b}
 </style>
 <section class="umowa">
+  <div class="logoband"><img src="https://app.iclubevents.pl/logo-iclub.png" alt="iClub"></div>
   <div class="head">
-    <div class="brand">i<span>Club</span></div>
     <div class="dtitle">Umowa świadczenia usług</div>
     <div class="dsub">nr {{numer_umowy}} · {{#data_zawarcia}}zawarta {{data_zawarcia}} {{/data_zawarcia}}w formie dokumentowej (art. 77² k.c.)</div>
     <div class="rule"></div>
@@ -104,13 +104,13 @@ const BODY = `
   <p class="cl"><span class="term">Zadatek</span> — kwota płatna po zawarciu Umowy, zaliczana w całości na poczet Wynagrodzenia (art. 394 Kodeksu cywilnego) — § 5.</p>
 
   <h2>§ 2. Przedmiot umowy</h2>
-  <p class="cl">2.1 Wykonawca zobowiązuje się dostarczyć, zamontować, obsłużyć podczas Wydarzenia i odebrać Sprzęt w zakresie Pakietu <b>{{pakiet}}</b> dla namiotu <b>{{namiot}}</b>, a Zleceniodawca zobowiązuje się zapłacić Wynagrodzenie.</p>
+  <p class="cl">2.1 Wykonawca zobowiązuje się dostarczyć, zamontować, zapewnić wsparcie techniczne podczas Wydarzenia i odebrać Sprzęt w zakresie Pakietu <b>{{pakiet}}</b> dla namiotu <b>{{namiot}}</b>, a Zleceniodawca zobowiązuje się zapłacić Wynagrodzenie.</p>
   <p class="cl">2.2 Usługa obejmuje:</p>
   <ul>
     <li>udostępnienie Sprzętu w zakresie wskazanym w § 3,</li>
     <li>dostarczenie Sprzętu na Miejsce Wydarzenia w terminie z § 4 oraz jego odbiór po zakończeniu Wydarzenia,</li>
     <li>montaż Sprzętu przed rozpoczęciem Wydarzenia oraz krótkie szkolenie z obsługi,</li>
-    <li>serwis w czasie trwania wynajmu.</li>
+    <li>wsparcie techniczne (serwis) w czasie trwania wynajmu.</li>
   </ul>
   <p class="cl">2.3 Wykonawca może realizować część Umowy przez podwykonawców, na co Zleceniodawca wyraża zgodę.</p>
   <p class="cl">2.4 Pominięcie elementu opisanego wzorcowo w ofercie nie stanowi nienależytego wykonania Umowy, o ile Strony zgodziły się na jego pominięcie.</p>

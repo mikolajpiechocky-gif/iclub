@@ -69,19 +69,26 @@ export async function resolveInquiryComposition(
   const addonQty: Record<string, number> = {};
   const addonNames: string[] = [];
   let addonsTotal = 0;
-  const cfgAddons = (cfg?.addons ?? []).filter((a) => a.code);
+  const cfgAddons = (cfg?.addons ?? []).filter((a) => a.code || a.name);
   if (cfgAddons.length) {
-    const codes = cfgAddons.map((a) => a.code as string);
+    // Dopasowanie kodem, a gdy kod z konfiguratora nie pasuje do magazynu (np. „stol_p"/„krz") —
+    // dopasowanie po NAZWIE (normalizowanej). Bierzemy pełne katalogi (magazyn + legacy).
     const [{ data: eq }, { data: leg }] = await Promise.all([
-      s.from("equipment").select("id, code, name, rental_price").in("code", codes),
-      s.from("addons").select("id, code, name, price").in("code", codes),
+      s.from("equipment").select("id, code, name, rental_price").eq("active", true),
+      s.from("addons").select("id, code, name, price").eq("active", true),
     ]);
-    const byCode = new Map<string, { id: string; price: number; name: string }>();
-    for (const a of (leg ?? []) as { id: string; code: string; name: string | null; price: number | null }[]) byCode.set(a.code, { id: a.id, price: Number(a.price ?? 0) || 0, name: a.name ?? a.code });
-    for (const e of (eq ?? []) as { id: string; code: string; name: string | null; rental_price: number | null }[]) byCode.set(e.code, { id: e.id, price: Number(e.rental_price ?? 0) || 0, name: e.name ?? e.code }); // magazyn ma pierwszeństwo
+    const norm = (x: string | null | undefined) => (x ?? "").toLowerCase().normalize("NFD").replace(/[^a-z0-9]/g, "");
+    interface Cand { id: string; price: number; name: string; code: string; nname: string }
+    const cands: Cand[] = [];
+    for (const a of (leg ?? []) as { id: string; code: string; name: string | null; price: number | null }[]) cands.push({ id: a.id, price: Number(a.price ?? 0) || 0, name: a.name ?? a.code, code: a.code, nname: norm(a.name) });
+    for (const e of (eq ?? []) as { id: string; code: string; name: string | null; rental_price: number | null }[]) cands.push({ id: e.id, price: Number(e.rental_price ?? 0) || 0, name: e.name ?? e.code, code: e.code, nname: norm(e.name) }); // magazyn dokładany po legacy
+    const byCode = new Map(cands.map((c) => [c.code, c]));
     for (const a of cfgAddons) {
-      const m = byCode.get(a.code as string);
-      if (!m) continue;
+      const nn = norm(a.name);
+      if (/ogrzew|nagrzewnic/.test(nn)) continue; // ogrzewanie to osobna flaga rezerwacji, nie dodatek
+      let m: Cand | undefined = a.code ? byCode.get(a.code) : undefined;
+      if (!m && nn) m = cands.find((c) => c.nname && c.nname === nn) || cands.find((c) => c.nname && (nn.startsWith(c.nname) || c.nname.startsWith(nn)));
+      if (!m || addonIds.includes(m.id)) continue;
       const qty = Math.max(1, Math.round(a.qty ?? 1));
       addonIds.push(m.id); addonQty[m.id] = qty;
       addonNames.push(`${qty > 1 ? `${qty} × ` : ""}${a.name ?? m.name}`);
@@ -89,6 +96,43 @@ export async function resolveInquiryComposition(
     }
   }
   return { packageId, packageName, packagePrice, packageItems, addonIds, addonQty, addonsTotal, addonNames };
+}
+
+const parseAddonsNote = (s: string | null): { name: string; qty: number }[] =>
+  !s ? [] : s.split(",").map((x) => x.trim()).filter(Boolean).map((part) => {
+    const m = part.match(/^(.*?)\s*[×x]\s*(\d+)\s*$/i);
+    return m ? { name: m[1].trim(), qty: parseInt(m[2], 10) } : { name: part, qty: 1 };
+  });
+
+const parseNotesEstimate = (notes: string | null): InquiryConfig["estimate"] => {
+  if (!notes) return null;
+  const m = notes.match(/warto[sś][cć]\D*(\d+)\D+transport\D*(\d+)[\s\S]*?za(?:datek|liczk\w*)\D*(\d+)\D+pozosta\w*\D*(\d+)/i);
+  return m ? { value: +m[1], transport: +m[2], deposit: +m[3], remaining: +m[4] } : null;
+};
+
+// Ujednolicona konfiguracja z leada: config_json (nowe leady) albo odtworzona z kolumn/notatki (stare).
+export function effectiveConfig(q: Record<string, unknown>): InquiryConfig {
+  const cfg = (q.config_json ?? null) as InquiryConfig | null;
+  if (cfg) return cfg;
+  const notes = (q.notes as string) ?? "";
+  return {
+    line: "ICLUB",
+    package: (q.package_interest as string) || null,
+    tentMain: (q.tent_interest as string) || null,
+    tentExtra: null,
+    addons: parseAddonsNote((q.addons_note as string) || null),
+    heating: /Ogrzewanie:\s*tak/i.test(notes),
+    eventDate: (q.event_date as string) || null,
+    location: (q.location as string) || null,
+    guests: (q.guests as number) ?? null,
+    eventStartTime: notes.match(/Start imprezy:\s*(.+)/)?.[1]?.trim() || null,
+    estimate: parseNotesEstimate(notes),
+    contact: {
+      name: (q.contact_name as string) || undefined,
+      email: (q.contact_email as string) || undefined,
+      phone: (q.contact_phone as string) || undefined,
+    },
+  };
 }
 
 // Wspólny builder: z zapytania (lead) zakłada rezerwację iClub (CONFIRMED) + zlecenie + etapy,
@@ -109,7 +153,7 @@ export async function buildReservationFromInquiry(inquiryId: string, opts: Build
   const { data: inq } = await s.from("inquiries").select("*").eq("id", inquiryId).maybeSingle();
   if (!inq) return null;
   const q = inq as Record<string, unknown>;
-  const cfg = (q.config_json ?? null) as InquiryConfig | null;
+  const cfg = effectiveConfig(q);
 
   // Klient: po e-mailu (istniejący) albo zakładamy nowego z danych kontaktowych leada.
   const email = ((cfg?.contact?.email as string) || (q.contact_email as string) || "").trim() || null;

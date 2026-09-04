@@ -10,7 +10,7 @@ import { getCustomer } from "@/lib/data/customers";
 import { listReservationAddons } from "@/lib/data/resources";
 import { settlementBreakdown } from "@/lib/domain/billing";
 import { suggestedDeposit } from "@/lib/domain/order-pricing";
-import { materializeReservationFromContract, resolveInquiryComposition } from "@/lib/data/reservation-from-contract";
+import { materializeReservationFromContract, resolveInquiryComposition, effectiveConfig } from "@/lib/data/reservation-from-contract";
 import {
   generateToken, generateCode, hashCode, verifyCode, sha256, buildEsignContractHtml,
   deliveryHourForPackage, ICLUB_BLIK, DEPOSIT_DUE_DEFAULT,
@@ -141,7 +141,7 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
   const { data: inq } = await s.from("inquiries").select("*").eq("id", input.inquiryId).maybeSingle();
   if (!inq) return { ok: false, error: "Nie znaleziono zapytania." };
   const q = inq as Record<string, unknown>;
-  const cfg = (q.config_json ?? null) as import("@/lib/data/types").InquiryConfig | null;
+  const cfg = effectiveConfig(q);
 
   const pkg = (cfg?.package ?? (q.package_interest as string)) || null;
   const deliveryHour = input.deliveryHour ?? deliveryHourForPackage(pkg);
@@ -235,11 +235,12 @@ export async function sendEsignContract(id: string): Promise<{ ok: boolean; erro
   if (c.signer_email) {
     const r = await sendEmail({
       to: c.signer_email,
-      subject: `Twoja umowa iClub do podpisu${c.order_no ? ` — ${c.order_no}` : ""}`,
+      subject: `Mamy dobrą wiadomość — Twój termin przyjęty! 🎉 Umowa do podpisu${c.order_no ? ` (${c.order_no})` : ""}`,
       html: emailShell({
-        preheader: `Umowa${c.order_no ? ` ${c.order_no}` : ""} gotowa do podpisu`,
-        heading: "Umowa gotowa do podpisu ✍️",
-        intro: `Przygotowaliśmy umowę na Twoją realizację iClub${c.order_no ? ` (nr ${c.order_no})` : ""}. Otwórz ją, przeczytaj i podpisz jednorazowym kodem — zajmie to chwilę.`,
+        preheader: "Twój termin został przyjęty — podpisz umowę i rezerwujemy datę na 100%.",
+        heading: "Mamy dobrą wiadomość! 🎉",
+        intro: `Świetnie — Twój termin został przyjęty, a my przygotowaliśmy umowę do podpisu${c.order_no ? ` (nr ${c.order_no})` : ""}. Otwórz ją, sprawdź szczegóły i podpisz jednorazowym kodem — zajmie to chwilę. 🎪✨`,
+        bodyHtml: `<p style="margin:0 0 4px;font:400 14px/1.6 Arial,sans-serif;color:#33353d">Po podpisaniu wyślemy Ci dane do wpłaty zadatku i rezerwujemy Twoją datę na 100%. Robi się! 🥳</p>`,
         cta: { label: "Otwórz i podpisz umowę", url: link },
         footerNote: `Link ważny ${TOKEN_TTL_DAYS} dni. Po otwarciu poprosisz o jednorazowy kod e-mail.`,
       }),
