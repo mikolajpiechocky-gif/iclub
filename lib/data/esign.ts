@@ -158,6 +158,10 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
   const amountDeposit = input.amountDeposit ?? (computedOk ? suggestedDeposit(transport, comp.addonsTotal) : (cfg?.estimate?.deposit ?? null));
   const tentLabelSrc = [cfg?.tentMain, cfg?.tentExtra].filter(Boolean).join(" + ") || (q.tent_interest as string) || null;
 
+  // §5 musi się sumować do „Razem": pakiet zakotwiczamy do wartości całkowitej (pakiet = Razem − transport − dodatki).
+  const effTransport = computedOk ? transport : (Number(cfg?.estimate?.transport ?? 0) || 0);
+  const cenaPakietu = amountTotal != null ? Math.max(0, Math.round(amountTotal - effTransport - comp.addonsTotal)) : (computedOk ? comp.packagePrice : null);
+
   const html = buildEsignContractHtml({
     orderNo,
     customerName: (cfg?.contact?.name as string) || (q.contact_name as string) || null,
@@ -169,9 +173,9 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
     tentName: tentLabelSrc,
     addonsNote: comp.addonNames.length ? comp.addonNames.join(", ") : ((q.addons_note as string) || null),
     packageItems: comp.packageItems,
-    packagePrice: computedOk ? comp.packagePrice : null,
-    addonsTotal: computedOk ? comp.addonsTotal : null,
-    transport: computedOk ? transport : (cfg?.estimate?.transport ?? null),
+    packagePrice: cenaPakietu,
+    addonsTotal: comp.addonsTotal,
+    transport: effTransport,
     amountTotal,
     amountDeposit,
     deliveryHour, depositDue, blik: ICLUB_BLIK,
