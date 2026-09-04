@@ -325,12 +325,16 @@ export async function createReservationFromInquiryAction(inquiryId: string): Pro
   if (!isSupabaseConfigured()) return { ok: false, error: "Tryb demo." };
   const me = await getCurrentProfile();
   if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef tworzy rezerwacje z zapytań." };
-  const built = await buildReservationFromInquiry(inquiryId, { noteReason: "z zapytania (bez umowy)", pushTitle: "Rezerwacja z zapytania" });
-  if (!built) return { ok: false, error: "Nie udało się utworzyć rezerwacji (brak zapytania lub konfiguracji serwera)." };
-  revalidatePath("/reservations");
-  revalidatePath("/dashboard");
-  revalidatePath(`/inquiries/${inquiryId}/edit`);
-  return { ok: true, reservationId: built.reservationId };
+  try {
+    const built = await buildReservationFromInquiry(inquiryId, { noteReason: "z zapytania (bez umowy)", pushTitle: "Rezerwacja z zapytania" });
+    if (!built) return { ok: false, error: "Brak konfiguracji serwera (service_role) albo nie znaleziono zapytania." };
+    revalidatePath("/reservations");
+    revalidatePath("/dashboard");
+    revalidatePath(`/inquiries/${inquiryId}/edit`);
+    return { ok: true, reservationId: built.reservationId };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się utworzyć rezerwacji." };
+  }
 }
 
 // §klient Nowy klient wpisany z ręki (customer_id="__new__") → utwórz go i podmień id.

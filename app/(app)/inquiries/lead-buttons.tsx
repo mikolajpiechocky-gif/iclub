@@ -63,9 +63,13 @@ export function AutoCloseBlockToggle({ id, blocked }: { id: string; blocked: boo
   const [on, setOn] = useState(blocked);
   const toggle = () => start(async () => { const next = !on; setOn(next); await setInquiryAutoCloseBlockedAction(id, next); router.refresh(); });
   return (
-    <label className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-ink-2">
+    <label
+      className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-ink-2"
+      title="Leady bez aktywności przez 21 dni same zamykają się jako przegrane. Zaznacz, by ten lead NIE zamknął się automatycznie (np. klient prosił o kontakt później)."
+    >
       <input type="checkbox" checked={on} onChange={toggle} disabled={pending} className="h-4 w-4 accent-accent" />
       Blokuj auto-zamknięcie
+      <span className="text-[11px] font-normal text-muted">— nie zamykaj po 21 dniach bez aktywności</span>
     </label>
   );
 }

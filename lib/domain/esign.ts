@@ -66,6 +66,21 @@ const fmtPLN = (v: number | null | undefined) =>
 const fmtDate = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString("pl-PL", { day: "2-digit", month: "long", year: "numeric" }) : "—";
 
+// Czytelna, pełna nazwa namiotu do umowy (klient ma wiedzieć co dostaje — nie kod „D").
+export function tentContractLabel(v: string | null | undefined): string | null {
+  if (!v) return null;
+  const s = v.trim();
+  if (!s) return null;
+  if (/\+/.test(s)) return s.split("+").map((x) => tentContractLabel(x.trim())).filter(Boolean).join(" + ");
+  if (s === "M") return "Mały namiot iClub 5,4×5,4 m";
+  if (s === "D") return "Duży namiot iClub 6×8 m";
+  if (s === "D_BACKDOOR") return "Duży namiot iClub 6×8 m (drzwi z tyłu)";
+  if (s === "GASTRO") return "Namiot gastronomiczny iClub";
+  if (/5[.,]4/.test(s)) return "Mały namiot iClub 5,4×5,4 m";
+  if (/6\s*[x×]\s*8/i.test(s)) return `Duży namiot iClub 6×8 m${/tył|back|drzw/i.test(s) ? " (drzwi z tyłu)" : ""}`;
+  return s;
+}
+
 export interface EsignContractInput {
   orderNo?: string | null;
   customerName?: string | null;
@@ -76,6 +91,11 @@ export interface EsignContractInput {
   packageName?: string | null;
   tentName?: string | null;
   addonsNote?: string | null;
+  packageItems?: { name: string; qty?: number }[]; // aktualny skład pakietu (§3.1)
+  packagePrice?: number | null;
+  addonsTotal?: number | null;
+  transport?: number | null;
+  discount?: number | null;
   amountTotal?: number | null;
   amountDeposit?: number | null;
   deliveryHour?: string | null;   // godzina montażu (decyzja: z pakietu lub sztywna)
@@ -84,13 +104,13 @@ export interface EsignContractInput {
 }
 
 // Zwraca kompletny dokument HTML umowy (migawka) z pełnego wzorca. Mapuje dane realizacji/leada
-// na pola szablonu. Kwot cząstkowych (pakiet/dodatki/dojazd) na razie nie rozdzielamy — pokazujemy
-// wartość całkowitą, zadatek i pozostało; render sam wstawia „—" tam, gdzie danych brak.
+// na pola szablonu: nazwa namiotu (pełna), skład pakietu (aktualny), rozbicie ceny (§5).
 export function buildEsignContractHtml(i: EsignContractInput): string {
   const remaining = i.amountTotal != null ? Math.max(0, i.amountTotal - (i.amountDeposit ?? 0)) : null;
   const name = (i.customerName ?? "").trim();
   const sp = name.indexOf(" ");
   const dodatki = (i.addonsNote ?? "").split(",").map((s) => s.trim()).filter(Boolean).map((n) => ({ nazwa_dodatku: n }));
+  const pozycje_pakietu = (i.packageItems ?? []).map((it) => ({ pozycja: `${it.qty && it.qty > 1 ? `${it.qty} × ` : ""}${it.name}` }));
   return renderContract({
     numer_umowy: i.orderNo ?? null,
     data_zawarcia: null,
@@ -98,11 +118,16 @@ export function buildEsignContractHtml(i: EsignContractInput): string {
     nazwisko: sp > 0 ? name.slice(sp + 1) : null,
     email: i.customerEmail ?? null,
     pakiet: i.packageName ?? null,
-    namiot: i.tentName ?? null,
+    namiot: tentContractLabel(i.tentName),
+    pozycje_pakietu,
     dodatki,
     data_imprezy: i.eventDate ? fmtDate(i.eventDate) : null,
     adres: i.location ?? null,
     godzina_dostawy: i.deliveryHour ?? null,
+    cena_pakietu: i.packagePrice != null ? fmtPLN(i.packagePrice) : null,
+    suma_dodatkow: i.addonsTotal != null ? fmtPLN(i.addonsTotal) : null,
+    koszt_dojazdu: i.transport != null ? fmtPLN(i.transport) : null,
+    rabat: i.discount != null && i.discount > 0 ? fmtPLN(i.discount) : null,
     cena_calkowita: i.amountTotal != null ? fmtPLN(i.amountTotal) : null,
     zadatek: i.amountDeposit != null ? fmtPLN(i.amountDeposit) : null,
     pozostalo: remaining != null ? fmtPLN(remaining) : null,

@@ -4,10 +4,13 @@
 import { createAdminClient, isServiceRoleConfigured } from "@/lib/supabase/admin";
 import { sendPushToOwners } from "@/lib/integrations/push";
 import { sendEmail, isEmailConfigured } from "@/lib/integrations/email";
+import { emailShell } from "@/lib/integrations/email/template";
 import { getJob } from "@/lib/data/jobs";
 import { getCustomer } from "@/lib/data/customers";
-import { listAddons } from "@/lib/data/resources";
-import { materializeReservationFromContract } from "@/lib/data/reservation-from-contract";
+import { listReservationAddons } from "@/lib/data/resources";
+import { settlementBreakdown } from "@/lib/domain/billing";
+import { suggestedDeposit } from "@/lib/domain/order-pricing";
+import { materializeReservationFromContract, resolveInquiryComposition } from "@/lib/data/reservation-from-contract";
 import {
   generateToken, generateCode, hashCode, verifyCode, sha256, buildEsignContractHtml,
   deliveryHourForPackage, ICLUB_BLIK, DEPOSIT_DUE_DEFAULT,
@@ -59,13 +62,28 @@ export async function createEsignContract(input: CreateEsignInput, createdBy: st
   if (job.business_line !== "ICLUB") return { ok: false, error: "Umowa dotyczy zleceń iClub." };
   const r = job.reservation;
   const customer = r?.customer_id ? await getCustomer(r.customer_id) : null;
-  const addons = await listAddons();
-  const addonNames = (r?.addon_ids ?? []).map((id) => addons.find((a) => a.id === id)?.name).filter((n): n is string => Boolean(n)).join(", ");
+  const s = createAdminClient();
+
+  // Katalog dodatków (nazwy + ceny) + aktualny skład pakietu — do §3.1 i rozbicia §5.
+  const resAddons = await listReservationAddons();
+  const addonPrice = new Map(resAddons.map((a) => [a.id, { name: a.name, price: Number(a.price ?? 0) }]));
+  const addonNames = (r?.addon_ids ?? []).map((id) => addonPrice.get(id)?.name).filter((n): n is string => Boolean(n)).join(", ");
+  const included: Record<string, number> = {};
+  const packageItems: { name: string; qty: number }[] = [];
+  if (r?.package_id) {
+    const { data: pi } = await s.from("package_items").select("quantity, equipment_id, equipment:equipment(name)").eq("package_id", r.package_id);
+    for (const it of (pi ?? []) as unknown as { quantity: number | null; equipment_id: string; equipment: { name: string | null } | null }[]) {
+      const qn = Number(it.quantity ?? 0) || 0;
+      included[it.equipment_id] = qn;
+      if (it.equipment?.name) packageItems.push({ name: it.equipment.name, qty: qn });
+    }
+  }
+  const bd = r ? settlementBreakdown(r, addonPrice, included) : null;
 
   const pkgName = r?.package?.name ?? null;
   const deliveryHour = input.deliveryHour ?? deliveryHourForPackage(pkgName);
-  const amountTotal = input.amountTotal ?? numOrNull(r?.price);
-  const amountDeposit = input.amountDeposit ?? numOrNull(r?.deposit);
+  const amountTotal = input.amountTotal ?? numOrNull(r?.price) ?? (bd ? bd.total : null);
+  const amountDeposit = input.amountDeposit ?? numOrNull(r?.deposit) ?? (bd ? bd.deposit : null);
   const depositDue = input.depositDue ?? DEPOSIT_DUE_DEFAULT;
   const blik = input.blik ?? ICLUB_BLIK;
   const signerEmail = customer?.email ?? null;
@@ -79,12 +97,16 @@ export async function createEsignContract(input: CreateEsignInput, createdBy: st
     eventDate: r?.event_date ?? null,
     location: r?.location ?? null,
     packageName: pkgName,
-    tentName: r?.tent?.name ?? null,
+    tentName: r?.tent_main ?? r?.tent?.name ?? null,
     addonsNote: addonNames || null,
+    packageItems,
+    packagePrice: bd?.packagePrice ?? null,
+    addonsTotal: bd?.addonsTotal ?? null,
+    transport: bd?.transport ?? null,
+    discount: bd?.discount ?? null,
     amountTotal, amountDeposit, deliveryHour, depositDue, blik,
   });
 
-  const s = createAdminClient();
   const { data, error } = await s.from("esign_contracts").insert({
     job_id: job.id,
     reservation_id: r?.id ?? null,
@@ -119,25 +141,39 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
   const { data: inq } = await s.from("inquiries").select("*").eq("id", input.inquiryId).maybeSingle();
   if (!inq) return { ok: false, error: "Nie znaleziono zapytania." };
   const q = inq as Record<string, unknown>;
+  const cfg = (q.config_json ?? null) as import("@/lib/data/types").InquiryConfig | null;
 
-  const pkg = (q.package_interest as string) || null;
+  const pkg = (cfg?.package ?? (q.package_interest as string)) || null;
   const deliveryHour = input.deliveryHour ?? deliveryHourForPackage(pkg);
   const depositDue = input.depositDue ?? DEPOSIT_DUE_DEFAULT;
-  const signerEmail = (q.contact_email as string) || null;
+  const signerEmail = (cfg?.contact?.email as string) || (q.contact_email as string) || null;
   const orderNo = `IC-${new Date().getFullYear()}-${Math.abs(hashStr(String(q.id))) % 9000 + 1000}`;
+
+  // Skład i ceny z konfiguracji leada (pakiet + dodatki), by §3.1/§5 były wypełnione.
+  const comp = await resolveInquiryComposition(s, cfg, cfg?.tentMain ?? null, cfg?.tentExtra ?? null);
+  const transport = cfg?.selfPickup ? 0 : Number(cfg?.estimate?.transport ?? 0) || 0;
+  const total = comp.packagePrice + comp.addonsTotal + transport;
+  const computedOk = comp.packagePrice > 0 || comp.addonsTotal > 0;
+  const amountTotal = input.amountTotal ?? (computedOk ? total : (cfg?.estimate?.value ?? null));
+  const amountDeposit = input.amountDeposit ?? (computedOk ? suggestedDeposit(transport, comp.addonsTotal) : (cfg?.estimate?.deposit ?? null));
+  const tentLabelSrc = [cfg?.tentMain, cfg?.tentExtra].filter(Boolean).join(" + ") || (q.tent_interest as string) || null;
 
   const html = buildEsignContractHtml({
     orderNo,
-    customerName: (q.contact_name as string) || null,
+    customerName: (cfg?.contact?.name as string) || (q.contact_name as string) || null,
     customerEmail: signerEmail,
     eventType: (q.event_type as string) || null,
-    eventDate: (q.event_date as string) || null,
-    location: (q.location as string) || null,
+    eventDate: (cfg?.eventDate as string) || (q.event_date as string) || null,
+    location: (cfg?.location as string) || (q.location as string) || null,
     packageName: pkg,
-    tentName: (q.tent_interest as string) || null,
-    addonsNote: (q.addons_note as string) || null,
-    amountTotal: input.amountTotal ?? null,
-    amountDeposit: input.amountDeposit ?? null,
+    tentName: tentLabelSrc,
+    addonsNote: comp.addonNames.length ? comp.addonNames.join(", ") : ((q.addons_note as string) || null),
+    packageItems: comp.packageItems,
+    packagePrice: computedOk ? comp.packagePrice : null,
+    addonsTotal: computedOk ? comp.addonsTotal : null,
+    transport: computedOk ? transport : (cfg?.estimate?.transport ?? null),
+    amountTotal,
+    amountDeposit,
     deliveryHour, depositDue, blik: ICLUB_BLIK,
   });
 
@@ -149,8 +185,8 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
     signer_email: signerEmail,
     delivery_hour: deliveryHour,
     deposit_due: depositDue,
-    amount_total: input.amountTotal ?? null,
-    amount_deposit: input.amountDeposit ?? null,
+    amount_total: amountTotal,
+    amount_deposit: amountDeposit,
     access_token: generateToken(),
     created_by: createdBy,
   }).select("id, access_token").single();
@@ -199,11 +235,14 @@ export async function sendEsignContract(id: string): Promise<{ ok: boolean; erro
   if (c.signer_email) {
     const r = await sendEmail({
       to: c.signer_email,
-      subject: `Umowa do podpisu — iClub ${c.order_no ?? ""}`.trim(),
-      html: `<p>Dzień dobry,</p><p>przygotowaliśmy umowę do podpisu dla zamówienia <b>${c.order_no ?? ""}</b>.</p>
-        <p><a href="${link}">Otwórz umowę i podpisz</a></p>
-        <p>Po otwarciu zobaczysz pełną treść umowy i poprosisz o jednorazowy kod. Link ważny ${TOKEN_TTL_DAYS} dni.</p>
-        <p>iClub</p>`,
+      subject: `Twoja umowa iClub do podpisu${c.order_no ? ` — ${c.order_no}` : ""}`,
+      html: emailShell({
+        preheader: `Umowa${c.order_no ? ` ${c.order_no}` : ""} gotowa do podpisu`,
+        heading: "Umowa gotowa do podpisu ✍️",
+        intro: `Przygotowaliśmy umowę na Twoją realizację iClub${c.order_no ? ` (nr ${c.order_no})` : ""}. Otwórz ją, przeczytaj i podpisz jednorazowym kodem — zajmie to chwilę.`,
+        cta: { label: "Otwórz i podpisz umowę", url: link },
+        footerNote: `Link ważny ${TOKEN_TTL_DAYS} dni. Po otwarciu poprosisz o jednorazowy kod e-mail.`,
+      }),
     });
     emailSkipped = Boolean(r.skipped);
     if (r.ok && r.messageId) await s.from("esign_contracts").update({ mail_message_id: r.messageId }).eq("id", id);
@@ -244,8 +283,14 @@ export async function requestEsignCode(token: string): Promise<OpResult> {
   const code = generateCode();
   const r = await sendEmail({
     to: c.signer_email || "",
-    subject: `Twój kod do podpisu: ${code}`,
-    html: `<p>Kod do podpisu umowy iClub ${c.order_no ?? ""}: <b style="font-size:20px">${code}</b></p><p>Ważny ${CODE_TTL_MIN} minut. Jeśli to nie Ty prosiłeś o kod — zignoruj tę wiadomość.</p>`,
+    subject: `Kod do podpisu umowy iClub: ${code}`,
+    html: emailShell({
+      preheader: `Twój kod do podpisu: ${code}`,
+      heading: "Twój kod do podpisu umowy",
+      intro: "Wpisz poniższy jednorazowy kod na stronie umowy, aby ją podpisać:",
+      bodyHtml: `<div style="text-align:center;margin:8px 0 4px"><span style="display:inline-block;padding:14px 22px;border:2px dashed #e11d74;border-radius:12px;font:800 30px/1 monospace;letter-spacing:8px;color:#14151b">${code}</span></div>`,
+      footerNote: `Kod ważny ${CODE_TTL_MIN} minut. Jeśli to nie Ty prosiłeś o kod — zignoruj tę wiadomość.`,
+    }),
   });
   if (!r.ok) return { ok: false, error: "email_send_failed", httpStatus: 502 };
 
@@ -304,12 +349,20 @@ export async function signEsignContract(
   if (c.signer_email) {
     await sendEmail({
       to: c.signer_email,
-      subject: `Umowa zawarta — iClub ${c.order_no ?? ""}`.trim(),
-      html: `<p>Dziękujemy — umowa <b>${c.order_no ?? ""}</b> została zawarta ${new Date(signedAt).toLocaleString("pl-PL")}.</p>
-        <p>Zadatek do zapłaty: <b>${c.amount_deposit != null ? c.amount_deposit + " zł" : "—"}</b>${c.deposit_due ? ` (termin: ${c.deposit_due})` : ""}.</p>
-        ${remaining != null ? `<p>Pozostało po imprezie: ${remaining} zł.</p>` : ""}
-        <p><a href="${link}">Podgląd zawartej umowy</a></p>
-        <p>iClub</p>`,
+      subject: `Umowa zawarta — iClub${c.order_no ? ` ${c.order_no}` : ""}`,
+      html: emailShell({
+        preheader: "Dziękujemy — umowa zawarta. Dane do wpłaty zadatku w środku.",
+        heading: "Umowa zawarta ✓ Dziękujemy!",
+        intro: `Twoja umowa${c.order_no ? ` nr ${c.order_no}` : ""} została zawarta ${new Date(signedAt).toLocaleString("pl-PL")}. Aby potwierdzić rezerwację terminu, prosimy o wpłatę zadatku.`,
+        bodyHtml: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 10px;border:1px solid #ececef;border-radius:12px">
+            <tr><td style="padding:12px 16px;font:400 14px/1.5 Arial,sans-serif;color:#33353d">
+              <div>Zadatek do zapłaty: <b style="color:#14151b">${c.amount_deposit != null ? c.amount_deposit + " zł" : "—"}</b>${c.deposit_due ? ` (termin: ${c.deposit_due})` : ""}</div>
+              ${remaining != null ? `<div>Pozostało po imprezie: <b style="color:#14151b">${remaining} zł</b></div>` : ""}
+              <div style="margin-top:6px">BLIK: <b style="color:#14151b">${ICLUB_BLIK}</b> · Przelew: <b style="color:#14151b">mBank 49 1140 2004 0000 3902 8533 9478</b></div>
+            </td></tr></table>`,
+        cta: { label: "Podgląd zawartej umowy", url: link },
+        footerNote: "Zespół iClub",
+      }),
     }).catch(() => {});
   }
   sendPushToOwners({

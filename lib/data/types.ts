@@ -84,7 +84,7 @@ export interface InquiryConfig {
   rentalDays?: number | null;
   heating?: boolean | null;
   selfPickup?: boolean | null;
-  estimate?: { value?: number; transport?: number; deposit?: number; remaining?: number } | null;
+  estimate?: { value?: number; transport?: number; deposit?: number; remaining?: number; discount?: number } | null;
   contact?: { name?: string; phone?: string; email?: string } | null;
   message?: string | null;
   configNo?: string | null;              // nr z konfiguratora (np. IC-2026-9619), jeśli przyszedł

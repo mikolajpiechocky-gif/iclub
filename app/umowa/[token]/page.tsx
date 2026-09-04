@@ -13,9 +13,15 @@ const REGULAMIN_URL = process.env.REGULAMIN_URL || "https://iclubevents.pl/regul
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <main className="min-h-screen bg-gray-100 px-4 py-8 text-gray-900">
-      <div className="mx-auto max-w-[720px]">
-        <div className="mb-4 text-center text-sm font-semibold tracking-wide text-gray-500">iClub — umowa do podpisu</div>
+    <main className="min-h-screen bg-[#0f1016] px-4 py-8 text-gray-900">
+      <div className="mx-auto max-w-[760px]">
+        <div className="mb-5 flex flex-col items-center gap-1.5 text-center">
+          <div className="font-display text-[26px] font-black tracking-tight text-white">
+            i<span style={{ color: "#e11d74" }}>Club</span>
+          </div>
+          <div className="text-[12px] font-semibold uppercase tracking-[0.35em] text-[#7a8092]">Umowa do podpisu</div>
+          <div className="mt-1 h-[3px] w-16 rounded-full" style={{ background: "#e11d74" }} />
+        </div>
         {children}
       </div>
     </main>

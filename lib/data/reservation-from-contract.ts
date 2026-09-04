@@ -24,6 +24,73 @@ function resolveTentId(choice: string | null | undefined, tents: TentRow[]): str
   return null;
 }
 
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+export interface InquiryComposition {
+  packageId: string | null;
+  packageName: string | null;
+  packagePrice: number;
+  packageItems: { name: string; qty: number }[];   // aktualny skład pakietu (do §3.1 umowy)
+  addonIds: string[];
+  addonQty: Record<string, number>;
+  addonsTotal: number;                              // płatna nadwyżka dodatków ponad pakiet
+  addonNames: string[];
+}
+
+// Rozwiązuje skład i ceny z konfiguracji leada: pakiet (cena wg wielkości namiotu) + jego skład,
+// dodatki (kod → pozycja magazynu/legacy, ilość, płatna nadwyżka). Wspólne dla rezerwacji i umowy.
+export async function resolveInquiryComposition(
+  s: AdminClient, cfg: InquiryConfig | null, tentMain: string | null, tentExtra: string | null,
+): Promise<InquiryComposition> {
+  const isBig = [tentMain, tentExtra].some((t) => t === "D" || t === "D_BACKDOOR");
+  let packageId: string | null = null, packageName: string | null = null, packagePrice = 0;
+  const packageItems: { name: string; qty: number }[] = [];
+  const included: Record<string, number> = {};
+  if (cfg?.package) {
+    const { data: pkgs } = await s.from("packages").select("id, code, name, price_small, price_big, base_price").eq("active", true);
+    const target = String(cfg.package).trim().toUpperCase();
+    const p = ((pkgs ?? []) as { id: string; code: string | null; name: string | null; price_small: number | null; price_big: number | null; base_price: number | null }[])
+      .find((x) => String(x.code ?? "").toUpperCase() === target || String(x.name ?? "").toUpperCase() === target);
+    if (p) {
+      packageId = p.id; packageName = p.name ?? null;
+      packagePrice = Number((isBig ? p.price_big : p.price_small) ?? p.base_price ?? 0) || 0;
+      const { data: pi } = await s.from("package_items").select("quantity, equipment:equipment(name)").eq("package_id", p.id);
+      for (const it of (pi ?? []) as unknown as { quantity: number | null; equipment: { name: string | null } | null }[]) {
+        const qn = Number(it.quantity ?? 0) || 0;
+        if (it.equipment?.name) packageItems.push({ name: it.equipment.name, qty: qn });
+      }
+      // included dla naliczania nadwyżki dodatków — potrzebne equipment_id
+      const { data: pi2 } = await s.from("package_items").select("equipment_id, quantity").eq("package_id", p.id);
+      for (const it of (pi2 ?? []) as { equipment_id: string; quantity: number | null }[]) included[it.equipment_id] = Number(it.quantity ?? 0) || 0;
+    }
+  }
+
+  const addonIds: string[] = [];
+  const addonQty: Record<string, number> = {};
+  const addonNames: string[] = [];
+  let addonsTotal = 0;
+  const cfgAddons = (cfg?.addons ?? []).filter((a) => a.code);
+  if (cfgAddons.length) {
+    const codes = cfgAddons.map((a) => a.code as string);
+    const [{ data: eq }, { data: leg }] = await Promise.all([
+      s.from("equipment").select("id, code, name, rental_price").in("code", codes),
+      s.from("addons").select("id, code, name, price").in("code", codes),
+    ]);
+    const byCode = new Map<string, { id: string; price: number; name: string }>();
+    for (const a of (leg ?? []) as { id: string; code: string; name: string | null; price: number | null }[]) byCode.set(a.code, { id: a.id, price: Number(a.price ?? 0) || 0, name: a.name ?? a.code });
+    for (const e of (eq ?? []) as { id: string; code: string; name: string | null; rental_price: number | null }[]) byCode.set(e.code, { id: e.id, price: Number(e.rental_price ?? 0) || 0, name: e.name ?? e.code }); // magazyn ma pierwszeństwo
+    for (const a of cfgAddons) {
+      const m = byCode.get(a.code as string);
+      if (!m) continue;
+      const qty = Math.max(1, Math.round(a.qty ?? 1));
+      addonIds.push(m.id); addonQty[m.id] = qty;
+      addonNames.push(`${qty > 1 ? `${qty} × ` : ""}${a.name ?? m.name}`);
+      addonsTotal += m.price * Math.max(0, qty - (included[m.id] ?? 0)); // płatna tylko nadwyżka ponad pakiet
+    }
+  }
+  return { packageId, packageName, packagePrice, packageItems, addonIds, addonQty, addonsTotal, addonNames };
+}
+
 // Wspólny builder: z zapytania (lead) zakłada rezerwację iClub (CONFIRMED) + zlecenie + etapy,
 // zakłada/łączy klienta i zamyka lead jako wygrany. Używany i przez podpis umowy, i przez ręczne
 // „Utwórz rezerwację (bez umowy)". Kwoty: override z umowy albo z wyceny konfiguratora.
@@ -73,43 +140,8 @@ export async function buildReservationFromInquiry(inquiryId: string, opts: Build
   const selfPickup = Boolean(cfg?.selfPickup);
 
   // Cena wg modelu iClub: wartość = pakiet + dodatki + transport; zadatek = 300 + transport + 15% dodatków.
-  // Rozwiązujemy pakiet (cena zależna od wielkości namiotu) i dodatki (kod → pozycja), żeby liczyć poprawnie.
-  const isBig = [tentMain, tentExtra].some((t) => t === "D" || t === "D_BACKDOOR");
-  let packageId: string | null = null, packagePrice = 0;
-  const included: Record<string, number> = {}; // equipment_id → ilość wliczona w pakiet (płatna tylko nadwyżka)
-  if (cfg?.package) {
-    const { data: pkgs } = await s.from("packages").select("id, code, name, price_small, price_big, base_price").eq("active", true);
-    const target = String(cfg.package).trim().toUpperCase();
-    const p = ((pkgs ?? []) as { id: string; code: string | null; name: string | null; price_small: number | null; price_big: number | null; base_price: number | null }[])
-      .find((x) => String(x.code ?? "").toUpperCase() === target || String(x.name ?? "").toUpperCase() === target);
-    if (p) {
-      packageId = p.id; packagePrice = Number((isBig ? p.price_big : p.price_small) ?? p.base_price ?? 0) || 0;
-      const { data: pi } = await s.from("package_items").select("equipment_id, quantity").eq("package_id", p.id);
-      for (const it of (pi ?? []) as { equipment_id: string; quantity: number | null }[]) included[it.equipment_id] = Number(it.quantity ?? 0) || 0;
-    }
-  }
-
-  const addonIds: string[] = [];
-  const addonQty: Record<string, number> = {};
-  let addonsTotal = 0;
-  const cfgAddons = (cfg?.addons ?? []).filter((a) => a.code);
-  if (cfgAddons.length) {
-    const codes = cfgAddons.map((a) => a.code as string);
-    const [{ data: eq }, { data: leg }] = await Promise.all([
-      s.from("equipment").select("id, code, rental_price").in("code", codes),
-      s.from("addons").select("id, code, price").in("code", codes),
-    ]);
-    const byCode = new Map<string, { id: string; price: number }>();
-    for (const a of (leg ?? []) as { id: string; code: string; price: number | null }[]) byCode.set(a.code, { id: a.id, price: Number(a.price ?? 0) || 0 });
-    for (const e of (eq ?? []) as { id: string; code: string; rental_price: number | null }[]) byCode.set(e.code, { id: e.id, price: Number(e.rental_price ?? 0) || 0 }); // magazyn ma pierwszeństwo
-    for (const a of cfgAddons) {
-      const m = byCode.get(a.code as string);
-      if (!m) continue;
-      const qty = Math.max(1, Math.round(a.qty ?? 1));
-      addonIds.push(m.id); addonQty[m.id] = qty;
-      addonsTotal += m.price * Math.max(0, qty - (included[m.id] ?? 0)); // płatna tylko nadwyżka ponad pakiet
-    }
-  }
+  const comp = await resolveInquiryComposition(s, cfg, tentMain, tentExtra);
+  const { packageId, packagePrice, addonIds, addonQty, addonsTotal } = comp;
 
   const transport = selfPickup ? 0 : Number(cfg?.estimate?.transport ?? 0) || 0;
   const computedOk = packagePrice > 0 || addonsTotal > 0;
@@ -138,7 +170,7 @@ export async function buildReservationFromInquiry(inquiryId: string, opts: Build
     notes: `Utworzona ${opts.noteReason ?? "z zapytania"}. Zweryfikuj pakiet, dodatki i wycenę.`.trim(),
   };
   const { data: rez, error: rErr } = await s.from("reservations").insert(insert).select("id, business_line, event_type, event_date").maybeSingle();
-  if (rErr || !rez) { console.error("buildReservationFromInquiry insert:", rErr); return null; }
+  if (rErr || !rez) { console.error("buildReservationFromInquiry insert:", rErr); throw new Error(rErr ? `Zapis rezerwacji: ${rErr.message}` : "Zapis rezerwacji nie zwrócił wiersza."); }
   const rr = rez as { id: string; business_line: string; event_type: string | null; event_date: string | null };
 
   const { data: job } = await s.from("jobs").insert({

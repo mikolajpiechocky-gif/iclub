@@ -8,6 +8,7 @@ import { DEFAULT_TENT_CAPACITIES, sumSlots, choiceFromTent, type TentChoice } fr
 import { sendPushToOwners } from "@/lib/integrations/push";
 import { listOwnerUserIds } from "@/lib/data/push";
 import { sendEmail } from "@/lib/integrations/email";
+import { emailShell } from "@/lib/integrations/email/template";
 
 const num = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
@@ -148,7 +149,7 @@ export interface PublicInquiryInput {
   heating?: boolean;
   eventStartTime?: string;
   selfPickup?: boolean;
-  estimate?: { value?: number; transport?: number; deposit?: number; remaining?: number };
+  estimate?: { value?: number; transport?: number; deposit?: number; remaining?: number; discount?: number };
   contact?: { name?: string; phone?: string; email?: string };
   message?: string;
 }
@@ -187,7 +188,7 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
     isRental && input.rentalDays != null && `Liczba dób: ${input.rentalDays}`,
     itemsStr && `${isRental ? "Sprzęt" : "Dodatki"}: ${itemsStr}`,
     input.selfPickup && "Odbiór własny: tak",
-    input.estimate && `Wycena konfiguratora: wartość ${zl(input.estimate.value)}, transport ${zl(input.estimate.transport)}, zadatek ${zl(input.estimate.deposit)}, pozostało ${zl(input.estimate.remaining)}`,
+    input.estimate && `Wycena konfiguratora: wartość ${zl(input.estimate.value)}, transport ${zl(input.estimate.transport)}, ${input.estimate.discount ? `rabat ${zl(input.estimate.discount)}` : "rabat: brak"}, zadatek ${zl(input.estimate.deposit)}, pozostało ${zl(input.estimate.remaining)}`,
     input.message?.trim() && `Wiadomość: ${input.message.trim()}`,
     "(Wycena orientacyjna — do potwierdzenia; bez wiążącej rezerwacji.)",
   ].filter(Boolean).join("\n");
@@ -252,12 +253,15 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
   if (c.email?.trim()) {
     sendEmail({
       to: c.email.trim(),
-      subject: "Dziękujemy — otrzymaliśmy Twoje zgłoszenie · iClub",
+      subject: "Mamy Twoje zgłoszenie 🎉 · iClub",
       replyTo: "odpalamy@iclubevents.pl",
-      html: `<p>Dzień dobry${c.name?.trim() ? " " + c.name.trim() : ""},</p>
-        <p>dziękujemy za zgłoszenie przez konfigurator iClub. Przyjęliśmy je i wkrótce potwierdzimy dostępność${input.eventDate ? ` terminu ${input.eventDate}` : " terminu"} oraz prześlemy szczegóły i sposób płatności.</p>
-        <p>To potwierdzenie przyjęcia zgłoszenia — nie jest to jeszcze wiążąca rezerwacja. Możesz odpisać na tę wiadomość, jeśli masz pytania.</p>
-        <p>Zespół iClub</p>`,
+      html: emailShell({
+        preheader: "Dziękujemy za zgłoszenie z konfiguratora iClub.",
+        heading: `Dziękujemy${c.name?.trim() ? ", " + c.name.trim() : ""}! 🎉`,
+        intro: `Otrzymaliśmy Twoje zgłoszenie z konfiguratora iClub${input.eventDate ? ` na termin ${input.eventDate}` : ""}. Wkrótce potwierdzimy dostępność i prześlemy szczegóły oraz sposób płatności.`,
+        bodyHtml: `<p style="margin:0;font:400 13.5px/1.6 Arial,sans-serif;color:#6b6f7a">To potwierdzenie przyjęcia zgłoszenia — nie jest to jeszcze wiążąca rezerwacja. Możesz odpisać na tę wiadomość, jeśli masz pytania.</p>`,
+        footerNote: "Zespół iClub",
+      }),
     }).catch(() => {});
   }
 

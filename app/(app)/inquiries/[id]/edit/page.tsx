@@ -54,7 +54,7 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
     configNo: cfg?.configNo ?? (rawNotes.match(/\b([A-Z]{2}-\d{4}-\d{3,})\b/)?.[1] ?? null),
     eventDate: cfg?.eventDate ?? inquiry.event_date,
     location: cfg?.location ?? inquiry.location,
-    est: cfg?.estimate ?? (estM ? { value: +estM[1], transport: +estM[2], deposit: +estM[3], remaining: +estM[4] } : null),
+    est: cfg?.estimate ?? (estM ? { value: +estM[1], transport: +estM[2], deposit: +estM[3], remaining: +estM[4], discount: undefined as number | undefined } : null),
   };
   const estTotal = view.est?.value != null ? String(Math.round(view.est.value)) : "";
   const estDeposit = view.est?.deposit != null ? String(Math.round(view.est.deposit)) : "";
@@ -106,6 +106,7 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] text-ink-2">
                     <span>Zadatek: <b className="text-[#5fd68b]">{zlk(view.est?.deposit)}</b></span>
                     {!view.isRental && <span>Transport: <b className="text-ink">{zlk(view.est?.transport)}</b></span>}
+                    <span>Rabat: <b className={view.est?.discount ? "text-[#ebb05a]" : "text-ink-2"}>{view.est?.discount ? zlk(view.est.discount) : "brak"}</b></span>
                     <span>Pozostało: <b className="text-ink">{zlk(view.est?.remaining)}</b></span>
                   </div>
                 </div>
