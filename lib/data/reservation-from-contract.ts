@@ -9,6 +9,7 @@ import { createAdminClient, isServiceRoleConfigured } from "@/lib/supabase/admin
 import { stagesForReservation } from "@/lib/domain/stages";
 import { tentSizeCode } from "@/lib/domain/calendar";
 import { sendPushToOwners } from "@/lib/integrations/push";
+import { computeOrderPrice, suggestedDeposit } from "@/lib/domain/order-pricing";
 import type { InquiryConfig } from "@/lib/data/types";
 
 interface TentRow { id: string; size: string | null; has_back_door: boolean; name: string | null }
@@ -70,6 +71,54 @@ export async function buildReservationFromInquiry(inquiryId: string, opts: Build
 
   const eventDate = (cfg?.eventDate as string) || (q.event_date as string) || null;
   const selfPickup = Boolean(cfg?.selfPickup);
+
+  // Cena wg modelu iClub: wartość = pakiet + dodatki + transport; zadatek = 300 + transport + 15% dodatków.
+  // Rozwiązujemy pakiet (cena zależna od wielkości namiotu) i dodatki (kod → pozycja), żeby liczyć poprawnie.
+  const isBig = [tentMain, tentExtra].some((t) => t === "D" || t === "D_BACKDOOR");
+  let packageId: string | null = null, packagePrice = 0;
+  const included: Record<string, number> = {}; // equipment_id → ilość wliczona w pakiet (płatna tylko nadwyżka)
+  if (cfg?.package) {
+    const { data: pkgs } = await s.from("packages").select("id, code, name, price_small, price_big, base_price").eq("active", true);
+    const target = String(cfg.package).trim().toUpperCase();
+    const p = ((pkgs ?? []) as { id: string; code: string | null; name: string | null; price_small: number | null; price_big: number | null; base_price: number | null }[])
+      .find((x) => String(x.code ?? "").toUpperCase() === target || String(x.name ?? "").toUpperCase() === target);
+    if (p) {
+      packageId = p.id; packagePrice = Number((isBig ? p.price_big : p.price_small) ?? p.base_price ?? 0) || 0;
+      const { data: pi } = await s.from("package_items").select("equipment_id, quantity").eq("package_id", p.id);
+      for (const it of (pi ?? []) as { equipment_id: string; quantity: number | null }[]) included[it.equipment_id] = Number(it.quantity ?? 0) || 0;
+    }
+  }
+
+  const addonIds: string[] = [];
+  const addonQty: Record<string, number> = {};
+  let addonsTotal = 0;
+  const cfgAddons = (cfg?.addons ?? []).filter((a) => a.code);
+  if (cfgAddons.length) {
+    const codes = cfgAddons.map((a) => a.code as string);
+    const [{ data: eq }, { data: leg }] = await Promise.all([
+      s.from("equipment").select("id, code, rental_price").in("code", codes),
+      s.from("addons").select("id, code, price").in("code", codes),
+    ]);
+    const byCode = new Map<string, { id: string; price: number }>();
+    for (const a of (leg ?? []) as { id: string; code: string; price: number | null }[]) byCode.set(a.code, { id: a.id, price: Number(a.price ?? 0) || 0 });
+    for (const e of (eq ?? []) as { id: string; code: string; rental_price: number | null }[]) byCode.set(e.code, { id: e.id, price: Number(e.rental_price ?? 0) || 0 }); // magazyn ma pierwszeństwo
+    for (const a of cfgAddons) {
+      const m = byCode.get(a.code as string);
+      if (!m) continue;
+      const qty = Math.max(1, Math.round(a.qty ?? 1));
+      addonIds.push(m.id); addonQty[m.id] = qty;
+      addonsTotal += m.price * Math.max(0, qty - (included[m.id] ?? 0)); // płatna tylko nadwyżka ponad pakiet
+    }
+  }
+
+  const transport = selfPickup ? 0 : Number(cfg?.estimate?.transport ?? 0) || 0;
+  const computedOk = packagePrice > 0 || addonsTotal > 0;
+  const computedTotal = computeOrderPrice({ packagePrice, addonsTotal, transportPrice: transport, discountType: "AMOUNT", discountValue: 0 }).total;
+  // Umowa (opts.amount*) ma pierwszeństwo (kwota podpisana); inaczej liczymy z rozwiązanych składowych,
+  // a gdy nic nie udało się rozwiązać — fallback do orientacyjnej wyceny konfiguratora.
+  const price = opts.amountTotal ?? (computedOk ? computedTotal : (cfg?.estimate?.value ?? null));
+  const deposit = opts.amountDeposit ?? (computedOk ? suggestedDeposit(transport, addonsTotal) : (cfg?.estimate?.deposit ?? null));
+
   const insert = {
     business_line: "ICLUB",
     status: "CONFIRMED",
@@ -79,12 +128,11 @@ export async function buildReservationFromInquiry(inquiryId: string, opts: Build
     location: (cfg?.location as string) || (q.location as string) || null,
     guests: (cfg?.guests as number) ?? (q.guests as number) ?? null,
     tent_main: tentMain, tent_extra: tentExtra, tent_id: tentId, tent_id_2: tentId2,
+    package_id: packageId, addon_ids: addonIds, addon_qty: addonQty,
     event_start_time: (cfg?.eventStartTime as string) || null,
     heating: Boolean(cfg?.heating),
     self_pickup: selfPickup,
-    price: opts.amountTotal ?? cfg?.estimate?.value ?? null,
-    deposit: opts.amountDeposit ?? cfg?.estimate?.deposit ?? null,
-    transport_price: cfg?.estimate?.transport ?? null,
+    price, deposit, transport_price: transport,
     source: "WEBSITE_FORM",
     client_confirmed: true, client_confirmed_at: now,
     notes: `Utworzona ${opts.noteReason ?? "z zapytania"}. Zweryfikuj pakiet, dodatki i wycenę.`.trim(),
