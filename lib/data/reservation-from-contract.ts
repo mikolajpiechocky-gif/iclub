@@ -164,7 +164,8 @@ export async function buildReservationFromInquiry(inquiryId: string, opts: Build
     event_start_time: (cfg?.eventStartTime as string) || null,
     heating: Boolean(cfg?.heating),
     self_pickup: selfPickup,
-    price, deposit, transport_price: transport,
+    // §schema: kolumny deposit/discount są NOT NULL — nigdy nie wstawiamy null (stary lead bez wyceny → 0).
+    price, deposit: deposit ?? 0, transport_price: transport ?? 0,
     source: "WEBSITE_FORM",
     client_confirmed: true, client_confirmed_at: now,
     notes: `Utworzona ${opts.noteReason ?? "z zapytania"}. Zweryfikuj pakiet, dodatki i wycenę.`.trim(),
