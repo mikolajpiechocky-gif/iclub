@@ -2,7 +2,7 @@
 // Server Actions modułu Zapytania: walidacja + zapis przez warstwę danych.
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createInquiry, updateInquiry, deleteInquiry, reactivateInquiry, setInquiryAutoCloseBlocked, autoCloseStaleLeads, type InquiryInput } from "@/lib/data/inquiries";
+import { createInquiry, updateInquiry, deleteInquiry, reactivateInquiry, setInquiryAutoCloseBlocked, setInquiryStatus, autoCloseStaleLeads, type InquiryInput } from "@/lib/data/inquiries";
 import { createEsignFromInquiry, sendEsignContract } from "@/lib/data/esign";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import type { InquiryStatus, InquirySource } from "@/lib/data/types";
@@ -120,7 +120,11 @@ export async function sendContractForInquiryAction(
   if (!created.ok || !created.id) return { ok: false, error: created.error ?? "Nie udało się utworzyć umowy." };
   const sent = await sendEsignContract(created.id);
   if (!sent.ok) return { ok: false, error: sent.error ?? "Nie udało się wysłać umowy." };
+  // Wysłana umowa = lead obsłużony → schodzi ze statusu NEW, więc znika z sekcji „Zgłoszenia z konfiguratora".
+  try { await setInquiryStatus(inquiryId, "OFFER_SENT"); } catch { /* status opcjonalny — nie blokuje wysyłki */ }
   revalidatePath(`/inquiries/${inquiryId}/edit`);
+  revalidatePath("/inquiries");
+  revalidatePath("/dashboard");
   return { ok: true, link: sent.link, emailSkipped: sent.emailSkipped };
 }
 

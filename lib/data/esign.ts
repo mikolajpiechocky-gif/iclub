@@ -247,14 +247,14 @@ export async function sendEsignContract(id: string): Promise<{ ok: boolean; erro
   if (c.signer_email) {
     const r = await sendEmail({
       to: c.signer_email,
-      subject: `Mamy dobrą wiadomość — Twój termin przyjęty! 🎉 Umowa do podpisu${c.order_no ? ` (${c.order_no})` : ""}`,
+      subject: `Twój termin jest wolny — działamy! 🎉 Umowa do podpisu${c.order_no ? ` (${c.order_no})` : ""}`,
       html: emailShell({
-        preheader: "Twój termin został przyjęty — podpisz umowę i rezerwujemy datę na 100%.",
-        heading: "Mamy dobrą wiadomość! 🎉",
-        intro: `Świetnie — Twój termin został przyjęty, a my przygotowaliśmy umowę do podpisu${c.order_no ? ` (nr ${c.order_no})` : ""}. Otwórz ją, sprawdź szczegóły i podpisz jednorazowym kodem — zajmie to chwilę. 🎪✨`,
-        bodyHtml: `<p style="margin:0 0 4px;font:400 14px/1.6 Arial,sans-serif;color:#33353d">Po podpisaniu wyślemy Ci dane do wpłaty zadatku i rezerwujemy Twoją datę na 100%. Robi się! 🥳</p>`,
-        cta: { label: "Otwórz i podpisz umowę", url: link },
-        footerNote: `Link ważny ${TOKEN_TTL_DAYS} dni. Po otwarciu poprosisz o jednorazowy kod e-mail.`,
+        preheader: "Termin wolny — przejrzyj i zatwierdź umowę.",
+        heading: "Twój termin jest wolny — działamy! 🎉",
+        intro: `Dzień dobry! Sprawdziliśmy kalendarz i Twój termin jest wolny${c.order_no ? ` (umowa nr ${c.order_no})` : ""}. Przygotowaliśmy umowę — kliknij poniżej, spokojnie ją przejrzyj i zatwierdź krótkim kodem (poprosisz o niego jednym kliknięciem na stronie).`,
+        bodyHtml: `<p style="margin:0 0 4px;font:400 14px/1.6 Arial,sans-serif;color:#33353d">Gdy tylko zatwierdzisz umowę, wyślemy numer do wpłaty zadatku i blokujemy dla Ciebie ten dzień. Masz pytania? Po prostu odpisz na tę wiadomość — chętnie pomożemy.</p>`,
+        cta: { label: "Przejrzyj i podpisz umowę", url: link },
+        footerNote: `Link ważny ${TOKEN_TTL_DAYS} dni.`,
       }),
     });
     emailSkipped = Boolean(r.skipped);

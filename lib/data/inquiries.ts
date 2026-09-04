@@ -129,6 +129,13 @@ export async function reactivateInquiry(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// Zmiana samego statusu (np. „umowa wysłana" → OFFER_SENT) + stempel aktywności.
+export async function setInquiryStatus(id: string, status: InquiryStatus): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("inquiries").update({ status, last_activity_at: nowIso() }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function setInquiryAutoCloseBlocked(id: string, blocked: boolean): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("inquiries").update({ auto_close_blocked: blocked }).eq("id", id);

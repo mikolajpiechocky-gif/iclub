@@ -27,24 +27,24 @@ export function emailShell(o: EmailShellOpts): string {
   return `<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;background:#0f1016;padding:24px 12px">
 ${pre}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35)">
-    <tr><td bgcolor="#14151b" align="center" style="background:#14151b;padding:22px 28px;text-align:center">
-      <img src="https://app.iclubevents.pl/logo-iclub.png" alt="iClub" width="150" style="height:auto;width:150px;max-width:70%;display:block;margin:0 auto">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0f1016" style="background:#0f1016"><tr><td align="center">
+  <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:560px">
+    <tr><td bgcolor="#14151b" align="center" style="background:#14151b;background-color:#14151b;padding:24px 28px;text-align:center;border-radius:14px 14px 0 0">
+      <img src="https://app.iclubevents.pl/logo-iclub.png" alt="iClub" width="150" height="53" style="width:150px;height:auto;max-width:70%;display:block;margin:0 auto;border:0;outline:none">
     </td></tr>
-    <tr><td style="height:4px;background:${BRAND}"></td></tr>
-    <tr><td style="padding:30px 28px;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${INK}">
+    <tr><td bgcolor="${BRAND}" style="background:${BRAND};height:4px;line-height:4px;font-size:0">&nbsp;</td></tr>
+    <tr><td bgcolor="#ffffff" style="background:#ffffff;padding:30px 28px;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${INK}">
       <h1 style="margin:0 0 12px;font-size:20px;font-weight:800;color:${INK}">${esc(o.heading)}</h1>
       ${o.intro ? `<p style="margin:0 0 12px;font-size:14.5px;line-height:1.6;color:#33353d">${esc(o.intro)}</p>` : ""}
       ${o.bodyHtml ?? ""}
       ${cta}
     </td></tr>
-    <tr><td style="padding:18px 28px;background:#f6f6f8;border-top:1px solid #ececef;font:400 12px/1.6 Arial,sans-serif;color:#8a8f9c;text-align:center">
+    <tr><td bgcolor="#f6f6f8" style="padding:18px 28px;background:#f6f6f8;border-top:1px solid #ececef;border-radius:0 0 14px 14px;font:400 12px/1.6 Arial,sans-serif;color:#8a8f9c;text-align:center">
       ${o.footerNote ? `<div style="margin-bottom:6px;color:#6b6f7a">${esc(o.footerNote)}</div>` : ""}
       iClub · odpalamy@iclubevents.pl · <a href="https://iclubevents.pl" style="color:${BRAND};text-decoration:none">iclubevents.pl</a>
     </td></tr>
+    <tr><td style="padding:14px 28px 0;font:400 11px/1.5 Arial,sans-serif;color:#5a5e6b;text-align:center">Wiadomość wysłana automatycznie przez system iClub. Jeśli trafiła do Ciebie omyłkowo — zignoruj ją.</td></tr>
   </table>
-  <div style="max-width:560px;margin-top:14px;font:400 11px/1.5 Arial,sans-serif;color:#5a5e6b;text-align:center">Wiadomość wysłana automatycznie przez system iClub. Jeśli trafiła do Ciebie omyłkowo — zignoruj ją.</div>
 </td></tr></table>
 </body></html>`;
 }
