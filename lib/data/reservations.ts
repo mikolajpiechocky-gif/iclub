@@ -342,6 +342,14 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
     const stages = stagesForReservation(input.business_line, input.self_pickup ?? false).map((s, i) => ({ job_id: (job as { id: string }).id, stage_key: s.key, title: s.title, sort: i }));
     const { error: sErr } = await supabase.from("job_stages").insert(stages);
     if (sErr) throw new Error(sErr.message);
+  } else {
+    // §sync KLUCZOWE: zmiana daty/typu/linii rezerwacji MUSI zejść na zlecenie — pracownik czyta
+    // datę ze zlecenia (jobs.event_date). Bez tego widzi starą datę po edycji rezerwacji.
+    const patch: Record<string, unknown> = { business_line: input.business_line };
+    if (input.event_date !== undefined) patch.event_date = input.event_date ?? null;
+    if (input.event_type !== undefined) patch.title = input.event_type ?? "Zlecenie";
+    const { error: juErr } = await supabase.from("jobs").update(patch).eq("id", (existingJob as { id: string }).id);
+    if (juErr) throw new Error(juErr.message);
   }
 }
 
