@@ -10,6 +10,7 @@ import { listJobs } from "@/lib/data/jobs";
 import { listCosts } from "@/lib/data/costs";
 import { listPayments } from "@/lib/data/payments";
 import { listPendingAssignmentRequests, countUnsettledDoneAssignments } from "@/lib/data/assignments";
+import { listServiceTasks } from "@/lib/data/service";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { fuelReminderDue } from "@/lib/data/settings";
 import { listOlxAdverts } from "@/lib/data/olx-adverts";
@@ -25,7 +26,7 @@ const fmtDate = (iso: string | null) =>
 const fmtPLN = (v: number) => new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v);
 
 export default async function DashboardPage() {
-  const [reservations, addonList, inquiries, jobs, profile, fuelDue, adverts, costs, assignmentRequests, unsettledCount, payments] = await Promise.all([
+  const [reservations, addonList, inquiries, jobs, profile, fuelDue, adverts, costs, assignmentRequests, unsettledCount, payments, serviceItems] = await Promise.all([
     listReservations(),
     listReservationAddons(),
     listInquiries(),
@@ -37,7 +38,9 @@ export default async function DashboardPage() {
     listPendingAssignmentRequests(),
     countUnsettledDoneAssignments(),
     listPayments(),
+    listServiceTasks().catch(() => []),
   ]);
+  const openServiceTasks = serviceItems.filter((t) => t.status !== "DONE").length;
   // §4.5 Skrót dodatków realizacji (liczba + najważniejsze nazwy).
   const addonName = new Map(addonList.map((a) => [a.id, a.name]));
   const addonSummary = (ids: string[] | null | undefined) => {
@@ -125,6 +128,10 @@ export default async function DashboardPage() {
     const pendingCosts = costs.filter((c) => c.status === "PENDING");
     if (pendingCosts.length > 0) {
       attention.push({ tone: "warn", title: `Koszty do akceptacji (${pendingCosts.length})`, desc: "Zweryfikuj i zatwierdź zgłoszone koszty realizacji.", href: "/costs" });
+    }
+    // Serwis / czyszczenie — otwarte zadania serwisowe (zebrane z realizacji, termin zwykle poniedziałek).
+    if (openServiceTasks > 0) {
+      attention.push({ tone: "warn", title: `Serwis / czyszczenie (${openServiceTasks})`, desc: "Sprzęt zgłoszony przy demontażu do wyczyszczenia/sprawdzenia — checklista na poniedziałek.", href: "/service" });
     }
     // Pracownicy z saldem do wypłaty (zakończone realizacje, nierozliczone).
     if (unsettledCount > 0) {

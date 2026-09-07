@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createCost } from "@/lib/data/costs";
 import { createIncident } from "@/lib/data/incidents";
+import { createServiceTask } from "@/lib/data/service";
 import { setActualKm } from "@/lib/data/transport";
 import { syncTransportFuelCost } from "@/lib/data/realization-close";
 import { sendPushToOwners } from "@/lib/integrations/push";
@@ -45,14 +46,29 @@ export async function saveActualKmAction(jobId: string, km: string): Promise<Pro
 // §II.8 Demontaż: kontrola sprzętu — status niesprawnej pozycji → wspólna baza zgłoszeń serwisowych.
 export type EqStatus = "Czyszczenie" | "Uszkodzony" | "Brak";
 
+// Najbliższy poniedziałek (≥ dziś) — termin zbiorczego zadania serwisowego po weekendzie.
+function nextMondayISO(): string {
+  const d = new Date();
+  const dow = d.getUTCDay(); // 0=nd..6=sob
+  const add = (8 - (dow === 0 ? 7 : dow)) % 7; // pon=0, wt=6, …, nd=1
+  d.setUTCDate(d.getUTCDate() + add);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function reportEquipmentStatusAction(jobId: string, equipment: string, status: EqStatus, note: string): Promise<ProtocolResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO };
   if (!equipment.trim()) return { ok: false, error: "Brak pozycji." };
   const priority: IncidentPriority = status === "Uszkodzony" ? "HIGH" : status === "Brak" ? "HIGH" : "MEDIUM";
+  const kind = status === "Uszkodzony" ? "Naprawa" : status === "Brak" ? "Uzupełnienie" : "Czyszczenie";
   try {
     await createIncident({ job_id: jobId, category: "Serwis", description: `Demontaż — ${status}${note.trim() ? `: ${note.trim()}` : ""}`, equipment: equipment.trim(), priority });
-    await sendPushToOwners({ title: `Sprzęt: ${status}`, body: equipment.trim(), url: "/media", tag: "teardown-eq" }).catch(() => {});
+    // §serwis Zbiorcze zadanie serwisowe na poniedziałek — wszystkie pozycje z realizacji (weekendowych)
+    // lądują na jednej liście /service (checklista dla Bartka). Termin: najbliższy poniedziałek.
+    await createServiceTask({ kind, equipment: equipment.trim(), description: note.trim() || null, due_date: nextMondayISO() }).catch(() => {});
+    await sendPushToOwners({ title: `Serwis: ${status}`, body: `${equipment.trim()} — na poniedziałek`, url: "/service", tag: "teardown-eq" }).catch(() => {});
     revalidatePath(`/field/${jobId}`);
+    revalidatePath("/service");
+    revalidatePath("/dashboard");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
