@@ -71,7 +71,7 @@ export function ServiceManager({ tasks, overdueDays = {} }: { tasks: ServiceTask
                     {weekly && <span className="rounded-[6px] bg-[#1b2a3f] px-1.5 py-0.5 text-[10px] font-bold text-[#7fa8f5]">co tydzień</span>}
                     {overdue > 0 && <span className="rounded-[6px] bg-[#341a1d] px-1.5 py-0.5 text-[10px] font-bold text-bad">{overdue} {overdue === 1 ? "dzień" : "dni"} po terminie</span>}
                   </div>
-                  <div className="mt-0.5 text-[12px] text-ink-2">{t.description || "—"}{due ? ` · termin ${due}` : ""}</div>
+                  <div className="mt-0.5 text-[12px] text-ink-2">{t.description || "—"}{due ? ` · termin ${due}` : ""}{t.assignee?.full_name ? ` · 👤 ${t.assignee.full_name}` : ""}</div>
                 </div>
                 <Pill label={m.label} fg={m.fg} bg={m.bg} />
                 <div className="flex gap-1.5">

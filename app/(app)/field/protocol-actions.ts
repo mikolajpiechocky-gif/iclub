@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createCost } from "@/lib/data/costs";
 import { createIncident } from "@/lib/data/incidents";
-import { createServiceTask } from "@/lib/data/service";
+import { createServiceTask, defaultServiceAssigneeId } from "@/lib/data/service";
 import { setActualKm } from "@/lib/data/transport";
 import { syncTransportFuelCost } from "@/lib/data/realization-close";
 import { sendPushToOwners } from "@/lib/integrations/push";
@@ -64,7 +64,8 @@ export async function reportEquipmentStatusAction(jobId: string, equipment: stri
     await createIncident({ job_id: jobId, category: "Serwis", description: `Demontaż — ${status}${note.trim() ? `: ${note.trim()}` : ""}`, equipment: equipment.trim(), priority });
     // §serwis Zbiorcze zadanie serwisowe na poniedziałek — wszystkie pozycje z realizacji (weekendowych)
     // lądują na jednej liście /service (checklista dla Bartka). Termin: najbliższy poniedziałek.
-    await createServiceTask({ kind, equipment: equipment.trim(), description: note.trim() || null, due_date: nextMondayISO() }).catch(() => {});
+    const assignee = await defaultServiceAssigneeId().catch(() => null);
+    await createServiceTask({ kind, equipment: equipment.trim(), description: note.trim() || null, due_date: nextMondayISO(), assigned_to: assignee }).catch(() => {});
     await sendPushToOwners({ title: `Serwis: ${status}`, body: `${equipment.trim()} — na poniedziałek`, url: "/service", tag: "teardown-eq" }).catch(() => {});
     revalidatePath(`/field/${jobId}`);
     revalidatePath("/service");

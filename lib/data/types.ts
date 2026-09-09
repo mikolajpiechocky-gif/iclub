@@ -426,6 +426,8 @@ export interface ServiceTaskRecord {
   status: ServiceStatus;
   due_date: string | null;
   recurrence: string | null; // 'WEEKLY' = cotygodniowe (po „Zrobione" tworzy kolejne za 7 dni)
+  assigned_to: string | null;            // profil odpowiedzialny (domyślnie Bartek)
+  assignee?: { full_name: string | null } | null;
   created_at: string;
 }
 

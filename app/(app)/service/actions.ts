@@ -2,7 +2,7 @@
 // Server Actions: zadania serwisowe (§29).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createServiceTask, setServiceStatus } from "@/lib/data/service";
+import { createServiceTask, setServiceStatus, defaultServiceAssigneeId } from "@/lib/data/service";
 import type { ServiceStatus } from "@/lib/data/types";
 
 export interface ServiceFormValues {
@@ -31,6 +31,7 @@ export async function createServiceTaskAction(v: ServiceFormValues): Promise<Act
       description: v.description.trim() || null,
       due_date: v.due_date || null,
       recurrence: v.weekly ? "WEEKLY" : null,
+      assigned_to: await defaultServiceAssigneeId().catch(() => null),
     });
     revalidatePath("/service");
     return { ok: true };
