@@ -10,7 +10,7 @@ import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LAB
 import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, checkAddonAvailabilityAction, checkHeatingAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
 import type { AddonShortage, HeatingAvailability } from "@/lib/data/reservations";
 import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
-import { computeOrderPrice, ADDON_DEPOSIT_PCT } from "@/lib/domain/order-pricing";
+import { computeOrderPrice, ADDON_DEPOSIT_PCT, DEFAULT_DEPOSIT_BASE } from "@/lib/domain/order-pricing";
 import { computeSetupTimes, fmtDuration, type AssemblyConfig } from "@/lib/domain/assembly";
 import type { PackageComposition } from "@/lib/domain/package-composition";
 import { AddressAutocomplete } from "./address-autocomplete";
@@ -213,11 +213,8 @@ export function ReservationForm({
     discount_value: initial?.discount_value != null ? String(initial.discount_value) : (initial?.discount ? String(initial.discount) : ""),
     discount_amount: initial?.discount != null ? String(initial.discount) : "",
     transport_price: initial?.transport_price != null ? String(initial.transport_price) : "",
-    // §13.6 W formularzu „Zadatek" = BAZA (bez transportu). Zapisana zaliczka = baza + transport,
-    // więc przy edycji odejmujemy transport, żeby pokazać samą bazę (round-trip zwraca tę samą kwotę).
-    deposit: initial?.deposit != null
-      ? String(Math.max(0, Math.round((Number(initial.deposit) - (initial?.self_pickup ? 0 : Number(initial?.transport_price ?? 0))) * 100) / 100))
-      : "",
+    // §13.6 „Zadatek" = pełna zaliczka od klienta, przechowywana i pokazywana 1:1 (bez odejmowania transportu).
+    deposit: initial?.deposit != null ? String(Math.round(Number(initial.deposit) * 100) / 100) : "",
     event_start_time: initial?.event_start_time ?? "",
     assembly_time: initial?.assembly_time ?? "",
     pricing_snapshot: initial?.pricing_snapshot ? JSON.stringify(initial.pricing_snapshot) : "",
@@ -354,15 +351,14 @@ export function ReservationForm({
   const order = computeOrderPrice({ packagePrice, addonsTotal, transportPrice, discountType: v.discount_type, discountValue: discountValueNum });
   // §21: ręcznie ustawiona wartość końcowa ma priorytet; inaczej używamy wyliczonej.
   const finalPrice = Number(v.price.replace(",", ".")) || order.total;
-  // §13.6 „Zadatek" = bazowa kwota zaliczki (domyślnie 300 zł). Transport oraz 15% sumy dodatków to
-  // OSOBNE składowe zaliczki pobieranej przy umowie → cała zaliczka = zadatek + transport + 15% dodatków,
-  // a klientowi pozostaje wartość − zaliczka.
-  const depositValue = depositTouched ? v.deposit : "300";
-  const depositNum = Number(depositValue.replace(",", ".")) || 0;
-  const addonsDeposit = v.business_line === "ICLUB" ? Math.round(ADDON_DEPOSIT_PCT * addonsTotal * 100) / 100 : 0; // §13.6 15% od dodatków
-  const fullDeposit = Math.round((depositNum + transportPrice + addonsDeposit) * 100) / 100; // zaliczka przy umowie = zadatek + transport + 15% dodatków
-  const remaining = Math.max(0, Math.round((finalPrice - fullDeposit) * 100) / 100);
-  const depositOverValue = finalPrice > 0 && fullDeposit > finalPrice; // §13.6 ostrzeżenie
+  // §13.6 „Zadatek" = PEŁNA kwota zaliczki od klienta z góry, używana DOKŁADNIE tak, jak wpisana.
+  // „Pozostało do zapłaty" = wartość − zadatek. Nic nie doliczamy na wierzch (to zaniżało pozostało).
+  // Formuła 300 + transport + 15% dodatków służy tylko jako PODPOWIEDŹ (prefill / przycisk).
+  const addonsDeposit = v.business_line === "ICLUB" ? Math.round(ADDON_DEPOSIT_PCT * addonsTotal * 100) / 100 : 0; // §13.6 15% od dodatków (do podpowiedzi)
+  const suggestedDeposit = v.business_line === "ICLUB" ? Math.round((DEFAULT_DEPOSIT_BASE + transportPrice + addonsDeposit) * 100) / 100 : 0;
+  const depositNum = v.business_line === "EQUIPMENT_RENTAL" ? 0 : (depositTouched ? (Number(v.deposit.replace(",", ".")) || 0) : suggestedDeposit);
+  const remaining = Math.max(0, Math.round((finalPrice - depositNum) * 100) / 100);
+  const depositOverValue = finalPrice > 0 && depositNum > finalPrice; // ostrzeżenie: zadatek > wartość
 
   // §14.3 Transport rezerwacji z adresu (odległość w jedną stronę → widełki).
   const computeTransport = () => {
@@ -391,7 +387,7 @@ export function ReservationForm({
       discount_type: v.discount_type,
       discount_value: discountValueNum,
       discount_amount: order.discountAmount,
-      deposit: fullDeposit,
+      deposit: depositNum,
       total: order.total,
       saved_at: new Date().toISOString(),
     };
@@ -405,7 +401,7 @@ export function ReservationForm({
       // a nie puste pole — inaczej przychód/rentowność rezerwacji pokazywały 0 zł.
       price: v.price.trim() !== "" ? v.price : String(order.total),
       discount_amount: String(order.discountAmount),
-      deposit: String(fullDeposit),
+      deposit: String(depositNum),
       // Wypożyczalnia: rental_items = nazwy wybranego sprzętu (z ilością) — do tytułu w kalendarzu i opisu.
       rental_items: v.business_line === "EQUIPMENT_RENTAL"
         ? addons.filter((a) => v.addon_ids.includes(a.id)).map((a) => (v.addon_qty?.[a.id] ?? 1) > 1 ? `${a.name} ×${v.addon_qty[a.id]}` : a.name).join(", ")
@@ -651,8 +647,15 @@ export function ReservationForm({
             {/* Zadatek tylko dla iClub — wypożyczalnia nie pobiera zadatku. */}
             {v.business_line === "ICLUB" && (
               <div>
-                <TextField label="Zadatek (zł)" inputMode="numeric" placeholder="300" value={depositValue} onChange={(e) => { setDepositTouched(true); set("deposit", e.target.value); }} error={errors.deposit} />
-                <div className="mt-1 text-[11px] text-ink-2">Zaliczka przy umowie = zadatek + transport{addonsDeposit > 0 && " + 15% dodatków"} = <span className="font-semibold text-ink">{fmtPLN(fullDeposit)}</span></div>
+                <TextField label="Zadatek / zaliczka od klienta (zł)" inputMode="numeric" placeholder="0" value={depositTouched ? v.deposit : String(suggestedDeposit)} onChange={(e) => { setDepositTouched(true); set("deposit", e.target.value); }} error={errors.deposit} />
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-2">
+                  <span>Pozostało do zapłaty: <span className="font-semibold text-ink">{fmtPLN(remaining)}</span> (wartość − zadatek)</span>
+                  {suggestedDeposit > 0 && (
+                    <button type="button" onClick={() => { setDepositTouched(true); set("deposit", String(suggestedDeposit)); }} className="font-semibold text-accent-soft">
+                      Podpowiedź {fmtPLN(suggestedDeposit)} (300 + transport{addonsDeposit > 0 ? " + 15% dodatków" : ""}) →
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             <SelectField label="Rabat" value={v.discount_type} onChange={(e) => set("discount_type", e.target.value === "PERCENT" ? "PERCENT" : "AMOUNT")}>
@@ -721,9 +724,7 @@ export function ReservationForm({
             {Math.round(finalPrice) !== Math.round(order.total) && (
               <div className="flex justify-between text-[11px] text-ink-2"><span>Wyliczona (pakiet+dodatki+transport−rabat)</span><span>{fmtPLN(order.total)}</span></div>
             )}
-            {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Zadatek</span><span className="font-semibold text-ink">− {fmtPLN(depositNum)}</span></div>}
-            {v.business_line === "ICLUB" && !v.self_pickup && <div className="flex justify-between"><span className="text-ink-2">Transport (składowa zadatku)</span><span className="font-semibold text-ink">− {fmtPLN(transportPrice)}</span></div>}
-            {v.business_line === "ICLUB" && addonsDeposit > 0 && <div className="flex justify-between"><span className="text-ink-2">Zaliczka za dodatki (15%)</span><span className="font-semibold text-ink">− {fmtPLN(addonsDeposit)}</span></div>}
+            {v.business_line === "ICLUB" && <div className="flex justify-between"><span className="text-ink-2">Zadatek / zaliczka (od klienta z góry)</span><span className="font-semibold text-ink">− {fmtPLN(depositNum)}</span></div>}
             {v.business_line === "ICLUB" && <div className="mt-1 flex justify-between border-t border-border-soft pt-2 text-[14px] font-bold text-warn"><span>Pozostało do zapłaty</span><span>{fmtPLN(remaining)}</span></div>}
             {depositOverValue && (
               <div className="rounded-[9px] border border-[#3a1c1f] bg-[#251215] px-2.5 py-1.5 text-[11.5px] font-semibold text-bad">Zadatek przekracza wartość rezerwacji — zmniejsz go, aby zapisać.</div>
