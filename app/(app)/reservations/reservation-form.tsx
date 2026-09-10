@@ -10,7 +10,7 @@ import { RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS, INQUIRY_SOURCE_LAB
 import { createReservationAction, updateReservationAction, checkTentAvailabilityAction, checkAddonAvailabilityAction, checkHeatingAvailabilityAction, computeReservationTransportAction, type ReservationFormValues, type TentConflict } from "./actions";
 import type { AddonShortage, HeatingAvailability } from "@/lib/data/reservations";
 import { MAIN_TENT_OPTIONS, EXTRA_TENT_OPTIONS, choiceFromTent } from "@/lib/domain/tents";
-import { computeOrderPrice, ADDON_DEPOSIT_PCT, DEFAULT_DEPOSIT_BASE } from "@/lib/domain/order-pricing";
+import { computeOrderPrice, DEFAULT_DEPOSIT_BASE } from "@/lib/domain/order-pricing";
 import { computeSetupTimes, fmtDuration, type AssemblyConfig } from "@/lib/domain/assembly";
 import type { PackageComposition } from "@/lib/domain/package-composition";
 import { AddressAutocomplete } from "./address-autocomplete";
@@ -353,9 +353,8 @@ export function ReservationForm({
   const finalPrice = Number(v.price.replace(",", ".")) || order.total;
   // §13.6 „Zadatek" = PEŁNA kwota zaliczki od klienta z góry, używana DOKŁADNIE tak, jak wpisana.
   // „Pozostało do zapłaty" = wartość − zadatek. Nic nie doliczamy na wierzch (to zaniżało pozostało).
-  // Formuła 300 + transport + 15% dodatków służy tylko jako PODPOWIEDŹ (prefill / przycisk).
-  const addonsDeposit = v.business_line === "ICLUB" ? Math.round(ADDON_DEPOSIT_PCT * addonsTotal * 100) / 100 : 0; // §13.6 15% od dodatków (do podpowiedzi)
-  const suggestedDeposit = v.business_line === "ICLUB" ? Math.round((DEFAULT_DEPOSIT_BASE + transportPrice + addonsDeposit) * 100) / 100 : 0;
+  // Podpowiedź w RĘCZNYM formularzu = 300 + transport (15% od dodatków dolicza TYLKO konfigurator).
+  const suggestedDeposit = v.business_line === "ICLUB" ? Math.round((DEFAULT_DEPOSIT_BASE + transportPrice) * 100) / 100 : 0;
   const depositNum = v.business_line === "EQUIPMENT_RENTAL" ? 0 : (depositTouched ? (Number(v.deposit.replace(",", ".")) || 0) : suggestedDeposit);
   const remaining = Math.max(0, Math.round((finalPrice - depositNum) * 100) / 100);
   const depositOverValue = finalPrice > 0 && depositNum > finalPrice; // ostrzeżenie: zadatek > wartość
@@ -652,7 +651,7 @@ export function ReservationForm({
                   <span>Pozostało do zapłaty: <span className="font-semibold text-ink">{fmtPLN(remaining)}</span> (wartość − zadatek)</span>
                   {suggestedDeposit > 0 && (
                     <button type="button" onClick={() => { setDepositTouched(true); set("deposit", String(suggestedDeposit)); }} className="font-semibold text-accent-soft">
-                      Podpowiedź {fmtPLN(suggestedDeposit)} (300 + transport{addonsDeposit > 0 ? " + 15% dodatków" : ""}) →
+                      Podpowiedź {fmtPLN(suggestedDeposit)} (300 + transport) →
                     </button>
                   )}
                 </div>
