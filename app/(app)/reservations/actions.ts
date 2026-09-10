@@ -92,10 +92,13 @@ function validate(v: ReservationFormValues): Record<string, string> {
     const val = num(v[k]);
     if (val && isNaN(Number(val.replace(",", ".")))) e[k] = `${label} musi być liczbą.`;
   }
-  // §13.6 Zadatek nie może przekroczyć wartości końcowej rezerwacji.
-  const priceN = toNumber(v.price);
-  const depositN = toNumber(v.deposit);
-  if (priceN != null && depositN != null && depositN > priceN) e.deposit = "Zadatek nie może przekroczyć wartości rezerwacji.";
+  // §13.6 Zadatek nie może przekroczyć wartości końcowej rezerwacji. TYLKO iClub — wypożyczalnia nie
+  // pobiera zadatku (toInput i tak wymusza 0), a stara wartość z pola po przełączeniu linii nie może blokować.
+  if (v.business_line !== "EQUIPMENT_RENTAL") {
+    const priceN = toNumber(v.price);
+    const depositN = toNumber(v.deposit);
+    if (priceN != null && depositN != null && depositN > priceN) e.deposit = "Zadatek nie może przekroczyć wartości rezerwacji.";
+  }
   // §18 Wypożyczalnia: gdy wyłączono rozliczenie godzinowe, ryczałt musi być podany i > 0 — inaczej
   // toNumber('') === null i zapis po cichu wraca do godzinowego (pracownik nic nie dostaje „do wypłaty").
   // Guard na linię, bo rental_hourly nie jest resetowany przy zmianie linii (bez guardu iClub dostałby fałszywy błąd).
