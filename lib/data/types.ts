@@ -6,7 +6,7 @@
 export type UserRole = "OWNER" | "EMPLOYEE";
 export type CustomerType = "PRIVATE" | "COMPANY";
 export type InquiryStatus = "NEW" | "CONTACTED" | "OFFER_SENT" | "WAITING" | "WON" | "LOST" | "REHEATED";
-export type InquirySource = "OLX" | "PHONE" | "WEBSITE_FORM" | "REFERRAL" | "FACEBOOK" | "INSTAGRAM" | "OTHER";
+export type InquirySource = "OLX" | "PHONE" | "WEBSITE_FORM" | "WEBSITE_CONTACT" | "REFERRAL" | "FACEBOOK" | "INSTAGRAM" | "OTHER";
 
 export interface ProfileRecord {
   id: string;
@@ -120,6 +120,7 @@ export const INQUIRY_SOURCE_LABELS: Record<InquirySource, string> = {
   OLX: "OLX",
   PHONE: "Telefon",
   WEBSITE_FORM: "Konfigurator",
+  WEBSITE_CONTACT: "Formularz kontaktowy",
   REFERRAL: "Polecenie",
   FACEBOOK: "Facebook Marketplace",
   INSTAGRAM: "Instagram",

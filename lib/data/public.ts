@@ -152,6 +152,7 @@ export interface PublicInquiryInput {
   estimate?: { value?: number; transport?: number; deposit?: number; remaining?: number; discount?: number };
   contact?: { name?: string; phone?: string; email?: string };
   message?: string;
+  origin?: "configurator" | "contact"; // które źródło ze strony: konfigurator vs prosty formularz kontaktowy
 }
 
 const zl = (n: number | undefined) => (n == null ? "—" : `${Math.round(n * 100) / 100} zł`);
@@ -165,16 +166,27 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
   }
   const s = createAdminClient();
 
+  // Rozróżnienie źródła ze strony: konfigurator (pełna konfiguracja: namiot/pakiet/wycena/sprzęt)
+  // vs prosty formularz kontaktowy (samo imię + wiadomość). Priorytet ma jawny `origin` ze strony.
+  const hasConfig = Boolean(
+    input.tentMain || input.package || input.estimate?.value != null ||
+    (input.addons?.length ?? 0) > 0 || (input.rentalItems?.length ?? 0) > 0 || input.line === "RENTAL",
+  );
+  const isConfigurator = input.origin ? input.origin === "configurator" : hasConfig;
+  const source: "WEBSITE_FORM" | "WEBSITE_CONTACT" = isConfigurator ? "WEBSITE_FORM" : "WEBSITE_CONTACT";
+
   const isRental = input.line === "RENTAL";
   const items = isRental ? (input.rentalItems ?? []) : (input.addons ?? []);
   const itemsStr = items.map((a) => `${a.name ?? a.code}${(a.qty ?? 1) > 1 ? ` ×${a.qty}` : ""}`).filter(Boolean).join(", ");
   const tents = [input.tentMain, input.tentExtra].filter(Boolean).join(" + ");
-  const eventType = isRental
-    ? `Wypożyczalnia${input.rentalDays ? ` · ${input.rentalDays} dób` : ""}`
-    : `iClub${input.package ? ` · ${input.package}` : ""}${tents ? ` · ${tents}` : ""}`;
+  const eventType = !isConfigurator
+    ? "Zapytanie ze strony"
+    : isRental
+      ? `Wypożyczalnia${input.rentalDays ? ` · ${input.rentalDays} dób` : ""}`
+      : `iClub${input.package ? ` · ${input.package}` : ""}${tents ? ` · ${tents}` : ""}`;
 
   // Pełne podsumowanie w notatce (gwarantowana kolumna) — obsługa widzi całość leada.
-  const notes = [
+  const notes = (isConfigurator ? [
     "ZGŁOSZENIE Z KONFIGURATORA",
     `Kontakt: ${[c.name, c.phone, c.email].filter(Boolean).join(" · ") || "—"}`,
     `Linia: ${isRental ? "Wypożyczalnia" : "iClub"}`,
@@ -191,7 +203,13 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
     input.estimate && `Wycena konfiguratora: wartość ${zl(input.estimate.value)}, transport ${zl(input.estimate.transport)}, ${input.estimate.discount ? `rabat ${zl(input.estimate.discount)}` : "rabat: brak"}, zadatek ${zl(input.estimate.deposit)}, pozostało ${zl(input.estimate.remaining)}`,
     input.message?.trim() && `Wiadomość: ${input.message.trim()}`,
     "(Wycena orientacyjna — do potwierdzenia; bez wiążącej rezerwacji.)",
-  ].filter(Boolean).join("\n");
+  ] : [
+    "WIADOMOŚĆ Z FORMULARZA KONTAKTOWEGO",
+    `Kontakt: ${[c.name, c.phone, c.email].filter(Boolean).join(" · ") || "—"}`,
+    input.eventDate && `Termin: ${input.eventDate}`,
+    input.location && `Lokalizacja: ${input.location}`,
+    input.message?.trim() && `Wiadomość: ${input.message.trim()}`,
+  ]).filter(Boolean).join("\n");
 
   // Nr z konfiguratora (jeśli klient/konfigurator wpisał go w wiadomości, np. „IC-2026-9619").
   const configNo = input.message?.match(/\b([A-Z]{2}-\d{4}-\d{3,})\b/)?.[1] ?? null;
@@ -210,7 +228,7 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
   };
 
   const { data, error } = await s.from("inquiries").insert({
-    source: "WEBSITE_FORM",
+    source,
     status: "NEW",
     contact_name: c.name?.trim() || null,     // §konfigurator: klient widoczny na liście (nie tylko w notatce)
     contact_email: c.email?.trim() || null,
@@ -223,17 +241,18 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
     package_interest: input.package || null,
     addons_note: itemsStr || null,
     notes,
-    config_json: config,
+    config_json: isConfigurator ? config : null,   // strukturę zapisujemy tylko dla konfiguratora
   }).select("id").single();
 
   if (error) return { ok: false, error: error.message };
   const newId = (data as { id: string }).id;
 
+  const pushTitle = isConfigurator ? "Nowe zgłoszenie z konfiguratora" : "Nowa wiadomość z formularza kontaktowego";
   sendPushToOwners({
-    title: "Nowe zgłoszenie z konfiguratora",
-    body: `${c.name?.trim() || "Klient"}${c.phone?.trim() ? ` · ${c.phone.trim()}` : ""} — ${eventType}`,
+    title: pushTitle,
+    body: `${c.name?.trim() || "Klient"}${c.phone?.trim() ? ` · ${c.phone.trim()}` : ""}${isConfigurator ? ` — ${eventType}` : ""}`,
     url: `/inquiries/${newId}/edit`,
-    tag: `configurator-lead-${newId}`,      // unikalny tag — kolejne zgłoszenia nie nadpisują poprzednich
+    tag: `web-lead-${newId}`,      // unikalny tag — kolejne zgłoszenia nie nadpisują poprzednich
   }).catch(() => {});
 
   // Wpis w panelu powiadomień (per szef) — inaczej lead jest tylko w push, nie na liście.
@@ -242,7 +261,7 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
     if (owners.length) {
       await s.from("notifications").insert(owners.map((oid) => ({
         recipient: oid,
-        title: "Nowe zgłoszenie z konfiguratora",
+        title: pushTitle,
         body: `${c.name?.trim() || "Klient"} — ${eventType}`,
         type: "INQUIRY",
       })));
@@ -256,10 +275,12 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
       subject: "Mamy Twoje zgłoszenie 🎉 · iClub",
       replyTo: "odpalamy@iclubevents.pl",
       html: emailShell({
-        preheader: "Dziękujemy za zgłoszenie z konfiguratora iClub.",
+        preheader: isConfigurator ? "Dziękujemy za zgłoszenie z konfiguratora iClub." : "Dziękujemy za wiadomość — odezwiemy się wkrótce.",
         heading: `Dziękujemy${c.name?.trim() ? ", " + c.name.trim() : ""}! 🎉`,
-        intro: `Otrzymaliśmy Twoje zgłoszenie z konfiguratora iClub${input.eventDate ? ` na termin ${input.eventDate}` : ""}. Wkrótce potwierdzimy dostępność i prześlemy szczegóły oraz sposób płatności.`,
-        bodyHtml: `<p style="margin:0;font:400 13.5px/1.6 Arial,sans-serif;color:#6b6f7a">To potwierdzenie przyjęcia zgłoszenia — nie jest to jeszcze wiążąca rezerwacja. Możesz odpisać na tę wiadomość, jeśli masz pytania.</p>`,
+        intro: isConfigurator
+          ? `Otrzymaliśmy Twoje zgłoszenie z konfiguratora iClub${input.eventDate ? ` na termin ${input.eventDate}` : ""}. Wkrótce potwierdzimy dostępność i prześlemy szczegóły oraz sposób płatności.`
+          : `Dziękujemy za wiadomość przez formularz na iclubevents.pl. Otrzymaliśmy ją i odezwiemy się do Ciebie tak szybko, jak to możliwe.`,
+        bodyHtml: `<p style="margin:0;font:400 13.5px/1.6 Arial,sans-serif;color:#6b6f7a">${isConfigurator ? "To potwierdzenie przyjęcia zgłoszenia — nie jest to jeszcze wiążąca rezerwacja. " : ""}Możesz odpisać na tę wiadomość, jeśli masz pytania.</p>`,
         footerNote: "Zespół iClub",
       }),
     }).catch(() => {});

@@ -49,7 +49,7 @@ export async function runLeadReminderSweep(): Promise<{ ok: boolean; sent: numbe
   const { data } = await s.from("inquiries")
     .select("id, source, status, contact_name, contact_email, event_type, location, created_at, olx_last_message_at, olx_messages, reminder_stage")
     .eq("status", "NEW")
-    .in("source", ["WEBSITE_FORM", "OLX"]);
+    .in("source", ["WEBSITE_FORM", "WEBSITE_CONTACT", "OLX"]);
   const rows = (data ?? []) as LeadRow[];
   if (!rows.length) return { ok: true, sent: 0 };
 

@@ -166,6 +166,13 @@ export default async function EditInquiryPage({ params }: { params: Promise<{ id
             </div>
           )}
 
+          {inquiry.source === "WEBSITE_CONTACT" && (view.message || inquiry.notes) && (
+            <div className="mt-2.5 rounded-card border border-border-soft bg-surface-2 p-3">
+              <div className="mb-1 text-[11.5px] font-bold text-ink-2">✉️ Wiadomość z formularza kontaktowego</div>
+              <div className="whitespace-pre-wrap break-words text-[13px] text-ink">{view.message || inquiry.notes}</div>
+            </div>
+          )}
+
           {isOlx && (
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <span className="rounded-[7px] px-2 py-1 text-[11.5px] font-bold" style={{ color: stageMeta.fg, background: stageMeta.bg }}>

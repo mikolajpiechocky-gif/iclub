@@ -120,6 +120,19 @@ export default async function DashboardPage() {
         href: `/inquiries/${q.id}/edit`,
       });
     }
+    // Wiadomości z formularza kontaktowego (nie konfigurator) — świeże, wymagają odpowiedzi.
+    const contactLeads = inquiries
+      .filter((q) => q.status === "NEW" && q.source === "WEBSITE_CONTACT"
+        && (q.last_activity_at ?? q.created_at ?? "").slice(0, 10) >= days14Str)
+      .sort((a, b) => ((a.created_at ?? "") < (b.created_at ?? "") ? -1 : 1));
+    for (const q of contactLeads.slice(0, 6)) {
+      attention.push({
+        tone: "info",
+        title: "✉️ Formularz kontaktowy — odpisz",
+        desc: `${inquiryDisplayName(q)}${q.created_at ? " · " + fmtDate(q.created_at) : ""}`,
+        href: `/inquiries/${q.id}/edit`,
+      });
+    }
     // Prośby pracowników o przypisanie — priorytet (blokują realizację).
     for (const req of assignmentRequests.slice(0, 5)) {
       attention.push({ tone: "bad", title: "Prośba o przypisanie", desc: `${req.employeeName} → ${req.title}${req.eventDate ? " · " + fmtDate(req.eventDate) : ""}`, href: req.reservationId ? `/reservations/${req.reservationId}` : `/jobs/${req.jobId}` });
