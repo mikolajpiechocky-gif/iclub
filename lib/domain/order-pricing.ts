@@ -1,6 +1,6 @@
 // §13 Kalkulacja ceny zamówienia rezerwacji (brutto, §22).
-// Cena końcowa = pakiet + dodatki + transport − rabat. Rabat obejmuje CAŁĄ wartość
-// (pakiet + dodatki + transport). Zadatek = 300 zł + transport + 15% sumy dodatków (§13.6).
+// Cena końcowa = pakiet + dodatki + transport − rabat. RABAT LICZY SIĘ TYLKO OD PAKIETU + DODATKÓW,
+// nigdy od transportu (transport to koszt dojazdu, nie podlega negocjacji). Zadatek osobno (§13.6).
 
 export type DiscountType = "AMOUNT" | "PERCENT";
 
@@ -16,22 +16,26 @@ export interface OrderPriceInput {
 }
 
 export interface OrderPrice {
-  base: number;           // pakiet + dodatki + transport (przed rabatem)
-  discountAmount: number; // faktyczna kwota rabatu
-  total: number;          // base − rabat (nie mniej niż 0)
+  base: number;             // pakiet + dodatki + transport (przed rabatem)
+  discountBase: number;     // podstawa rabatu = pakiet + dodatki (BEZ transportu)
+  discountAmount: number;   // faktyczna kwota rabatu
+  total: number;            // base − rabat (nie mniej niż 0)
 }
 
-// §13.4/§13.5 Cena końcowa z rabatem obejmującym całe zamówienie.
+// §13.4/§13.5 Cena końcowa. Rabat (% lub kwotowy) liczony WYŁĄCZNIE od pakietu + dodatków —
+// transport nigdy nie jest rabatowany. Rabat nie może przekroczyć wartości pakietu + dodatków.
 export function computeOrderPrice(i: OrderPriceInput): OrderPrice {
-  const base = round2((i.packagePrice || 0) + (i.addonsTotal || 0) + (i.transportPrice || 0));
+  const discountBase = round2((i.packagePrice || 0) + (i.addonsTotal || 0)); // pakiet + dodatki
+  const transport = round2(i.transportPrice || 0);
+  const base = round2(discountBase + transport);
   let discountAmount = 0;
   if (i.discountType === "PERCENT") {
-    discountAmount = round2((base * clamp(i.discountValue || 0, 0, 100)) / 100);
+    discountAmount = round2((discountBase * clamp(i.discountValue || 0, 0, 100)) / 100);
   } else {
     discountAmount = round2(Math.max(0, i.discountValue || 0));
   }
-  discountAmount = Math.min(discountAmount, base); // rabat nie może przekroczyć wartości zamówienia
-  return { base, discountAmount, total: round2(base - discountAmount) };
+  discountAmount = Math.min(discountAmount, discountBase); // rabat max = pakiet + dodatki (nie tyka transportu)
+  return { base, discountBase, discountAmount, total: round2(base - discountAmount) };
 }
 
 export const DEFAULT_DEPOSIT_BASE = 300; // §13.6 domyślny zadatek bazowy (zł)

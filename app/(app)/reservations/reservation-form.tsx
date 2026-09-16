@@ -661,7 +661,7 @@ export function ReservationForm({
               <option value="AMOUNT">Kwotowy (zł)</option>
               <option value="PERCENT">Procentowy (%)</option>
             </SelectField>
-            <TextField label={v.discount_type === "PERCENT" ? "Rabat (%)" : "Rabat (zł)"} inputMode="decimal" placeholder="0" value={v.discount_value} onChange={(e) => set("discount_value", e.target.value)} error={errors.discount_value} hint={v.discount_type === "PERCENT" && order.discountAmount > 0 ? `= ${fmtPLN(order.discountAmount)}` : undefined} />
+            <TextField label={v.discount_type === "PERCENT" ? "Rabat (%)" : "Rabat (zł)"} inputMode="decimal" placeholder="0" value={v.discount_value} onChange={(e) => set("discount_value", e.target.value)} error={errors.discount_value} hint={order.discountAmount > 0 ? `= ${fmtPLN(order.discountAmount)} · tylko od pakietu + dodatków (nie od transportu)` : "Rabat tylko od pakietu + dodatków (nie od transportu)"} />
             <SelectField label="Źródło" value={v.source} onChange={(e) => set("source", e.target.value)}>
               <option value="">— nie podano —</option>
               {(Object.keys(INQUIRY_SOURCE_LABELS) as (keyof typeof INQUIRY_SOURCE_LABELS)[]).map((s) => (
