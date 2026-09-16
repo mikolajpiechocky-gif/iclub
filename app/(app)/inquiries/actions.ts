@@ -141,6 +141,25 @@ export async function previewContractForInquiryAction(inquiryId: string, ov: Esi
   return { ok: r.ok, html: r.html, error: r.error };
 }
 
+// §pulpit „✕" na kaflu z konfiguratora — schowaj obsłużony/nieaktualny lead z pulpitu.
+// Ustawia LOST (odrzucone) → schodzi z sekcji „Zgłoszenia z konfiguratora" i z powiadomień.
+// Odwracalne przez „Odgrzej" na zapytaniu.
+export async function dismissInquiryAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef." };
+  try {
+    await setInquiryStatus(id, "LOST");
+    await syncInquiryNotifications(id, "LOST").catch(() => {});
+    revalidatePath("/dashboard");
+    revalidatePath("/inquiries");
+    revalidatePath("/notifications");
+    return { ok: true, id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się schować." };
+  }
+}
+
 // Usunięcie zapytania (np. testowe) — tylko Szef.
 export async function deleteInquiryAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };

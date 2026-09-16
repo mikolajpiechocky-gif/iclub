@@ -17,8 +17,9 @@ import { listOlxAdverts } from "@/lib/data/olx-adverts";
 import { analyzeFleet } from "@/lib/domain/olx-adverts";
 import { olxNeedsResponse } from "@/lib/domain/lead-analysis";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { RESERVATION_STATUS_META, inquiryDisplayName } from "@/lib/data/types";
+import { RESERVATION_STATUS_META, inquiryDisplayName, INQUIRY_STATUS_LABELS } from "@/lib/data/types";
 import { warsawTodayISO } from "@/lib/domain/dates";
+import { DismissLeadX } from "./dismiss-lead";
 
 export const dynamic = "force-dynamic";
 const fmtDate = (iso: string | null) =>
@@ -133,6 +134,18 @@ export default async function DashboardPage() {
         href: `/inquiries/${q.id}/edit`,
       });
     }
+    // Konfigurator W TOKU (już procedowany — nie „nowy") → do „Wymaga uwagi", żeby dokończyć.
+    const inProgressConfig = inquiries
+      .filter((q) => q.source === "WEBSITE_FORM" && ["CONTACTED", "OFFER_SENT", "WAITING", "REHEATED"].includes(q.status))
+      .sort((a, b) => ((a.last_activity_at ?? "") < (b.last_activity_at ?? "") ? -1 : 1));
+    for (const q of inProgressConfig.slice(0, 6)) {
+      attention.push({
+        tone: "info",
+        title: "🌐 Konfigurator w toku — dokończ",
+        desc: `${inquiryDisplayName(q)}${q.event_type ? " · " + q.event_type : ""} · ${INQUIRY_STATUS_LABELS[q.status]}`,
+        href: `/inquiries/${q.id}/edit`,
+      });
+    }
     // Prośby pracowników o przypisanie — priorytet (blokują realizację).
     for (const req of assignmentRequests.slice(0, 5)) {
       attention.push({ tone: "bad", title: "Prośba o przypisanie", desc: `${req.employeeName} → ${req.title}${req.eventDate ? " · " + fmtDate(req.eventDate) : ""}`, href: req.reservationId ? `/reservations/${req.reservationId}` : `/jobs/${req.jobId}` });
@@ -192,7 +205,9 @@ export default async function DashboardPage() {
             {configLeads.slice(0, 6).map((q) => {
               const est = configEstValue(q);
               return (
-                <Link key={q.id} href={`/inquiries/${q.id}/edit`} className="flex items-start gap-3 rounded-[12px] border border-[#243654] bg-[#0f1a2b] px-3.5 py-3 transition hover:border-[#37527e] hover:bg-[#132238]">
+                <div key={q.id} className="relative">
+                <DismissLeadX id={q.id} />
+                <Link href={`/inquiries/${q.id}/edit`} className="flex items-start gap-3 rounded-[12px] border border-[#243654] bg-[#0f1a2b] px-3.5 py-3 pr-9 transition hover:border-[#37527e] hover:bg-[#132238]">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <span className="truncate text-[14px] font-bold text-white">{inquiryDisplayName(q)}</span>
@@ -209,6 +224,7 @@ export default async function DashboardPage() {
                     <div className="mt-1 text-[11px] font-semibold text-[#7fa8f5]">Otwórz →</div>
                   </div>
                 </Link>
+                </div>
               );
             })}
           </div>
