@@ -4,6 +4,7 @@ import { EmptyState, Pill } from "@/components/ui";
 import { Avatar } from "@/components/avatar";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import { listAssignedJobs, listClaimableJobs } from "@/lib/data/jobs";
+import { listOpenServiceTasksForAssignee } from "@/lib/data/service";
 import { getSettings } from "@/lib/data/settings";
 import { getEmployee } from "@/lib/data/employees";
 import { countOccupiedIclubByMonth } from "@/lib/data/jobs";
@@ -26,10 +27,11 @@ const fmtPLN2 = (v: number) =>
 
 export default async function EmployeeDashboardPage() {
   const profile = await getCurrentProfile();
-  const [jobs, claimable] = profile
-    ? await Promise.all([listAssignedJobs(profile.id), listClaimableJobs(profile.id)])
-    : [[], []];
+  const [jobs, claimable, serviceTasks] = profile
+    ? await Promise.all([listAssignedJobs(profile.id), listClaimableJobs(profile.id), listOpenServiceTasksForAssignee(profile.id).catch(() => [])])
+    : [[], [], []];
   const demo = !isSupabaseConfigured();
+  const fmtSrvDate = (iso: string | null) => (iso ? new Date(iso + "T00:00:00Z").toLocaleDateString("pl-PL", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" }) : "bez terminu");
 
   const todayStr = warsawTodayISO();
   const upcoming = jobs
@@ -107,6 +109,26 @@ export default async function EmployeeDashboardPage() {
 
       {demo && (
         <div className="mb-4 flex items-center gap-2 rounded-card border border-[#3d3216] bg-[#241e10] px-4 py-3 text-[12px] text-warn">Tryb demo — dane przykładowe.</div>
+      )}
+
+      {/* §serwis Zadania serwisowe/czyszczenia przypisane do pracownika — czekają w jego kokpicie. */}
+      {serviceTasks.length > 0 && (
+        <Link href="/service" className="mb-4 block rounded-[16px] border border-[#274063] bg-gradient-to-b from-[#12203a] to-[#0e1826] p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-[15px]">🧽</span>
+            <span className="font-display text-[14px] font-bold text-white">Serwis i czyszczenie</span>
+            <span className="ml-auto rounded-[7px] bg-[#1b2f4d] px-2 py-0.5 text-[12px] font-bold text-[#9fc0ff]">{serviceTasks.length}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            {serviceTasks.slice(0, 4).map((t) => (
+              <div key={t.id} className="flex items-center justify-between gap-2 text-[12.5px]">
+                <span className="min-w-0 flex-1 truncate text-ink">{t.kind}{t.equipment ? ` · ${t.equipment}` : ""}</span>
+                <span className="flex-none text-[11px] font-semibold text-[#9fc0ff]">{fmtSrvDate(t.due_date)}</span>
+              </div>
+            ))}
+            {serviceTasks.length > 4 && <span className="text-[11.5px] text-ink-2">+{serviceTasks.length - 4} więcej — otwórz listę</span>}
+          </div>
+        </Link>
       )}
 
       {next ? (

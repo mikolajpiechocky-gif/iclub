@@ -1,6 +1,8 @@
 // Warstwa danych: zadania serwisowe (§29).
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { sendPushToUsers } from "@/lib/integrations/push";
+import { createNotification } from "./notifications";
 import type { ServiceTaskRecord, ServiceStatus } from "./types";
 
 const DEMO_SERVICE: ServiceTaskRecord[] = [
@@ -30,6 +32,19 @@ export async function listServiceTasks(): Promise<ServiceTaskRecord[]> {
   return (data ?? []) as unknown as ServiceTaskRecord[];
 }
 
+// Otwarte zadania serwisowe przypisane do danego pracownika (do jego kokpitu /me).
+export async function listOpenServiceTasksForAssignee(userId: string): Promise<ServiceTaskRecord[]> {
+  if (!isSupabaseConfigured() || !userId) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("service_tasks")
+    .select("*, assignee:profiles!assigned_to(full_name)")
+    .eq("assigned_to", userId)
+    .neq("status", "DONE")
+    .order("due_date", { ascending: true });
+  return (data ?? []) as unknown as ServiceTaskRecord[];
+}
+
 // Domyślny odpowiedzialny za serwis (Bartek). Szukamy po imieniu; brak → nieprzypisane.
 export async function defaultServiceAssigneeId(): Promise<string | null> {
   if (!isSupabaseConfigured()) return null;
@@ -48,6 +63,13 @@ export async function createServiceTask(input: ServiceInput): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   const { error } = await supabase.from("service_tasks").insert({ ...input, created_by: user?.id ?? null });
   if (error) throw new Error(error.message);
+  // §serwis Powiadom przypisanego (Bartek): push + wpis w dzwonku, żeby zadanie nie umknęło.
+  if (input.assigned_to) {
+    const label = `${input.kind}${input.equipment ? ` · ${input.equipment}` : ""}`;
+    const due = input.due_date ? ` (termin ${input.due_date})` : "";
+    await sendPushToUsers([input.assigned_to], { title: "Nowe zadanie serwisowe", body: `${label}${due}`, url: "/service", tag: "service-task" }).catch(() => {});
+    await createNotification(input.assigned_to, "Nowe zadanie serwisowe", `${label}${due}`, "SERVICE").catch(() => {});
+  }
 }
 
 export async function setServiceStatus(id: string, status: ServiceStatus): Promise<void> {
