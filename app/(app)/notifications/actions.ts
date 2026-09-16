@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { markRead, markAllRead, listMyNotifications, type NotificationRecord } from "@/lib/data/notifications";
+import { markRead, markAllRead, deleteNotification, listMyNotifications, type NotificationRecord } from "@/lib/data/notifications";
 
 export interface ActionResult {
   ok: boolean;
@@ -24,6 +24,14 @@ export async function markReadAction(id: string): Promise<ActionResult> {
 export async function markAllReadAction(): Promise<ActionResult> {
   if (isSupabaseConfigured()) {
     await markAllRead();
+    revalidatePath("/notifications");
+  }
+  return { ok: true };
+}
+
+export async function deleteNotificationAction(id: string): Promise<ActionResult> {
+  if (isSupabaseConfigured()) {
+    await deleteNotification(id);
     revalidatePath("/notifications");
   }
   return { ok: true };

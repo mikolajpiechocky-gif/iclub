@@ -264,6 +264,7 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
         title: pushTitle,
         body: `${c.name?.trim() || "Klient"} — ${eventType}`,
         type: "INQUIRY",
+        inquiry_id: newId,   // §powiadomienia: po obsłużeniu/przegranej znika automatycznie
       })));
     }
   } catch { /* panel opcjonalny — nie blokuje leada */ }

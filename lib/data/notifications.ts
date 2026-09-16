@@ -8,6 +8,7 @@ export interface NotificationRecord {
   title: string;
   body: string | null;
   job_id: string | null;
+  inquiry_id: string | null;
   read: boolean;
   created_at: string;
 }
@@ -43,6 +44,24 @@ export async function unreadCount(): Promise<number> {
 export async function markRead(id: string): Promise<void> {
   const supabase = await createClient();
   await supabase.from("notifications").update({ read: true }).eq("id", id);
+}
+
+// Trwałe usunięcie powiadomienia (przycisk „Usuń").
+export async function deleteNotification(id: string): Promise<void> {
+  const supabase = await createClient();
+  await supabase.from("notifications").delete().eq("id", id);
+}
+
+// §powiadomienia Sync ze statusem zapytania: nowe (NEW) świecą, procedowane gasną (read),
+// wygrane/przegrane znikają (delete). Wołane przy każdej zmianie statusu leada.
+export async function syncInquiryNotifications(inquiryId: string, status: string): Promise<void> {
+  if (!isSupabaseConfigured() || !inquiryId) return;
+  const supabase = await createClient();
+  if (status === "WON" || status === "LOST") {
+    await supabase.from("notifications").delete().eq("inquiry_id", inquiryId);
+  } else if (status !== "NEW") {
+    await supabase.from("notifications").update({ read: true }).eq("inquiry_id", inquiryId).eq("read", false);
+  }
 }
 
 export async function markAllRead(): Promise<void> {

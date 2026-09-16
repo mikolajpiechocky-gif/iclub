@@ -238,8 +238,9 @@ export default async function ReservationHubPage({ params }: { params: Promise<{
             {reservation.pricing_snapshot.discount_amount > 0 && (
               <div className="flex justify-between"><span className="text-ink-2">Rabat</span><span className="font-semibold text-ok">− {fmtPLN(reservation.pricing_snapshot.discount_amount)}</span></div>
             )}
-            <div className="flex justify-between border-t border-border-soft pt-1.5 font-bold text-white"><span>Razem</span><span>{fmtPLN(reservation.pricing_snapshot.total)}</span></div>
-            <div className="flex justify-between"><span className="text-ink-2">Zadatek</span><span className="font-semibold text-ink">{fmtPLN(reservation.pricing_snapshot.deposit)}</span></div>
+            <div className="flex justify-between border-t border-border-soft pt-1.5 font-bold text-white"><span>Wartość rezerwacji</span><span>{fmtPLN(reservation.pricing_snapshot.total)}</span></div>
+            <div className="flex justify-between"><span className="text-ink-2">Zadatek (wpłacony przez klienta)</span><span className="font-semibold text-ink">− {fmtPLN(reservation.pricing_snapshot.deposit)}</span></div>
+            <div className="flex justify-between border-t border-border-soft pt-1.5 text-[14px] font-bold text-warn"><span>Pozostało do zapłaty</span><span>{fmtPLN(Math.max(0, Math.round((reservation.pricing_snapshot.total - reservation.pricing_snapshot.deposit) * 100) / 100))}</span></div>
           </div>
           <p className="mt-2 text-[11px] text-ink-2">Kopia z chwili zapisu — późniejsze zmiany cennika jej nie zmieniają.</p>
         </div>

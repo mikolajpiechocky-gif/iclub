@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { SecondaryButton } from "@/components/ui";
 import type { NotificationRecord } from "@/lib/data/notifications";
-import { markReadAction, markAllReadAction } from "./actions";
+import { markReadAction, markAllReadAction, deleteNotificationAction } from "./actions";
 
 const fmt = (iso: string) => new Date(iso).toLocaleString("pl-PL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -15,6 +15,7 @@ export function NotificationsView({ items }: { items: NotificationRecord[] }) {
 
   const readOne = (id: string) => startTransition(async () => { await markReadAction(id); router.refresh(); });
   const readAll = () => startTransition(async () => { await markAllReadAction(); router.refresh(); });
+  const removeOne = (id: string) => startTransition(async () => { await deleteNotificationAction(id); router.refresh(); });
 
   return (
     <>
@@ -31,7 +32,10 @@ export function NotificationsView({ items }: { items: NotificationRecord[] }) {
                 {n.body && <div className="mt-0.5 text-[12.5px] text-ink-2">{n.body}</div>}
                 <div className="mt-1 text-[11px] text-muted">{fmt(n.created_at)}</div>
               </div>
-              {!n.read && <button onClick={(e) => { e.preventDefault(); readOne(n.id); }} disabled={pending} className="self-center rounded-[9px] border border-border bg-surface-2 px-2.5 py-1.5 text-[11.5px] font-semibold text-ink-2">Przeczytane</button>}
+              <div className="flex flex-none items-center gap-1.5 self-center">
+                {!n.read && <button onClick={(e) => { e.preventDefault(); readOne(n.id); }} disabled={pending} className="rounded-[9px] border border-border bg-surface-2 px-2.5 py-1.5 text-[11.5px] font-semibold text-ink-2">Przeczytane</button>}
+                <button onClick={(e) => { e.preventDefault(); removeOne(n.id); }} disabled={pending} title="Usuń powiadomienie" className="rounded-[9px] border border-border bg-surface-2 px-2 py-1.5 text-[11.5px] font-semibold text-ink-2 hover:text-bad">Usuń</button>
+              </div>
             </div>
           );
           // Kliknięcie = nawigacja do zlecenia. Oznaczenie „przeczytane" strzelamy w tle

@@ -229,6 +229,7 @@ export async function buildReservationFromInquiry(inquiryId: string, opts: Build
 
   // Zamykamy lead jako wygrany.
   await s.from("inquiries").update({ status: "WON", last_activity_at: now }).eq("id", inquiryId);
+  await s.from("notifications").delete().eq("inquiry_id", inquiryId).then(() => {}, () => {}); // lead wygrany → powiadomienia znikają
 
   sendPushToOwners({
     title: opts.pushTitle ?? "Rezerwacja z zapytania",

@@ -156,5 +156,8 @@ export async function autoCloseStaleLeads(days = 21): Promise<{ closed: number }
     .lt("last_activity_at", cutoff)
     .eq("auto_close_blocked", false)
     .select("id");
-  return { closed: (data ?? []).length };
+  const ids = (data ?? []).map((r) => (r as { id: string }).id);
+  // Auto-przegrane leady → ich powiadomienia znikają (nie zaśmiecają dzwonka).
+  if (ids.length) await s.from("notifications").delete().in("inquiry_id", ids).then(() => {}, () => {});
+  return { closed: ids.length };
 }

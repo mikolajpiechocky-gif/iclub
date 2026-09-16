@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createInquiry, updateInquiry, deleteInquiry, reactivateInquiry, setInquiryAutoCloseBlocked, setInquiryStatus, autoCloseStaleLeads, type InquiryInput } from "@/lib/data/inquiries";
 import { createEsignFromInquiry, sendEsignContract, type EsignFieldOverrides } from "@/lib/data/esign";
+import { syncInquiryNotifications } from "@/lib/data/notifications";
 import { getCurrentProfile } from "@/lib/data/profiles";
 import type { InquiryStatus, InquirySource } from "@/lib/data/types";
 
@@ -87,8 +88,11 @@ export async function updateInquiryAction(id: string, values: InquiryFormValues)
   if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
   try {
     await updateInquiry(id, toInput(values));
+    await syncInquiryNotifications(id, values.status).catch(() => {}); // status leada → powiadomienia (gasną/znikają)
     revalidatePath("/inquiries");
     revalidatePath(`/inquiries/${id}/edit`);
+    revalidatePath("/notifications");
+    revalidatePath("/dashboard");
     return { ok: true, id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się zapisać zmian." };
@@ -121,7 +125,7 @@ export async function sendContractForInquiryAction(
   const sent = await sendEsignContract(created.id);
   if (!sent.ok) return { ok: false, error: sent.error ?? "Nie udało się wysłać umowy." };
   // Wysłana umowa = lead obsłużony → schodzi ze statusu NEW, więc znika z sekcji „Zgłoszenia z konfiguratora".
-  try { await setInquiryStatus(inquiryId, "OFFER_SENT"); } catch { /* status opcjonalny — nie blokuje wysyłki */ }
+  try { await setInquiryStatus(inquiryId, "OFFER_SENT"); await syncInquiryNotifications(inquiryId, "OFFER_SENT"); } catch { /* status opcjonalny — nie blokuje wysyłki */ }
   revalidatePath(`/inquiries/${inquiryId}/edit`);
   revalidatePath("/inquiries");
   revalidatePath("/dashboard");
