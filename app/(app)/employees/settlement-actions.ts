@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentProfile } from "@/lib/data/profiles";
-import { setAssignmentExtras, setEmployeePaidOut } from "@/lib/data/assignments";
+import { setAssignmentExtras, setEmployeePaidOut, setAssignmentSettled } from "@/lib/data/assignments";
 
 // §rozliczenie Zapis narastająco wypłaconej kwoty (pozostało = do wypłaty − wypłacono). Tylko szef.
 export async function setEmployeePaidOutAction(profileId: string, amount: number) {
@@ -18,6 +18,22 @@ export async function setEmployeePaidOutAction(profileId: string, amount: number
     return { ok: true as const };
   } catch (e) {
     return { ok: false as const, error: e instanceof Error ? e.message : "Nie udało się zapisać." };
+  }
+}
+
+// §rozliczenie Rozlicz JEDNO zlecenie: przycisk „Rozlicz" + kwota (albo cofnij). Tylko szef.
+export async function settleAssignmentAction(assignmentId: string, profileId: string, settled: boolean, amount?: number) {
+  if (!isSupabaseConfigured()) return { ok: false as const, error: "Tryb demo." };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false as const, error: "Tylko szef." };
+  try {
+    await setAssignmentSettled(assignmentId, settled, settled ? (amount ?? null) : null);
+    revalidatePath(`/employees`);
+    revalidatePath(`/employees/${profileId}`);
+    revalidatePath("/dashboard"); // kafelek „Rozliczenia pracowników" schodzi per zlecenie
+    return { ok: true as const };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Nie udało się rozliczyć." };
   }
 }
 

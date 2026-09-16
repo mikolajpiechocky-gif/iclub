@@ -111,6 +111,7 @@ export interface EmployeeSettlementRow {
   title: string;
   eventDate: string | null;
   settledAt: string | null;
+  settledAmount: number | null;   // kwota faktycznie rozliczona (per zlecenie)
   // §rozliczenie Rozbicie propozycji: baza (za realizację) + czy jest DO WYPŁATY (ryczałt),
   // czy tylko KOSZT „w ramach umowy" (czas wolny, rozliczany poza apką). Plus premie należne.
   basePaidOut: boolean;
@@ -129,6 +130,7 @@ interface RawSettlementRow {
   is_lead: boolean | null;
   earnings_snapshot: EarningsBreakdown | null;
   settled_at: string | null;
+  settled_amount: number | string | null;
   review_given: boolean | null;
   reel_given: boolean | null;
   reel_link: string | null;
@@ -142,7 +144,7 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
   const [{ data }, { data: rateData }, settings] = await Promise.all([
     supabase
       .from("job_assignments")
-      .select("id, is_lead, earnings_snapshot, settled_at, status, review_given, reel_given, reel_link, fuel_amount, job:jobs(id, title, status, business_line, event_date, owner_bonus, reservation:reservations(id, event_type, tent_main, tent_extra, rental_settlement_flat, upsell_value, customer:customers(name)))")
+      .select("id, is_lead, earnings_snapshot, settled_at, settled_amount, status, review_given, reel_given, reel_link, fuel_amount, job:jobs(id, title, status, business_line, event_date, owner_bonus, reservation:reservations(id, event_type, tent_main, tent_extra, rental_settlement_flat, upsell_value, customer:customers(name)))")
       .eq("profile_id", profileId)
       .eq("status", "APPROVED"),
     supabase.from("employee_rates").select("*").eq("profile_id", profileId).maybeSingle(),
@@ -221,6 +223,7 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
       title: r.job!.reservation?.customer?.name ?? r.job!.reservation?.event_type ?? r.job!.title ?? "Realizacja",
       eventDate: r.job!.event_date ?? null,
       settledAt: r.settled_at ?? null,
+      settledAmount: r.settled_amount != null ? Number(r.settled_amount) : null,
       basePaidOut,
       baseValue,
       baseLabel,
@@ -291,35 +294,34 @@ export async function listPendingAssignmentRequests(): Promise<PendingAssignment
 export async function countUnsettledDoneAssignments(): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
   const supabase = await createClient();
-  // Liczymy PRACOWNIKÓW z realnym saldem do wypłaty: suma zamrożonego wynagrodzenia z zakończonych
-  // realizacji − „wypłacono" (employee_rates.paid_out). Dzięki temu kafelek spada, gdy szef zapisze
-  // wypłatę (wcześniej liczył po settled_at, które nie było nigdzie ustawiane → nigdy nie malał).
+  // Model PER ZLECENIE: liczymy pracowników, którzy mają choć jedno zakończone (DONE) przypisanie
+  // z wynagrodzeniem > 0, jeszcze NIE oznaczone „Rozliczono" (settled_at is null). Po odhaczeniu
+  // konkretnego zlecenia kafelek maleje — bez narastającej kwoty.
   const { data } = await supabase
     .from("job_assignments")
-    .select("profile_id, earnings_snapshot, status, job:jobs(status)")
-    .eq("status", "APPROVED");
+    .select("profile_id, earnings_snapshot, settled_at, status, job:jobs(status)")
+    .eq("status", "APPROVED")
+    .is("settled_at", null);
   const rows = (data ?? []) as unknown as { profile_id: string; earnings_snapshot: { total?: number } | null; job: { status: string } | null }[];
-  const owedByEmp = new Map<string, number>();
+  const emps = new Set<string>();
   for (const r of rows) {
     if (r.job?.status !== "DONE" || !r.profile_id) continue;
-    owedByEmp.set(r.profile_id, (owedByEmp.get(r.profile_id) ?? 0) + (Number(r.earnings_snapshot?.total ?? 0) || 0));
+    if ((Number(r.earnings_snapshot?.total ?? 0) || 0) > 0.5) emps.add(r.profile_id);
   }
-  if (owedByEmp.size === 0) return 0;
-  const { data: rates } = await supabase.from("employee_rates").select("profile_id, paid_out").in("profile_id", [...owedByEmp.keys()]);
-  const paidByEmp = new Map((rates ?? []).map((x) => [(x as { profile_id: string }).profile_id, Number((x as { paid_out: number | null }).paid_out ?? 0) || 0]));
-  let count = 0;
-  for (const [emp, owed] of owedByEmp) {
-    if (owed - (paidByEmp.get(emp) ?? 0) > 0.5) count++;
-  }
+  const count = emps.size;
   return count;
 }
 
-export async function setAssignmentSettled(id: string, settled: boolean): Promise<void> {
+export async function setAssignmentSettled(id: string, settled: boolean, amount?: number | null): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { error } = await supabase
     .from("job_assignments")
-    .update({ settled_at: settled ? new Date().toISOString() : null, settled_by: settled ? (user?.id ?? null) : null })
+    .update({
+      settled_at: settled ? new Date().toISOString() : null,
+      settled_by: settled ? (user?.id ?? null) : null,
+      settled_amount: settled ? (amount ?? null) : null,
+    })
     .eq("id", id);
   if (error) throw new Error(error.message);
 }
