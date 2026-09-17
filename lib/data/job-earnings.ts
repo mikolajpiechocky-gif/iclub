@@ -2,7 +2,7 @@
 // oraz przy „zamrażaniu" rozliczenia w chwili zakończenia realizacji (snapshot), żeby
 // późniejsza zmiana stawek NIE zmieniała rozliczeń już zakończonych realizacji.
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
-import { settlementForRealization, rulesFromSettings, numOr, possibleAddonBonuses, type IclubSettlementRules } from "@/lib/domain/iclub-settlement";
+import { settlementForRealization, rulesFromSettings, numOr, possibleAddonBonuses, DEFAULT_BONUSES, type IclubSettlementRules } from "@/lib/domain/iclub-settlement";
 import { hasGastroTent } from "@/lib/domain/tents";
 import { countDoneIclubRealizations } from "./jobs";
 import type { AppSettings } from "./settings";
@@ -48,17 +48,20 @@ export async function buildAssignmentEarnings(
   if (!ctx.iclub) {
     // Opinia/rolka są zawsze możliwe do zgarnięcia — także na wynajmie (rate może być null → wartości domyślne).
     const possible = possibleAddonBonuses(rate);
+    // §wynajem Daleki wynajem (>100 km) — premia do wypłaty jak przy iClub.
+    const far = ctx.farTrip ? numOr(rate?.far_bonus, DEFAULT_BONUSES.far) : 0;
+    const farLabel = far > 0 ? " + Daleki wynajem (>100 km)" : "";
     if (ctx.rentalFlat != null) {
       return {
         base: ctx.rentalFlat,
-        baseLabel: "Ryczałt za zlecenie",
+        baseLabel: "Ryczałt za zlecenie" + farLabel,
         ownerBonus: ctx.ownerBonus,
-        total: Math.round((ctx.rentalFlat + ctx.ownerBonus) * 100) / 100,
+        total: Math.round((ctx.rentalFlat + ctx.ownerBonus + far) * 100) / 100,
         possibleBonuses: possible,
       };
     }
-    if (ctx.ownerBonus > 0) {
-      return { base: 0, baseLabel: "Bonus szefa", ownerBonus: ctx.ownerBonus, total: ctx.ownerBonus, possibleBonuses: possible };
+    if (ctx.ownerBonus > 0 || far > 0) {
+      return { base: 0, baseLabel: far > 0 ? `Daleki wynajem (>100 km)${ctx.ownerBonus > 0 ? " + Bonus szefa" : ""}` : "Bonus szefa", ownerBonus: ctx.ownerBonus, total: Math.round((ctx.ownerBonus + far) * 100) / 100, possibleBonuses: possible };
     }
     // Domyślny wynajem: brak bazy do wypłaty, ale opinia/rolka wciąż możliwe → pokazujemy zachętę.
     return { base: 0, baseLabel: "Bez wypłaty (wynajem)", ownerBonus: 0, total: 0, possibleBonuses: possible };

@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { EmployeeRate } from "./types";
 import type { EarningsBreakdown } from "@/lib/domain/earnings";
 import { getSettings } from "./settings";
-import { settlementForRealization, rulesFromSettings, numOr } from "@/lib/domain/iclub-settlement";
+import { settlementForRealization, rulesFromSettings, numOr, DEFAULT_BONUSES } from "@/lib/domain/iclub-settlement";
 import { hasGastroTent } from "@/lib/domain/tents";
 
 export type AssignmentStatus = "REQUESTED" | "APPROVED";
@@ -200,6 +200,8 @@ export async function listEmployeeSettlements(profileId: string): Promise<Employ
       const flat = r.job!.reservation?.rental_settlement_flat != null ? Number(r.job!.reservation.rental_settlement_flat) : null;
       if (flat != null) { basePaidOut = true; baseValue = flat; baseLabel = "Ryczałt za zlecenie"; }
       else { basePaidOut = false; baseValue = 0; baseLabel = "Stawka godzinowa (koszt osobno)"; }
+      // §wynajem Daleki wynajem (>100 km) — premia do wypłaty jak przy iClub (rate.far_bonus lub 150 zł).
+      if (farByJob.get(r.job!.id)) guaranteed.push({ label: "Daleki wynajem (>100 km)", amount: numOr(rate?.far_bonus, DEFAULT_BONUSES.far) });
     } else if (rate) {
       const s = settlementForRealization(rules, priorCount, { farTrip: farByJob.get(r.job!.id) ?? false, hasGastro: hasGastroTent(r.job!.reservation?.tent_main, r.job!.reservation?.tent_extra), rate });
       basePaidOut = s.form === "flat"; // ryczałt (flat) = do wypłaty; czas wolny (free_time) = koszt „w ramach umowy"
