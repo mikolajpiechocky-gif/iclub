@@ -3,7 +3,7 @@
 // rezerwacji automatycznie generuje zlecenie i etapy (warstwa danych).
 import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setReservationStatus, getReservation, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, checkHeatingAvailability, type ReservationInput, type AddonShortage, type HeatingAvailability } from "@/lib/data/reservations";
+import { createReservation, updateReservation, deleteReservation, setReservationConfirmed, setReservationStatus, setAwaitingDeposit, getReservation, setInvoiceIssued, checkTentOverbooking, checkAddonOverbooking, checkHeatingAvailability, type ReservationInput, type AddonShortage, type HeatingAvailability } from "@/lib/data/reservations";
 import { getJobByReservation, setJobStatus } from "@/lib/data/jobs";
 import { createCustomer, setCustomerPhone, setCustomerEmail } from "@/lib/data/customers";
 import { createPayment } from "@/lib/data/payments";
@@ -346,6 +346,36 @@ export async function createReservationFromInquiryAction(inquiryId: string): Pro
     return { ok: true, reservationId: built.reservationId };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Nie udało się utworzyć rezerwacji." };
+  }
+}
+
+// §zadatek Kokpit: klient wpłacił zadatek → potwierdź (zdejmij oczekiwanie). Tylko Szef.
+export async function confirmDepositPaidAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef." };
+  try {
+    await setAwaitingDeposit(id, false);
+    revalidatePath("/dashboard"); revalidatePath("/reservations"); revalidatePath(`/reservations/${id}`);
+    return { ok: true, id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Błąd." };
+  }
+}
+
+// §zadatek Kokpit: klient NIE wpłacił zadatku → anuluj rezerwację (double-check w UI). Tylko Szef.
+export async function depositNotPaidCancelAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, error: DEMO_MSG };
+  const me = await getCurrentProfile();
+  if (me?.role !== "OWNER") return { ok: false, error: "Tylko Szef." };
+  try {
+    try { await removeReservationFromCalendar(id); } catch {}
+    await setReservationStatus(id, "CANCELLED");
+    await setAwaitingDeposit(id, false);
+    revalidatePath("/dashboard"); revalidatePath("/reservations"); revalidatePath("/calendar");
+    return { ok: true, id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Nie udało się anulować." };
   }
 }
 

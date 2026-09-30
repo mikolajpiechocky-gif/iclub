@@ -256,8 +256,9 @@ export async function materializeReservationFromContract(c: ContractForReservati
   const now = new Date().toISOString();
 
   // (1) Umowa ze zlecenia — rezerwacja już jest. Podpis = twarde potwierdzenie terminu.
+  // Zadatek czeka na wpłatę → awaiting_deposit=true (szef potwierdza ✓/✗ w kokpicie).
   if (c.reservation_id) {
-    await s.from("reservations").update({ status: "CONFIRMED", client_confirmed: true, client_confirmed_at: now }).eq("id", c.reservation_id);
+    await s.from("reservations").update({ status: "CONFIRMED", client_confirmed: true, client_confirmed_at: now, awaiting_deposit: true }).eq("id", c.reservation_id);
     return { created: false, confirmed: true, reservationId: c.reservation_id };
   }
   if (!c.inquiry_id) return { created: false, confirmed: false };
@@ -277,5 +278,7 @@ export async function materializeReservationFromContract(c: ContractForReservati
   if (!built) return { created: false, confirmed: false };
 
   await s.from("esign_contracts").update({ reservation_id: built.reservationId, job_id: built.jobId }).eq("id", c.id);
+  // Podpisano → rezerwacja czeka na zadatek (szef potwierdza w kokpicie).
+  await s.from("reservations").update({ awaiting_deposit: true }).eq("id", built.reservationId).then(() => {}, () => {});
   return { created: true, confirmed: true, reservationId: built.reservationId };
 }

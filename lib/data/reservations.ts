@@ -353,6 +353,13 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
   }
 }
 
+// §zadatek Potwierdzenie/wyczyszczenie oczekiwania na zadatek (po podpisaniu umowy).
+export async function setAwaitingDeposit(id: string, value: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("reservations").update({ awaiting_deposit: value }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // Usunięcie rezerwacji. Kaskada bazy usuwa powiązane zlecenie i jego dane operacyjne
 // (etapy, przypisania, checklistę, płatności); koszty pozostają (job_id → null).
 export async function deleteReservation(id: string): Promise<void> {

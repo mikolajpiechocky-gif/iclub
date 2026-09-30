@@ -262,6 +262,7 @@ export interface ReservationRecord {
   notes: string | null;
   client_confirmed: boolean;
   client_confirmed_at: string | null;
+  awaiting_deposit: boolean;  // §zadatek po podpisaniu umowy — czeka na potwierdzenie wpłaty w kokpicie
   skip_grass: boolean; // §II.12 klient rezygnuje ze sztucznej trawy (mimo pakietu)
   phone_call_done: boolean; // §II.12 zadanie „Telefon do klienta" wykonane (osobno od potwierdzenia)
   deposit_deduction: number; // §II.16 potrącenie z kaucji za uszkodzenia (przychód realizacji)

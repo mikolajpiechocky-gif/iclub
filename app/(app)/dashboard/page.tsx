@@ -20,6 +20,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { RESERVATION_STATUS_META, inquiryDisplayName, INQUIRY_STATUS_LABELS } from "@/lib/data/types";
 import { warsawTodayISO } from "@/lib/domain/dates";
 import { DismissLeadX } from "./dismiss-lead";
+import { DepositConfirm } from "./deposit-confirm";
 
 export const dynamic = "force-dynamic";
 const fmtDate = (iso: string | null) =>
@@ -82,6 +83,11 @@ export default async function DashboardPage() {
     .sort((a, b) => ((a.created_at ?? "") < (b.created_at ?? "") ? 1 : -1));
   const configEstValue = (q: (typeof configLeads)[number]): number | null =>
     (q.config_json as { estimate?: { value?: number } } | null)?.estimate?.value ?? null;
+
+  // §zadatek Rezerwacje po podpisanej umowie czekające na wpłatę zadatku — szybkie ✓/✗ w kokpicie.
+  const awaitingDeposit = isOwner
+    ? reservations.filter((r) => (r as { awaiting_deposit?: boolean }).awaiting_deposit && r.status !== "CANCELLED" && r.status !== "EXPIRED")
+    : [];
 
   // §pulpit Zysk w tym miesiącu = przychód − koszty realizacji, których DATA (event_date) wypada
   // w tym miesiącu. Po dacie realizacji (a nie wpisania płatności) — inaczej świeżo wprowadzone
@@ -230,6 +236,29 @@ export default async function DashboardPage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* §zadatek Po podpisanej umowie — potwierdź wpłatę zadatku (✓) albo anuluj, gdy klient nie wpłacił (✗). */}
+      {awaitingDeposit.length > 0 && (
+        <div className="mb-5 rounded-card-lg border border-[#3d3216] bg-gradient-to-b from-[#241e10] to-[#1a160c] p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-[16px]">💰</span>
+            <h2 className="font-display text-[15px] font-bold text-white">Zadatek do potwierdzenia</h2>
+            <span className="rounded-[7px] bg-[#3d3216] px-2 py-0.5 text-[12px] font-bold text-warn">{awaitingDeposit.length}</span>
+          </div>
+          <p className="mb-2.5 text-[11.5px] text-ink-2">Umowa podpisana — klient miał wpłacić zadatek (24 h). Potwierdź wpłatę (✓) albo anuluj rezerwację, jeśli nie wpłacił (✗).</p>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            {awaitingDeposit.slice(0, 8).map((r) => (
+              <div key={r.id} className="flex items-center gap-3 rounded-[12px] border border-[#4a3c1a] bg-[#1c1810] px-3.5 py-2.5">
+                <Link href={`/reservations/${r.id}`} className="min-w-0 flex-1">
+                  <div className="truncate text-[13.5px] font-bold text-ink">{r.customer?.name ?? r.event_type ?? "Rezerwacja"}</div>
+                  <div className="truncate text-[11.5px] text-ink-2">{[fmtDate(r.event_date), r.location, r.deposit ? `zadatek ${fmtPLN(Number(r.deposit))}` : null].filter(Boolean).join(" · ")}</div>
+                </Link>
+                <DepositConfirm id={r.id} />
+              </div>
+            ))}
           </div>
         </div>
       )}
