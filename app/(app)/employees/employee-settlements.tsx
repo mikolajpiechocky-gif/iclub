@@ -74,7 +74,7 @@ export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus }:
           <div className="mt-0.5 font-display text-[18px] font-bold text-warn">{zl(doWyplaty)}</div>
         </div>
         <div className="rounded-card border border-[#1d3a28] bg-[#12271b] px-4 py-3">
-          <div className="text-[11px] font-semibold text-ok/80">Rozliczono</div>
+          <div className="text-[11px] font-semibold text-ok/80">Wypłacono</div>
           <div className="mt-0.5 font-display text-[18px] font-bold text-ok">{zl(rozliczono)}</div>
         </div>
         <div className="col-span-2 rounded-card border border-border bg-surface-2 px-4 py-3 sm:col-span-1">
@@ -98,7 +98,7 @@ export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus }:
                   <span className="text-[13.5px] font-bold capitalize text-white">{monthLabel(mk)}</span>
                   <span className="text-[11.5px] font-semibold text-ink-2">{mrows.length} real.</span>
                   <span className="ml-auto text-[12.5px] font-bold" style={{ color: unsettledN > 0 ? "#ebb05a" : "#5fd68b" }}>
-                    {unsettledN > 0 ? `${zl(Math.round(monthDue * 100) / 100)} do wypłaty` : "rozliczone ✓"}
+                    {unsettledN > 0 ? `${zl(Math.round(monthDue * 100) / 100)} do wypłaty` : "wypłacone ✓"}
                   </span>
                 </summary>
                 <ul className="flex flex-col gap-2 border-t border-border-soft px-3 py-3">
@@ -115,7 +115,7 @@ export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus }:
                           </div>
                           <div className="text-right">
                             <div className="font-display text-[14px] font-bold text-ok">{zl(settled ? (r.settledAmount ?? payout) : payout)}</div>
-                            <div className="text-[10.5px] text-ink-2">{settled ? "rozliczono" : "do wypłaty"}</div>
+                            <div className="text-[10.5px] text-ink-2">{settled ? "wypłacono" : "do wypłaty"}</div>
                           </div>
                         </div>
 
@@ -149,16 +149,16 @@ export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus }:
                             )}
                             {/* Rozlicz to zlecenie: kwota (domyślnie wyliczona) + przycisk */}
                             <div className="mt-2.5 flex items-center gap-2 border-t border-border-soft pt-2.5">
-                              <span className="text-[11.5px] font-semibold text-ink-2">Rozlicz kwotę</span>
+                              <span className="text-[11.5px] font-semibold text-ink-2">Kwota do wypłaty</span>
                               <input inputMode="decimal" value={amountEdit[r.assignmentId] ?? String(payout)} onChange={(ev) => setAmountEdit((x) => ({ ...x, [r.assignmentId]: ev.target.value }))} className="w-24 rounded-field border border-border bg-surface-2 px-2.5 py-1.5 text-right text-[13px] font-semibold text-ink outline-none focus:border-accent" />
                               <span className="text-[12px] font-semibold text-ink-2">zł</span>
-                              <button onClick={() => settle(r)} disabled={pending} className="ml-auto rounded-field bg-[#22c55e] px-3.5 py-1.5 text-[12.5px] font-bold text-[#08170d] disabled:opacity-60">Rozlicz ✓</button>
+                              <button onClick={() => settle(r)} disabled={pending} className="ml-auto rounded-field bg-[#22c55e] px-3.5 py-1.5 text-[12.5px] font-bold text-[#08170d] disabled:opacity-60">Wypłać ✓</button>
                             </div>
                           </>
                         )}
                         {settled && (
                           <div className="mt-2 flex items-center gap-2 border-t border-border-soft pt-2 text-[11.5px]">
-                            <span className="font-semibold text-ok">Rozliczono ✓ {zl(r.settledAmount ?? payout)} · {fmtDate(r.settledAt)}</span>
+                            <span className="font-semibold text-ok">Wypłacono ✓ {zl(r.settledAmount ?? payout)} · {fmtDate(r.settledAt)}</span>
                             <button onClick={() => unsettle(r)} disabled={pending} className="ml-auto rounded-[9px] border border-border bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-ink-2">Cofnij</button>
                           </div>
                         )}
@@ -171,7 +171,7 @@ export function EmployeeSettlements({ profileId, rows, reviewBonus, reelBonus }:
           })}
         </div>
       )}
-      <p className="mt-3 text-[11px] text-ink-2">Każde zlecenie rozliczasz osobno przyciskiem „Rozlicz” (kwota domyślnie wyliczona, można zmienić). „W ramach umowy” (czas wolny) rozliczasz poza apką. Lista zwinięta miesiącami.</p>
+      <p className="mt-3 text-[11px] text-ink-2">Każde zlecenie wypłacasz osobno przyciskiem „Wypłać” (kwota domyślnie wyliczona, można zmienić) — oznaczenie = wypłacono pracownikowi. „W ramach umowy” (czas wolny) rozliczasz poza apką. Lista zwinięta miesiącami.</p>
     </section>
   );
 }

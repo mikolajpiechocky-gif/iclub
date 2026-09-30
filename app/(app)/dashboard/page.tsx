@@ -104,7 +104,7 @@ export default async function DashboardPage() {
 
   // §pulpit „Wymaga uwagi" — wszystko wymagające decyzji szefa: prośby o przypisanie, koszty do
   // akceptacji, rozliczenia pracowników, faktury, paliwo, ogłoszenia OLX.
-  const attention: { tone: "bad" | "warn" | "info"; title: string; desc: string; href: string }[] = [];
+  const attention: { tone: "bad" | "warn" | "info"; title: string; desc: string; href: string; dismissId?: string }[] = [];
   if (isOwner) {
     // Nieodpisane leady OLX (konfigurator ma własną sekcję na górze). Tylko gdy FAKTYCZNIE
     // wymagają odpowiedzi (nie „dziękuję"/po naszej odmowie) i tylko świeże (14 dni).
@@ -119,6 +119,7 @@ export default async function DashboardPage() {
         title: "💬 Nowy lead OLX — odpisz",
         desc: `${inquiryDisplayName(q)}${q.event_type ? " · " + q.event_type : ""}${q.created_at ? " · " + fmtDate(q.created_at) : ""}`,
         href: `/inquiries/${q.id}/edit`,
+        dismissId: q.id,
       });
     }
     // Wiadomości z formularza kontaktowego (nie konfigurator) — świeże, wymagają odpowiedzi.
@@ -132,6 +133,7 @@ export default async function DashboardPage() {
         title: "✉️ Formularz kontaktowy — odpisz",
         desc: `${inquiryDisplayName(q)}${q.created_at ? " · " + fmtDate(q.created_at) : ""}`,
         href: `/inquiries/${q.id}/edit`,
+        dismissId: q.id,
       });
     }
     // Konfigurator W TOKU (już procedowany — nie „nowy") → do „Wymaga uwagi", żeby dokończyć.
@@ -144,6 +146,7 @@ export default async function DashboardPage() {
         title: "🌐 Konfigurator w toku — dokończ",
         desc: `${inquiryDisplayName(q)}${q.event_type ? " · " + q.event_type : ""} · ${INQUIRY_STATUS_LABELS[q.status]}`,
         href: `/inquiries/${q.id}/edit`,
+        dismissId: q.id,
       });
     }
     // Prośby pracowników o przypisanie — priorytet (blokują realizację).
@@ -248,13 +251,16 @@ export default async function DashboardPage() {
           <p className="px-1 py-3 text-[13px] text-ink-2">Nic nie wymaga uwagi 👍</p>
         ) : (
           attention.map((a, i) => (
-            <Link key={i} href={a.href} className={`flex gap-3 border-t border-border-soft py-3 first:border-t-0 ${a.tone === "info" ? "-mx-2 rounded-[10px] border-t-0 bg-[#111c2e] px-2" : ""}`}>
-              <span className="mt-1.5 h-2.5 w-2.5 flex-none rounded-[3px]" style={{ background: a.tone === "bad" ? "#f58585" : a.tone === "info" ? "#7fa8f5" : "#ebb05a" }} />
-              <div className="flex-1">
-                <div className="text-[13px] font-bold text-ink" style={a.tone === "info" ? { color: "#7fa8f5" } : undefined}>{a.title}</div>
-                <div className="mt-0.5 text-[12px] font-medium text-ink-2">{a.desc}</div>
-              </div>
-            </Link>
+            <div key={i} className="relative">
+              {a.dismissId && <DismissLeadX id={a.dismissId} />}
+              <Link href={a.href} className={`flex gap-3 border-t border-border-soft py-3 first:border-t-0 ${a.tone === "info" ? "-mx-2 rounded-[10px] border-t-0 bg-[#111c2e] px-2" : ""} ${a.dismissId ? "pr-9" : ""}`}>
+                <span className="mt-1.5 h-2.5 w-2.5 flex-none rounded-[3px]" style={{ background: a.tone === "bad" ? "#f58585" : a.tone === "info" ? "#7fa8f5" : "#ebb05a" }} />
+                <div className="flex-1">
+                  <div className="text-[13px] font-bold text-ink" style={a.tone === "info" ? { color: "#7fa8f5" } : undefined}>{a.title}</div>
+                  <div className="mt-0.5 text-[12px] font-medium text-ink-2">{a.desc}</div>
+                </div>
+              </Link>
+            </div>
           ))
         )}
       </SectionCard>
