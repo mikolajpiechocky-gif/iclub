@@ -19,7 +19,7 @@ interface ExistingContract { status: string; link: string; signerEmail: string |
 export interface ContractDefaults {
   eventDate?: string; eventStartTime?: string; location?: string;
   tentName?: string; packageName?: string; addonsNote?: string;
-  customerName?: string; customerEmail?: string;
+  customerName?: string; customerAddress?: string; customerEmail?: string;
   deliveryHour?: string; depositDue?: string;
   packagePrice?: string; addonsTotal?: string; transport?: string;
 }
@@ -62,6 +62,7 @@ export function LeadContractPanel({ inquiryId, jobId, defaultTotal, defaultDepos
   const [pending, start] = useTransition();
   const [result, setResult] = useState<{ link?: string; emailSkipped?: boolean } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null); // podgląd w zamykalnym oknie w apce
 
   const buildOv = () => {
     const num = (s?: string) => { const n = Number((s ?? "").replace(",", ".")); return s && Number.isFinite(n) ? n : undefined; };
@@ -73,7 +74,7 @@ export function LeadContractPanel({ inquiryId, jobId, defaultTotal, defaultDepos
       deliveryHour: str(d.deliveryHour), depositDue: str(d.depositDue),
       eventDate: str(d.eventDate), eventStartTime: str(d.eventStartTime), location: str(d.location),
       tentName: str(d.tentName), packageName: str(d.packageName), addonsNote: str(d.addonsNote),
-      customerName: str(d.customerName), customerEmail: str(d.customerEmail),
+      customerName: str(d.customerName), customerAddress: str(d.customerAddress), customerEmail: str(d.customerEmail),
     };
   };
 
@@ -88,19 +89,18 @@ export function LeadContractPanel({ inquiryId, jobId, defaultTotal, defaultDepos
     });
   };
 
+  // Podgląd w zamykalnym oknie WEWNĄTRZ apki (bez popupu, który trudno zamknąć na telefonie).
   const preview = () => {
     setErr(null);
-    // Otwieramy kartę od razu (gest użytkownika), by uniknąć blokady popupów; treść wstawiamy po odpowiedzi.
-    const w = window.open("", "_blank");
-    if (w) w.document.write('<!doctype html><meta charset="utf-8"><title>Podgląd umowy</title><div style="font:600 14px sans-serif;color:#555;padding:24px">Generuję podgląd umowy…</div>');
     const ov = buildOv();
     start(async () => {
       const r = jobId ? await previewContractForJobAction(jobId, ov) : await previewContractForInquiryAction(inquiryId ?? "", ov);
-      if (!r.ok || !r.html) { setErr(r.error ?? "Nie udało się wygenerować podglądu."); if (w) w.close(); return; }
-      const doc = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Podgląd umowy — iClub</title></head><body style="margin:0;background:#e9eaee;padding:24px 12px"><div style="max-width:720px;margin:0 auto;background:#fff;border-radius:14px;padding:28px 24px;box-shadow:0 10px 40px rgba(0,0,0,.15)"><div style="margin:0 0 14px;padding:8px 12px;border-radius:8px;background:#fff3cd;color:#7a5b00;font:600 12.5px sans-serif">PODGLĄD — tak umowę zobaczy klient. To NIE jest jeszcze wysłane ani podpisane.</div>${r.html}</div></body></html>`;
-      if (w) { w.document.open(); w.document.write(doc); w.document.close(); }
+      if (!r.ok || !r.html) { setErr(r.error ?? "Nie udało się wygenerować podglądu."); return; }
+      setPreviewHtml(r.html);
     });
   };
+  // Wyślij prosto z podglądu — sprawdzasz i wysyłasz w jednym kroku.
+  const sendFromPreview = () => { setPreviewHtml(null); send(); };
 
   const st = contract ? (STATUS_PL[contract.status] ?? STATUS_PL.draft) : null;
 
@@ -131,11 +131,11 @@ export function LeadContractPanel({ inquiryId, jobId, defaultTotal, defaultDepos
         <label className="text-[12px] font-semibold text-ink-2">Zadatek (zł)
           <input inputMode="numeric" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="—" className="mt-1 block w-28 rounded-field border border-border bg-surface-2 px-3 py-2 text-[14px] text-ink" />
         </label>
-        <button onClick={preview} disabled={pending} className="min-h-[40px] rounded-field border border-border bg-surface-2 px-4 text-[13px] font-bold text-ink disabled:opacity-50">
-          👁 Podgląd
+        <button onClick={preview} disabled={pending} className="bg-brand min-h-[40px] rounded-field px-4 text-[13px] font-bold text-white shadow-[0_6px_18px_rgba(225,29,116,0.4)] disabled:opacity-50">
+          {pending && !previewHtml ? "Generuję…" : "👁 Sprawdź umowę (podgląd)"}
         </button>
-        <button onClick={send} disabled={pending} className="bg-brand min-h-[40px] rounded-field px-4 text-[13px] font-bold text-white shadow-[0_6px_18px_rgba(225,29,116,0.4)] disabled:opacity-50">
-          {pending ? "Wysyłanie…" : contract && contract.status !== "draft" ? "Wyślij nową umowę" : "Utwórz i wyślij umowę"}
+        <button onClick={send} disabled={pending} className="min-h-[40px] rounded-field border border-border bg-surface-2 px-4 text-[13px] font-bold text-ink disabled:opacity-50">
+          {pending ? "…" : contract && contract.status !== "draft" ? "Wyślij nową bez podglądu" : "Wyślij bez podglądu"}
         </button>
       </div>
 
@@ -156,7 +156,8 @@ export function LeadContractPanel({ inquiryId, jobId, defaultTotal, defaultDepos
           <Field label="Pakiet" value={d.packageName ?? ""} onChange={(v) => set("packageName", v)} placeholder="np. VIP" />
           <div className="col-span-2 sm:col-span-3"><Field label="Wyposażenie dodatkowe (opis)" value={d.addonsNote ?? ""} onChange={(v) => set("addonsNote", v)} placeholder="Stół 180 ×4, Krzesła ×20…" /></div>
           <div className="col-span-2 sm:col-span-1"><Field label="Imię i nazwisko" value={d.customerName ?? ""} onChange={(v) => set("customerName", v)} /></div>
-          <div className="col-span-2"><Field label="E-mail (adres podpisu)" type="email" value={d.customerEmail ?? ""} onChange={(v) => set("customerEmail", v)} /></div>
+          <div className="col-span-2 sm:col-span-2"><Field label="Adres klienta (do umowy)" value={d.customerAddress ?? ""} onChange={(v) => set("customerAddress", v)} placeholder="ulica, kod i miejscowość" /></div>
+          <div className="col-span-2 sm:col-span-3"><Field label="E-mail (adres podpisu)" type="email" value={d.customerEmail ?? ""} onChange={(v) => set("customerEmail", v)} /></div>
         </div>
       </details>
 
@@ -167,6 +168,26 @@ export function LeadContractPanel({ inquiryId, jobId, defaultTotal, defaultDepos
         </div>
       )}
       {err && <p className="mt-2 text-[12.5px] font-medium text-bad">{err}</p>}
+
+      {/* Podgląd umowy — zamykalne okno w apce. Sprawdzasz treść, a stąd wysyłasz do klienta. */}
+      {previewHtml && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/70 p-2 sm:p-6" onClick={() => setPreviewHtml(null)}>
+          <div className="mx-auto flex h-full w-full max-w-[760px] flex-col overflow-hidden rounded-card-lg border border-border bg-surface" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-none items-center gap-2 border-b border-border px-4 py-2.5">
+              <span className="font-display text-[14px] font-bold text-white">Podgląd umowy</span>
+              <span className="rounded-[6px] bg-[#241e10] px-2 py-0.5 text-[10.5px] font-bold text-warn">jeszcze niewysłana</span>
+              <button type="button" onClick={() => setPreviewHtml(null)} className="ml-auto flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-2 text-[15px] font-bold text-ink-2 hover:text-white">✕</button>
+            </div>
+            <div className="flex-1 overflow-auto bg-[#e9eaee] p-3">
+              <div className="mx-auto max-w-[720px] rounded-[12px] bg-white p-5 shadow-lg" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            </div>
+            <div className="flex flex-none items-center gap-2 border-t border-border px-4 py-3">
+              <button type="button" onClick={() => setPreviewHtml(null)} className="rounded-field border border-border bg-surface-2 px-4 py-2 text-[13px] font-semibold text-ink">Zamknij</button>
+              <button type="button" onClick={sendFromPreview} disabled={pending} className="bg-brand ml-auto rounded-field px-4 py-2 text-[13px] font-bold text-white shadow-[0_6px_18px_rgba(225,29,116,0.4)] disabled:opacity-50">{pending ? "Wysyłanie…" : "Wyślij do klienta →"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

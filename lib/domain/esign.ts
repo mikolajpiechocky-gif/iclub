@@ -84,6 +84,7 @@ export function tentContractLabel(v: string | null | undefined): string | null {
 export interface EsignContractInput {
   orderNo?: string | null;
   customerName?: string | null;
+  customerAddress?: string | null;
   customerEmail?: string | null;
   eventType?: string | null;
   eventDate?: string | null;
@@ -116,6 +117,7 @@ export function buildEsignContractHtml(i: EsignContractInput): string {
     numer_umowy: i.orderNo ?? null,
     data_zawarcia: null,
     imie: sp > 0 ? name.slice(0, sp) : name || null,
+    adres_klienta: i.customerAddress ?? null,
     nazwisko: sp > 0 ? name.slice(sp + 1) : null,
     email: i.customerEmail ?? null,
     pakiet: i.packageName ?? null,

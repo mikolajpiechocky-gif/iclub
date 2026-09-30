@@ -58,6 +58,7 @@ export interface EsignFieldOverrides {
   packageName?: string | null;    // pakiet
   addonsNote?: string | null;     // dodatki (opis §3.2)
   customerName?: string | null;   // imię i nazwisko
+  customerAddress?: string | null; // adres klienta (Zleceniodawca)
   customerEmail?: string | null;  // e-mail (adres podpisu)
   blik?: string | null;           // domyślnie ICLUB_BLIK
   orderNo?: string | null;
@@ -106,6 +107,7 @@ export async function createEsignContract(input: CreateEsignInput, createdBy: st
   const html = buildEsignContractHtml({
     orderNo,
     customerName: input.customerName ?? customer?.name ?? r?.customer?.name ?? null,
+    customerAddress: input.customerAddress ?? ([customer?.address, customer?.city].filter(Boolean).join(", ") || null),
     customerEmail: signerEmail,
     eventType: r?.event_type ?? null,
     eventDate: input.eventDate ?? r?.event_date ?? null,
@@ -187,6 +189,7 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
   const html = buildEsignContractHtml({
     orderNo,
     customerName: (input.customerName ?? (cfg?.contact?.name as string)) || (q.contact_name as string) || null,
+    customerAddress: input.customerAddress ?? null,
     customerEmail: signerEmail,
     eventType: (q.event_type as string) || null,
     eventDate: (input.eventDate ?? (cfg?.eventDate as string)) || (q.event_date as string) || null,

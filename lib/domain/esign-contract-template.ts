@@ -84,6 +84,7 @@ const BODY = `
     <div class="party">
       <div class="ph">Zleceniodawca</div>
       <div><b>{{imie}} {{nazwisko}}</b></div>
+      {{#adres_klienta}}<div>{{adres_klienta}}</div>{{/adres_klienta}}
       {{#firma}}<div>{{nazwa_firmy}}, NIP {{nip}}, {{adres_faktury}}</div>{{/firma}}
       <div>tel. {{telefon}}</div>
       <div>{{email}}</div>
@@ -216,6 +217,7 @@ export interface ContractTemplateData {
   data_zawarcia?: string | null;
   imie?: string | null;
   nazwisko?: string | null;
+  adres_klienta?: string | null;
   firma?: boolean;
   nazwa_firmy?: string | null;
   nip?: string | null;
