@@ -1,5 +1,6 @@
 // Warstwa danych: powiadomienia in-app (§8).
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, isServiceRoleConfigured } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export interface NotificationRecord {
@@ -72,11 +73,13 @@ export async function markAllRead(): Promise<void> {
 }
 
 // Best-effort — nie przerywa akcji wywołującej, jeśli się nie uda.
+// Powiadomienia są SYSTEMOWE (często dla innego użytkownika, np. szefa/Bartka) → zapis przez service_role.
+// Dzięki temu RLS może zablokować wstawianie powiadomień przez zwykłych zalogowanych (anty-spoofing).
 export async function createNotification(recipient: string, title: string, body: string | null, type: string, jobId?: string | null): Promise<void> {
-  if (!isSupabaseConfigured() || !recipient) return;
+  if (!isServiceRoleConfigured() || !recipient) return;
   try {
-    const supabase = await createClient();
-    await supabase.from("notifications").insert({ recipient, title, body, type, job_id: jobId ?? null });
+    const admin = createAdminClient();
+    await admin.from("notifications").insert({ recipient, title, body, type, job_id: jobId ?? null });
   } catch {
     // ignoruj
   }

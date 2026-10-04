@@ -2,6 +2,7 @@
 // ?mode=departure → tylko alert „pracownik powinien już jechać" (cron co ~30 min).
 // Autoryzacja sekretem (CRON_SECRET / OLX_CRON_SECRET). Proxy przepuszcza tę ścieżkę.
 import { NextRequest, NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/http/safe-compare";
 import { runNotificationsSweep } from "@/lib/data/notifications-sweep";
 import { runDepartureAlertSweep } from "@/lib/data/departure-alerts";
 import { runLeadReminderSweep } from "@/lib/data/lead-reminders";
@@ -10,7 +11,7 @@ import { sendPushToOwners } from "@/lib/integrations/push";
 function isCronAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
   const secrets = [process.env.CRON_SECRET, process.env.OLX_CRON_SECRET].filter(Boolean) as string[];
-  return secrets.some((s) => auth === `Bearer ${s}`);
+  return cronAuthorized(auth, secrets);
 }
 
 export async function GET(req: NextRequest) {

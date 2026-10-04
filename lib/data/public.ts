@@ -164,7 +164,24 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
   if (!c.name?.trim() && !c.phone?.trim() && !c.email?.trim()) {
     return { ok: false, error: "Podaj dane kontaktowe (imię, telefon lub e-mail)." };
   }
+  // §bezpieczeństwo Limity długości pól (anty-abuse: brak gigantycznych payloadów / zaśmiecania bazy).
+  const cap = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : v);
+  c.name = cap(c.name, 120) as string | undefined;
+  c.phone = cap(c.phone, 40) as string | undefined;
+  c.email = cap(c.email, 160) as string | undefined;
+  input.location = cap(input.location, 200) as string | undefined;
+  input.message = cap(input.message, 2000) as string | undefined;
+  if (Array.isArray(input.addons)) input.addons = input.addons.slice(0, 40).map((a) => ({ ...a, name: cap(a.name, 120) as string | undefined }));
+  if (Array.isArray(input.rentalItems)) input.rentalItems = input.rentalItems.slice(0, 40).map((a) => ({ ...a, name: cap(a.name, 120) as string | undefined }));
+
   const s = createAdminClient();
+
+  // §bezpieczeństwo Limit antyspamowy: max 20 publicznych zgłoszeń na 15 min (globalnie) — chroni przed
+  // zalewaniem powiadomień właściciela i wysyłką maili potwierdzających z naszej domeny na dowolny adres.
+  const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const { count: recent } = await s.from("inquiries").select("id", { count: "exact", head: true })
+    .in("source", ["WEBSITE_FORM", "WEBSITE_CONTACT"]).gte("created_at", since);
+  if ((recent ?? 0) >= 20) return { ok: false, error: "Za dużo zgłoszeń w krótkim czasie — spróbuj ponownie za chwilę." };
 
   // Rozróżnienie źródła ze strony: konfigurator (pełna konfiguracja: namiot/pakiet/wycena/sprzęt)
   // vs prosty formularz kontaktowy (samo imię + wiadomość). Priorytet ma jawny `origin` ze strony.
@@ -270,7 +287,8 @@ export async function createPublicInquiry(input: PublicInquiryInput): Promise<{ 
   } catch { /* panel opcjonalny — nie blokuje leada */ }
 
   // Automatyczne potwierdzenie przyjęcia zgłoszenia dla klienta (Resend; pominięte, gdy poczta niegotowa).
-  if (c.email?.trim()) {
+  // §bezpieczeństwo Wysyłamy TYLKO na poprawnie sformatowany adres (brak wysyłki na śmieciowe wpisy).
+  if (c.email?.trim() && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email.trim())) {
     sendEmail({
       to: c.email.trim(),
       subject: "Mamy Twoje zgłoszenie 🎉 · iClub",

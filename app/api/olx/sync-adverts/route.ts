@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncOlxAdverts } from "@/lib/data/olx-adverts";
 import { getCurrentProfile } from "@/lib/data/profiles";
+import { cronAuthorized } from "@/lib/http/safe-compare";
 
 // Synchronizacja ogłoszeń + statystyk bywa dłuższa (wiele ogłoszeń × wywołania OLX/geokodowanie) —
 // podnosimy limit czasu funkcji do 60 s (max na planie Hobby), żeby nie kończyła się timeoutem.
@@ -11,7 +12,7 @@ export const maxDuration = 60;
 function isCronAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
   const secrets = [process.env.CRON_SECRET, process.env.OLX_CRON_SECRET].filter(Boolean) as string[];
-  return secrets.some((s) => auth === `Bearer ${s}`);
+  return cronAuthorized(auth, secrets);
 }
 
 export async function GET(req: NextRequest) {

@@ -353,12 +353,15 @@ export async function signEsignContract(
   if (c.token_expires_at && c.token_expires_at < nowIso()) return { ok: false, error: "token_expired", httpStatus: 410 };
   if (!regulaminAccepted) return { ok: false, error: "regulamin_required", httpStatus: 400 };
   if (!c.code_hash || !c.code_expires_at || c.code_expires_at < nowIso()) return { ok: false, error: "code_expired", httpStatus: 410 };
-  if ((c.code_attempts ?? 0) >= CODE_MAX_ATTEMPTS) return { ok: false, error: "too_many_attempts", httpStatus: 429 };
+
+  // §bezpieczeństwo ATOMOWY licznik prób (inkrementacja+odczyt w jednej instrukcji SQL) — zamyka okno
+  // na obejście limitu 5 prób przy równoległych żądaniach (brute-force 6-cyfrowego kodu).
+  const { data: bumped, error: bumpErr } = await s.rpc("esign_bump_attempts", { p_id: c.id });
+  const attempts = typeof bumped === "number" ? bumped : (c.code_attempts ?? 0) + 1;
+  if (bumpErr) return { ok: false, error: "db_error", httpStatus: 500 };
+  if (attempts > CODE_MAX_ATTEMPTS) return { ok: false, error: "too_many_attempts", httpStatus: 429 };
 
   if (!verifyCode(String(code || ""), c.code_hash)) {
-    const attempts = (c.code_attempts ?? 0) + 1;
-    await s.from("esign_contracts").update({ code_attempts: attempts }).eq("id", c.id);
-    if (attempts >= CODE_MAX_ATTEMPTS) return { ok: false, error: "too_many_attempts", httpStatus: 429 };
     return { ok: false, error: "invalid_code", httpStatus: 401 };
   }
 

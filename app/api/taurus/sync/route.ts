@@ -2,6 +2,7 @@
 // Proxy przepuszcza tę ścieżkę (własna autoryzacja sekretem).
 import { NextRequest, NextResponse } from "next/server";
 import { syncUpcomingEventsToTaurus, syncServiceTasksToTaurus } from "@/lib/data/taurus-sync";
+import { cronAuthorized } from "@/lib/http/safe-compare";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -9,7 +10,7 @@ export const maxDuration = 60;
 function isCronAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
   const secrets = [process.env.CRON_SECRET, process.env.OLX_CRON_SECRET].filter(Boolean) as string[];
-  return secrets.some((s) => auth === `Bearer ${s}`);
+  return cronAuthorized(auth, secrets);
 }
 
 export async function GET(req: NextRequest) {

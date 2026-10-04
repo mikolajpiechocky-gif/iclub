@@ -2,6 +2,7 @@
 // Origin z env PUBLIC_CONFIGURATOR_ORIGIN (domena strony); domyślnie "*" (odczyt cennika/lead — niskie ryzyko).
 // Opcjonalny klucz: gdy ustawisz PUBLIC_API_KEY, żądanie musi mieć nagłówek x-api-key.
 import { NextRequest, NextResponse } from "next/server";
+import { safeEqual } from "./safe-compare";
 
 export function corsHeaders(): Record<string, string> {
   const origin = process.env.PUBLIC_CONFIGURATOR_ORIGIN || "*";
@@ -26,5 +27,5 @@ export function jsonCors(body: unknown, status = 200): NextResponse {
 export function apiKeyOk(req: NextRequest): boolean {
   const key = process.env.PUBLIC_API_KEY;
   if (!key) return true;
-  return req.headers.get("x-api-key") === key;
+  return safeEqual(req.headers.get("x-api-key"), key);
 }

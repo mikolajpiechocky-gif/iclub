@@ -12,9 +12,14 @@ export function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   if (!apiKeyOk(req)) return jsonCors({ ok: false, error: "unauthorized" }, 401);
+  // §bezpieczeństwo Limit rozmiaru body (anty-abuse) — odrzucamy zawczasu zbyt duże payloady.
+  const len = Number(req.headers.get("content-length") ?? "0");
+  if (len > 32_768) return jsonCors({ ok: false, error: "Zgłoszenie zbyt duże." }, 413);
   let body: PublicInquiryInput;
   try {
-    body = (await req.json()) as PublicInquiryInput;
+    const text = await req.text();
+    if (text.length > 32_768) return jsonCors({ ok: false, error: "Zgłoszenie zbyt duże." }, 413);
+    body = JSON.parse(text) as PublicInquiryInput;
   } catch {
     return jsonCors({ ok: false, error: "Nieprawidłowy JSON." }, 400);
   }
