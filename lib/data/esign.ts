@@ -3,13 +3,15 @@
 // pilnują handlery: wewnętrzne (owner z sesji), publiczne (token + kod).
 import { createAdminClient, isServiceRoleConfigured } from "@/lib/supabase/admin";
 import { sendPushToOwners } from "@/lib/integrations/push";
+import { listOwnerUserIds } from "@/lib/data/push";
+import { createNotification } from "@/lib/data/notifications";
 import { sendEmail, isEmailConfigured } from "@/lib/integrations/email";
 import { emailShell } from "@/lib/integrations/email/template";
 import { getJob } from "@/lib/data/jobs";
 import { getCustomer } from "@/lib/data/customers";
 import { listReservationAddons } from "@/lib/data/resources";
 import { settlementBreakdown } from "@/lib/domain/billing";
-import { suggestedDeposit, DEFAULT_DEPOSIT_BASE, ADDON_DEPOSIT_PCT } from "@/lib/domain/order-pricing";
+import { suggestedDeposit } from "@/lib/domain/order-pricing";
 import { materializeReservationFromContract, resolveInquiryComposition, effectiveConfig } from "@/lib/data/reservation-from-contract";
 import {
   generateToken, generateCode, hashCode, verifyCode, sha256, buildEsignContractHtml,
@@ -51,6 +53,7 @@ export interface EsignFieldOverrides {
   packagePrice?: number | null;   // §5 cena pakietu
   addonsTotal?: number | null;    // §5 suma dodatków
   transport?: number | null;      // §5 koszt dojazdu
+  discount?: number | null;       // §5 rabat (od pakietu + dodatków, nie od transportu)
   eventDate?: string | null;      // data imprezy (YYYY-MM-DD)
   eventStartTime?: string | null; // godzina imprezy
   location?: string | null;       // miejsce
@@ -167,19 +170,33 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
   // Skład pakietu do §3.1 (pakiet mapuje się po kodzie/nazwie — PREMIUM/VIP).
   const comp = await resolveInquiryComposition(s, cfg, cfg?.tentMain ?? null, cfg?.tentExtra ?? null);
   const transport = cfg?.selfPickup ? 0 : (Number(cfg?.estimate?.transport ?? 0) || 0);
+  const round2 = (n: number) => Math.round(n * 100) / 100;
 
-  // Kwoty: priorytet ma to, co widział i zaakceptował klient (wycena konfiguratora) lub override Szefa.
-  const amountTotal = input.amountTotal ?? cfg?.estimate?.value ?? ((comp.packagePrice + comp.addonsTotal + transport) || null);
-  const amountDeposit = input.amountDeposit ?? cfg?.estimate?.deposit ?? suggestedDeposit(transport, comp.addonsTotal);
-
-  // §5 suma dodatków = WYPROWADZONA z zadatku (zadatek = 300 + transport + 15% dodatków). Łapie WSZYSTKO,
-  // co policzył konfigurator (stoły + krzesła + ogrzewanie), niezależnie od mapowania kodów na magazyn.
+  // §5 rozbicie LICZONE ZE SKŁADNIKÓW (koniec z odwracaniem z zadatku — tamto gubiło dodatki i zaniżało
+  // transport, gdy Szef ręcznie wpisał kwoty). Trzy pewne filary:
+  //   • transport — z wyceny konfiguratora lub override (nigdy rabatowany),
+  //   • pakiet — cena katalogowa dla wielkości namiotu,
+  //   • wyposażenie — realna nadwyżka dodatków dopasowanych po kodzie/nazwie.
   const effTransport = input.transport ?? transport;
-  let addonsTotal = input.addonsTotal ?? (amountDeposit != null
-    ? Math.max(0, Math.round((amountDeposit - DEFAULT_DEPOSIT_BASE - effTransport) / ADDON_DEPOSIT_PCT))
-    : comp.addonsTotal);
-  if (amountTotal != null && addonsTotal > amountTotal) addonsTotal = comp.addonsTotal; // bezpiecznik
-  const cenaPakietu = input.packagePrice ?? (amountTotal != null ? Math.max(0, Math.round(amountTotal - effTransport - addonsTotal)) : null);
+  let cenaPakietu = input.packagePrice ?? comp.packagePrice ?? 0;
+  let addonsTotal = input.addonsTotal ?? comp.addonsTotal ?? 0;
+
+  // Wartość całkowita = to, co klient zaakceptował w konfiguratorze (lub override Szefa) — to jest prawda.
+  const amountTotal = input.amountTotal ?? cfg?.estimate?.value ?? (round2(cenaPakietu + addonsTotal + effTransport) || null);
+
+  // Rabat UZGADNIA pozycje §5 z „Razem" i liczy się wyłącznie od pakietu + dodatków (transport nietykalny).
+  // Gdy składniki sumują się wyżej niż wartość całkowita → różnica to rabat; gdy niżej (np. nie zmapowaliśmy
+  // ogrzewania/krzeseł) → brakującą kwotę dokładamy do wyposażenia, by pozycje zawsze sumowały się do „Razem".
+  let discount = input.discount ?? (cfg?.estimate?.discount ?? null);
+  if (amountTotal != null) {
+    const goods = round2(amountTotal - effTransport);          // część na pakiet + dodatki (po rabacie)
+    if (!cenaPakietu) cenaPakietu = Math.max(0, round2(goods - addonsTotal)); // pakiet nieznany → bierze resztę
+    const gross = round2(cenaPakietu + addonsTotal);           // pakiet + dodatki przed rabatem
+    if (gross > goods) discount = round2(gross - goods);
+    else if (gross < goods) { addonsTotal = round2(addonsTotal + (goods - gross)); if (!(discount && discount > 0)) discount = null; }
+  }
+
+  const amountDeposit = input.amountDeposit ?? cfg?.estimate?.deposit ?? suggestedDeposit(effTransport, addonsTotal);
 
   const tentLabelSrc = input.tentName ?? ([cfg?.tentMain, cfg?.tentExtra].filter(Boolean).join(" + ") || (q.tent_interest as string) || null);
   // §3.2 nazwy: WSZYSTKIE dodatki z konfiguracji (łącznie z ogrzewaniem), nie tylko dopasowane do magazynu.
@@ -202,6 +219,7 @@ export async function createEsignFromInquiry(input: CreateEsignFromInquiryInput,
     packagePrice: cenaPakietu,
     addonsTotal,
     transport: effTransport,
+    discount,
     amountTotal,
     amountDeposit,
     deliveryHour, depositDue, blik: input.blik ?? ICLUB_BLIK,
@@ -408,12 +426,18 @@ export async function signEsignContract(
   }).catch(() => {});
 
   // Zawarcie umowy zakłada/potwierdza rezerwację i wpis w kalendarzu (best-effort — nie wywraca podpisu).
+  // KRYTYCZNE: jeśli rezerwacja się NIE założy, podpisana umowa nie może zniknąć w próżni — alarmujemy
+  // Szefa (push + panel), żeby założył ją ręcznie i termin trafił do kalendarza.
   try {
-    await materializeReservationFromContract({
+    const mat = await materializeReservationFromContract({
       id: c.id, inquiry_id: c.inquiry_id, reservation_id: c.reservation_id,
       order_no: c.order_no, amount_total: c.amount_total, amount_deposit: c.amount_deposit,
     });
-  } catch (e) { console.error("materializeReservationFromContract:", e); }
+    if (!mat.created && !mat.confirmed) await alertContractNeedsManualReservation(c);
+  } catch (e) {
+    console.error("materializeReservationFromContract:", e);
+    await alertContractNeedsManualReservation(c).catch(() => {});
+  }
 
   return { ok: true, signedAt, httpStatus: 200 };
 }
@@ -422,4 +446,17 @@ function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; }
   return h;
+}
+
+// Umowa podpisana, ale rezerwacja się nie założyła → głośny alarm do Szefa (push + panel powiadomień),
+// z linkiem do zapytania, żeby mógł utworzyć rezerwację ręcznie. Lepsze niż ciche zgubienie terminu.
+async function alertContractNeedsManualReservation(c: { id: string; inquiry_id: string | null; order_no: string | null }): Promise<void> {
+  const title = "Umowa podpisana — załóż rezerwację ręcznie";
+  const body = `${c.order_no ?? "Umowa"} zawarta, ale nie udało się automatycznie utworzyć rezerwacji. Wejdź w zapytanie i dodaj ją, by termin trafił do kalendarza.`;
+  const url = c.inquiry_id ? `/inquiries/${c.inquiry_id}/edit` : "/inquiries";
+  sendPushToOwners({ title, body, url, tag: `esign-noreservation-${c.id}` }).catch(() => {});
+  try {
+    const owners = await listOwnerUserIds();
+    await Promise.all(owners.map((oid) => createNotification(oid, title, body, "ESIGN_NO_RESERVATION")));
+  } catch { /* panel opcjonalny */ }
 }
