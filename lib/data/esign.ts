@@ -12,6 +12,7 @@ import { getCustomer } from "@/lib/data/customers";
 import { listReservationAddons } from "@/lib/data/resources";
 import { settlementBreakdown } from "@/lib/domain/billing";
 import { suggestedDeposit } from "@/lib/domain/order-pricing";
+import { expandPackageContents } from "@/lib/domain/package-contents";
 import { materializeReservationFromContract, resolveInquiryComposition, effectiveConfig } from "@/lib/data/reservation-from-contract";
 import {
   generateToken, generateCode, hashCode, verifyCode, sha256, buildEsignContractHtml,
@@ -94,6 +95,13 @@ export async function createEsignContract(input: CreateEsignInput, createdBy: st
       const qn = Number(it.quantity ?? 0) || 0;
       included[it.equipment_id] = qn;
       if (it.equipment?.name) packageItems.push({ name: it.equipment.name, qty: qn });
+    }
+    // Brak rozpisanych pozycji → skład z opisu pakietu (kumulatywny), żeby §3.1 nie był ogólnikiem.
+    if (!packageItems.length) {
+      const { data: pkgs } = await s.from("packages").select("code, name, description").eq("active", true);
+      const all = (pkgs ?? []) as { code: string | null; name: string | null; description: string | null }[];
+      const self = all.find((x) => (x.name ?? "") === (r?.package?.name ?? "") || String(x.code ?? "").toUpperCase() === String(r?.package?.name ?? "").toUpperCase());
+      if (self) for (const line of expandPackageContents(self, all)) packageItems.push({ name: line, qty: 1 });
     }
   }
   const bd = r ? settlementBreakdown(r, addonPrice, included) : null;

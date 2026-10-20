@@ -53,12 +53,17 @@ export async function confirmRentalDeliveryAction(reservationId: string, jobId: 
   }
 }
 
-// Auto-domknięcie: gdy WSZYSTKIE etapy realizacji są zrobione (lub pominięte), zamknij ją wspólną
+// Auto-domknięcie: gdy wszystkie etapy REALIZACJI są zrobione (lub pominięte), zamknij ją wspólną
 // procedurą closeRealization (snapshot zarobków + DONE + przychód + koszty). Dotyczy iClub i wypożyczalni.
+// PACKING („Pakowanie") to przygotowanie dzień wcześniej (osobny blok, poza przebiegiem w terenie) —
+// NIE może blokować domknięcia: inaczej chłopaki kończą realizację, a przychód nie wchodzi, dopóki Szef
+// nie zamknie jej ręcznie. Liczą się etapy właściwej realizacji (bez PACKING).
 async function autoCloseIfAllStagesDone(jobId: string): Promise<void> {
   const [job, stages] = await Promise.all([getJob(jobId), getJobStages(jobId)]);
-  if (!job || job.status === "DONE" || !stages.length) return;
-  if (stages.some((s) => s.status !== "DONE" && s.status !== "SKIPPED")) return;
+  if (!job || job.status === "DONE") return;
+  const realizationStages = stages.filter((s) => s.stage_key !== "PACKING");
+  if (!realizationStages.length) return;
+  if (realizationStages.some((s) => s.status !== "DONE" && s.status !== "SKIPPED")) return;
   await closeRealization(jobId);
 }
 

@@ -10,6 +10,7 @@ import { stagesForReservation } from "@/lib/domain/stages";
 import { tentSizeCode } from "@/lib/domain/calendar";
 import { sendPushToOwners } from "@/lib/integrations/push";
 import { computeOrderPrice, suggestedDeposit } from "@/lib/domain/order-pricing";
+import { expandPackageContents } from "@/lib/domain/package-contents";
 import type { InquiryConfig } from "@/lib/data/types";
 
 interface TentRow { id: string; size: string | null; has_back_door: boolean; name: string | null }
@@ -47,10 +48,11 @@ export async function resolveInquiryComposition(
   const packageItems: { name: string; qty: number }[] = [];
   const included: Record<string, number> = {};
   if (cfg?.package) {
-    const { data: pkgs } = await s.from("packages").select("id, code, name, price_small, price_big, base_price").eq("active", true);
+    const { data: pkgs } = await s.from("packages").select("id, code, name, description, price_small, price_big, base_price").eq("active", true);
+    type PkgRow = { id: string; code: string | null; name: string | null; description: string | null; price_small: number | null; price_big: number | null; base_price: number | null };
+    const allPkgs = (pkgs ?? []) as PkgRow[];
     const target = String(cfg.package).trim().toUpperCase();
-    const p = ((pkgs ?? []) as { id: string; code: string | null; name: string | null; price_small: number | null; price_big: number | null; base_price: number | null }[])
-      .find((x) => String(x.code ?? "").toUpperCase() === target || String(x.name ?? "").toUpperCase() === target);
+    const p = allPkgs.find((x) => String(x.code ?? "").toUpperCase() === target || String(x.name ?? "").toUpperCase() === target);
     if (p) {
       packageId = p.id; packageName = p.name ?? null;
       packagePrice = Number((isBig ? p.price_big : p.price_small) ?? p.base_price ?? 0) || 0;
@@ -58,6 +60,10 @@ export async function resolveInquiryComposition(
       for (const it of (pi ?? []) as unknown as { quantity: number | null; equipment: { name: string | null } | null }[]) {
         const qn = Number(it.quantity ?? 0) || 0;
         if (it.equipment?.name) packageItems.push({ name: it.equipment.name, qty: qn });
+      }
+      // Brak rozpisanych pozycji w magazynie → skład z opisu pakietu (kumulatywny, §3.1 umowy).
+      if (!packageItems.length) {
+        for (const line of expandPackageContents(p, allPkgs)) packageItems.push({ name: line, qty: 1 });
       }
       // included dla naliczania nadwyżki dodatków — potrzebne equipment_id
       const { data: pi2 } = await s.from("package_items").select("equipment_id, quantity").eq("package_id", p.id);

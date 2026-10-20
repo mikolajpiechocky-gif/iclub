@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout";
 import { Icon } from "@/components/icons";
 import { listReservations } from "@/lib/data/reservations";
+import { listReservationAddons } from "@/lib/data/resources";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { reservationCalendarTitle } from "@/lib/domain/calendar";
 import { warsawTodayISO } from "@/lib/domain/dates";
@@ -37,9 +38,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     month0 = m - 1;
   }
 
-  const reservations = await listReservations();
+  const [reservations, reservationAddons] = await Promise.all([listReservations(), listReservationAddons()]);
   const demo = !isSupabaseConfigured();
   const monthPrefix = `${year}-${pad2(month0 + 1)}`;
+  const addonNameById = new Map(reservationAddons.map((a) => [a.id, a.name]));
 
   // Etykieta kalendarzowa rezerwacji (wspólna dla desktopu i mobile).
   const labelFor = (r: (typeof reservations)[number]) =>
@@ -52,6 +54,23 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       customerName: r.customer?.name ?? null,
       rentalItems: r.rental_items,
     });
+
+  // §kalendarz Skrót SPRZĘTU w rezerwacji: iClub = namiot(y) + dodatki (×ilość) + ogrzewanie;
+  // wypożyczalnia = pozycje sprzętu. Pokazywany w agendzie mobilnej i jako podpowiedź (tooltip) na desktopie.
+  const equipmentFor = (r: (typeof reservations)[number]): string => {
+    if (r.business_line !== "ICLUB") return (r.rental_items ?? "").trim();
+    const parts: string[] = [];
+    const tents = [r.tent?.name, r.tent2?.name].filter(Boolean) as string[];
+    if (tents.length) parts.push(tents.join(" + "));
+    for (const id of r.addon_ids ?? []) {
+      const n = addonNameById.get(id);
+      if (!n) continue;
+      const q = Math.round(Number(r.addon_qty?.[id] ?? 1)) || 1;
+      parts.push(q > 1 ? `${n} ×${q}` : n);
+    }
+    if (r.heating) parts.push("ogrzewanie");
+    return parts.join(" · ");
+  };
 
   // „Dziś" i poniedziałek bieżącego tygodnia (strefa Warszawa) dla widoku mobilnego.
   const dow = (base.getUTCDay() + 6) % 7; // Pon=0
@@ -76,12 +95,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   for (const r of needWeather) weatherById.set(r.id, weatherByKey.get(`${r.location}|${r.event_date}`) ?? null);
 
   // Rezerwacje w tym miesiącu, pogrupowane po dniu (siatka desktop).
-  const byDay = new Map<number, { id: string; label: string; status: ReservationStatus }[]>();
+  const byDay = new Map<number, { id: string; label: string; status: ReservationStatus; equipment: string }[]>();
   for (const r of reservations) {
     if (!r.event_date || !r.event_date.startsWith(monthPrefix)) continue;
     const day = Number(r.event_date.slice(8, 10));
     const list = byDay.get(day) ?? [];
-    list.push({ id: r.id, label: labelFor(r), status: r.status });
+    list.push({ id: r.id, label: labelFor(r), status: r.status, equipment: equipmentFor(r) });
     byDay.set(day, list);
   }
 
@@ -95,6 +114,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         date: r.event_date!,
         label: labelFor(r),
         status: r.status,
+        equipment: equipmentFor(r) || null,
         weather: w ? { ok: w.warnings.length === 0, kinds: w.warnings.map((x) => x.kind) } : null,
       };
     });
@@ -164,7 +184,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                     const m = RESERVATION_STATUS_META[e.status];
                     const w = weatherById.get(e.id) ?? null;
                     const bad = w && w.warnings.length > 0;
-                    const title = w ? (bad ? w.warnings.map((x) => x.text).join(" · ") : WEATHER_OK_MSG) : undefined;
+                    const weatherTitle = w ? (bad ? w.warnings.map((x) => x.text).join(" · ") : WEATHER_OK_MSG) : null;
+                    const title = [e.equipment, weatherTitle].filter(Boolean).join(" · ") || undefined;
                     return (
                       <Link key={e.id} href={`/reservations/${e.id}/edit`} title={title} className="mb-1 block rounded border-l-[3px] px-1.5 py-1 text-[10.5px] font-semibold" style={{ background: m.bg, color: m.fg, borderColor: m.fg }}>
                         <span className="block truncate">{e.label}</span>

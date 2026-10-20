@@ -13,6 +13,7 @@ export type CalEvent = {
   date: string; // YYYY-MM-DD (data imprezy)
   label: string;
   status: ReservationStatus;
+  equipment: string | null; // sprzęt w rezerwacji (namiot + dodatki / pozycje wypożyczalni)
   weather: { ok: boolean; kinds: WeatherWarningKind[] } | null;
 };
 
@@ -141,6 +142,7 @@ function DayAgenda({ iso, events }: { iso: string; events: CalEvent[] }) {
               <Link key={e.id} href={`/reservations/${e.id}/edit`} className="flex items-center gap-2.5 rounded-card border border-border bg-surface px-3.5 py-2.5" style={{ borderLeft: `3px solid ${meta.fg}` }}>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13.5px] font-bold text-ink">{e.label}</div>
+                  {e.equipment && <div className="mt-0.5 truncate text-[11.5px] text-ink-2">{e.equipment}</div>}
                   <div className="mt-0.5 flex items-center gap-1.5">
                     <span className="text-[11px] font-bold" style={{ color: meta.fg }}>{meta.label}</span>
                     {e.weather && !e.weather.ok && e.weather.kinds.map((k) => (
